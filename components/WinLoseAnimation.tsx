@@ -19,31 +19,35 @@ export default function WinLoseAnimation() {
       textOpacity.value = withTiming(1, { duration: 500 });
     };
 
-    // This is the new, dynamic pulse animation
     const pulses = [];
-    const numberOfPulses = 25; // Controls the total number of flashes
-    const baseDuration = 20; // The duration of the very first flash (in ms)
-    const durationIncrease = 6; // How much longer each subsequent flash is
-    const maxOpacity = 0.9; // The brightness of the first flash
-    const opacityDecrease = 0.03; // How much dimmer each subsequent flash is
+    const numberOfPulses = 25;
+    const baseDuration = 20;
+    const durationIncrease = 6;
+    const maxOpacity = 0.9;
+    const opacityDecrease = 0.03;
 
     for (let i = 0; i < numberOfPulses; i++) {
       const duration = baseDuration + i * durationIncrease;
-      const opacity = Math.max(0, maxOpacity - i * opacityDecrease); // Ensure opacity doesn't go below 0
+      const opacity = Math.max(0, maxOpacity - i * opacityDecrease);
 
-      // Flash ON with calculated opacity and duration
+      // Flash ON
       pulses.push(withTiming(opacity, { duration }));
-      // Flash OFF with the same duration for a rhythmic pulse
-      pulses.push(withTiming(0, { duration }));
+
+      // THE FIX IS HERE: We check if this is the absolute last pulse in the sequence.
+      if (i === numberOfPulses - 1) {
+        // If it IS the last one, we attach the callback to the final "Flash OFF" animation.
+        pulses.push(
+          withTiming(0, { duration }, () => {
+            runOnJS(onAnimationFinish)();
+          })
+        );
+      } else {
+        // If it's NOT the last one, we add the "Flash OFF" animation normally.
+        pulses.push(withTiming(0, { duration }));
+      }
     }
 
-    strobeOpacity.value = withSequence(
-      ...pulses,
-      // The final callback to show the text
-      () => {
-        runOnJS(onAnimationFinish)();
-      }
-    );
+    strobeOpacity.value = withSequence(...pulses);
   }, []);
 
   const strobeStyle = useAnimatedStyle(() => {
