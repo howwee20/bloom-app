@@ -56,7 +56,7 @@ const MainFlowScreen = () => {
       case 'WIN_LOSE':
         return <WinLoseAnimation />;
       case 'WINNER_VIDEO':
-        return <FullScreenView text="Today's Winner" backgroundColor="#ffcf00" />;
+        return <VideoPlayer uri="https://idsirmgnimjbvehwdtag.supabase.co/storage/v1/object/public/videos/demo-assets/IMG_1883.MOV" />;
       case 'AD_VIDEO':
         return <FullScreenView text="6 Second Ad" backgroundColor="#ffe000" />;
       case 'PAYOUT':

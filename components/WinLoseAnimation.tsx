@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  useSharedValue,
+  runOnJS,
   useAnimatedStyle,
+  useSharedValue,
   withSequence,
   withTiming,
-  runOnJS,
 } from 'react-native-reanimated';
 
 export default function WinLoseAnimation() {
@@ -88,6 +88,6 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333333',
+    color: '#FFFFFF',
   },
 });
