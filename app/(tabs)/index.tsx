@@ -29,6 +29,9 @@ const MainFlowScreen = () => {
   // Track if the main ad can be skipped
   const [isAdSkippable, setIsAdSkippable] = useState(false);
 
+  // User's streak number (fake data for now)
+  const userStreak = 5;
+
   // Time-based automatic transitions
   useEffect(() => {
     // Logic for the unskippable 3-second "Sponsored by" bumper
@@ -102,9 +105,18 @@ const MainFlowScreen = () => {
       case 'AD_VIDEO':
         return <VideoPlayer uri="https://idsirmgnimjbvehwdtag.supabase.co/storage/v1/object/public/videos/demo-assets/IMG_1878.MOV" />;
       case 'PAYOUT':
-        return <FullScreenView text="$5.00 PAID" backgroundColor="#fffb00" />;
+        return (
+          <View style={styles.payoutContainer}>
+            <Text style={styles.payoutText}>$5.00 PAID</Text>
+          </View>
+        );
       case 'STREAK':
-        return <FullScreenView text="BLOOM STREAK 5" backgroundColor="#ffdd00" />;
+        return (
+          <View style={styles.streakContainer}>
+            <Text style={styles.streakTextLabel}>BLOOM STREAK</Text>
+            <Text style={styles.streakTextNumber}>{userStreak}</Text>
+          </View>
+        );
       default:
         // This will show a loading or error state if something is wrong
         return <FullScreenView text="Loading..." backgroundColor="#ccc" />;
@@ -151,6 +163,34 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  payoutContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFD7B5',
+  },
+  payoutText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  streakContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFD7B5',
+  },
+  streakTextLabel: {
+    color: 'white',
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  streakTextNumber: {
+    color: 'white',
+    fontSize: 96,
+    fontWeight: 'bold',
+    marginTop: 8,
   },
 });
 
