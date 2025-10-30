@@ -1,5 +1,5 @@
 import { router } from 'expo-router'; // We will need this to navigate to the camera
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import VideoPlayer from '../../components/VideoPlayer';
 import WinLoseAnimation from '../../components/WinLoseAnimation';
@@ -9,6 +9,7 @@ const FLOW_STEPS = [
   'USER_VIDEO',
   'WIN_LOSE',
   'WINNER_VIDEO',
+  'AD_BUMPER',
   'AD_VIDEO',
   'PAYOUT',
   'STREAK',
@@ -25,22 +26,57 @@ const MainFlowScreen = () => {
   // We need to store the timestamp of the last tap
   const [lastTap, setLastTap] = useState(0);
 
-  // We're renaming this function to be more accurate
+  // Track if the main ad can be skipped
+  const [isAdSkippable, setIsAdSkippable] = useState(false);
+
+  // Time-based automatic transitions
+  useEffect(() => {
+    // Logic for the unskippable 3-second "Sponsored by" bumper
+    if (currentStep === 'AD_BUMPER') {
+      const timer = setTimeout(() => {
+        // After 3 seconds, automatically advance the flow to the ad
+        advanceToNextStep();
+      }, 3000); // 3000 milliseconds = 3 seconds
+
+      return () => clearTimeout(timer); // Cleanup the timer
+    }
+
+    // Logic for the 6-second unskippable ad video
+    if (currentStep === 'AD_VIDEO') {
+      // When the ad video starts, it is NOT skippable
+      setIsAdSkippable(false);
+      const timer = setTimeout(() => {
+        // After 6 seconds, make the ad skippable
+        setIsAdSkippable(true);
+      }, 6000); // 6000 milliseconds = 6 seconds
+
+      return () => clearTimeout(timer); // Cleanup the timer
+    }
+  }, [currentStep]);
+
   const handlePress = () => {
     const now = Date.now();
+    const isDoubleTap = now - lastTap < DOUBLE_PRESS_DELAY;
 
-    if (now - lastTap < DOUBLE_PRESS_DELAY) {
-      // It's a double-tap! Advance the flow.
-      handleAdvanceFlow();
+    if (isDoubleTap) {
+      // This is the new home for the guard clause
+      if (
+        currentStep === 'AD_BUMPER' ||
+        (currentStep === 'AD_VIDEO' && !isAdSkippable)
+      ) {
+        return; // Bouncer: Do nothing, screen is unskippable
+      }
+
+      // If the guard clause passes, advance the flow
+      advanceToNextStep();
     } else {
-      // It's just a single tap. Update the last tap time.
+      // It's just a single tap
       setLastTap(now);
     }
   };
 
-  const handleAdvanceFlow = () => {
+  const advanceToNextStep = () => {
     const nextIndex = stepIndex + 1;
-
     if (nextIndex >= FLOW_STEPS.length) {
       router.push('/camera');
     } else {
@@ -57,8 +93,14 @@ const MainFlowScreen = () => {
         return <WinLoseAnimation />;
       case 'WINNER_VIDEO':
         return <VideoPlayer uri="https://idsirmgnimjbvehwdtag.supabase.co/storage/v1/object/public/videos/demo-assets/IMG_1883.MOV" />;
+      case 'AD_BUMPER':
+        return (
+          <View style={styles.adBumperContainer}>
+            <Text style={styles.adBumperText}>Sponsored by...</Text>
+          </View>
+        );
       case 'AD_VIDEO':
-        return <FullScreenView text="6 Second Ad" backgroundColor="#ffe000" />;
+        return <VideoPlayer uri="https://idsirmgnimjbvehwdtag.supabase.co/storage/v1/object/public/videos/demo-assets/IMG_1878.MOV" />;
       case 'PAYOUT':
         return <FullScreenView text="$5.00 PAID" backgroundColor="#fffb00" />;
       case 'STREAK':
@@ -98,6 +140,17 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+  },
+  adBumperContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFD7B5',
+  },
+  adBumperText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
 });
 
