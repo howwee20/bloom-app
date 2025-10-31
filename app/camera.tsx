@@ -1,5 +1,5 @@
 import { View, Pressable, StyleSheet, Text, Button, ActivityIndicator, Alert } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { FontAwesome } from '@expo/vector-icons';
 import React, { useState, useEffect, useRef, useCallback } from 'react';

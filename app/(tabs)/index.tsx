@@ -1,5 +1,5 @@
-import { router } from 'expo-router'; // We will need this to navigate to the camera
-import React, { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router'; // We will need this to navigate to the camera
+import React, { useEffect, useState, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View, Button } from 'react-native';
 import VideoPlayer from '../../components/VideoPlayer';
 import WinLoseAnimation from '../../components/WinLoseAnimation';
@@ -107,35 +107,31 @@ const MainFlowScreen = () => {
     fetchUserVideo();
   }, [session]);
 
-  // Fetch user's streak on component load
-  useEffect(() => {
-    const fetchUserStreak = async () => {
-      if (!session) return;
+  // Fetch user's streak every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const fetchFreshUserStreak = async () => {
+        if (!session) return;
+        try {
+          // THE DEFINITIVE FIX: Call the non-cacheable RPC function.
+          const { data, error } = await supabase.rpc('get_current_streak');
 
-      try {
-        // Query the profile table for the user's current streak
-        const { data, error } = await supabase
-          .from('profile')
-          .select('current_streak')
-          .eq('id', session.user.id)
-          .maybeSingle();
+          if (error) throw error;
 
-        if (error) {
-          console.error('Error fetching user streak:', error);
-          return;
+          // The RPC function returns the number directly, not an object.
+          if (typeof data === 'number') {
+            setUserStreak(data);
+          } else {
+            setUserStreak(0); // Default to 0 if no profile exists yet
+          }
+        } catch (e) {
+          console.error('Error fetching fresh user streak:', e);
         }
+      };
 
-        if (data) {
-          setUserStreak(data.current_streak || 0);
-          console.log('User streak:', data.current_streak);
-        }
-      } catch (error) {
-        console.error('Error in fetchUserStreak:', error);
-      }
-    };
-
-    fetchUserStreak();
-  }, [session]);
+      fetchFreshUserStreak();
+    }, [session])
+  );
 
   const handlePress = () => {
     const now = Date.now();
@@ -214,11 +210,14 @@ const MainFlowScreen = () => {
     <Pressable onPress={handlePress} style={styles.container}>
       {renderCurrentStep()}
 
-      {/* --- TEMPORARY LOG OUT BUTTON --- */}
-      <View style={{ position: 'absolute', bottom: 50, alignSelf: 'center', zIndex: 10 }}>
+      {/* --- START: NEW DEBUG PANEL --- */}
+      <View style={styles.debugPanel}>
+        <Text style={styles.debugText}>-- DEBUG --</Text>
+        <Text style={styles.debugText}>Email: {session?.user?.email}</Text>
+        <Text style={styles.debugText}>Streak: {userStreak}</Text>
         <Button title="Log Out" color="#888" onPress={() => supabase.auth.signOut()} />
       </View>
-      {/* --- END OF LOG OUT BUTTON --- */}
+      {/* --- END: NEW DEBUG PANEL --- */}
     </Pressable>
   );
 };
@@ -282,6 +281,21 @@ const styles = StyleSheet.create({
     fontSize: 96,
     fontWeight: 'bold',
     marginTop: 8,
+  },
+  debugPanel: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 15,
+    borderRadius: 10,
+    zIndex: 10,
+  },
+  debugText: {
+    color: 'white',
+    fontSize: 12,
+    marginBottom: 5,
   },
 });
 
