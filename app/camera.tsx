@@ -4,11 +4,14 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import { FontAwesome } from '@expo/vector-icons';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Animated, { useSharedValue, withTiming, useAnimatedStyle } from 'react-native-reanimated';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/app/_layout';
 
 // Helper function for the stabilization delay
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function CameraScreen() {
+  const { session } = useAuth();
   const [cameraState, setCameraState] = useState<'idle' | 'activating' | 'ready' | 'recording'>('idle');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
@@ -54,7 +57,54 @@ export default function CameraScreen() {
 
       const video = await cameraRef.current.recordAsync({ maxDuration: 6 });
       console.log('Video recorded:', video.uri);
-      setHasSubmittedToday(true);
+
+      // Upload video to Supabase
+      try {
+        if (!session || !video.uri) {
+          throw new Error('No session or video URI available');
+        }
+
+        // Create unique file path
+        const filePath = `${session.user.id}/${Date.now()}.mov`;
+
+        // Use FormData to prepare the file for upload
+        const formData = new FormData();
+        formData.append('file', {
+          uri: video.uri,
+          name: 'video.mov',
+          type: 'video/mov',
+        } as any); // 'as any' is used to bypass TypeScript's strict type checking for FormData body
+
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('videos')
+          .upload(filePath, formData);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        // Insert record into videos table
+        const { error: dbError } = await supabase
+          .from('videos')
+          .insert({
+            user_id: session.user.id,
+            storage_path: filePath,
+          });
+
+        if (dbError) {
+          throw dbError;
+        }
+
+        console.log('Video uploaded successfully:', filePath);
+        setHasSubmittedToday(true);
+      } catch (uploadError) {
+        console.error('Upload failed:', uploadError);
+        Alert.alert(
+          'Upload Failed',
+          uploadError instanceof Error ? uploadError.message : 'Failed to upload video. Please try again.'
+        );
+      }
     } catch (e) {
       console.error("Recording failed:", e);
       Alert.alert('Recording Failed', 'The camera could not start. Please try again.');

@@ -1,8 +1,9 @@
 import { router } from 'expo-router'; // We will need this to navigate to the camera
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Button } from 'react-native';
 import VideoPlayer from '../../components/VideoPlayer';
 import WinLoseAnimation from '../../components/WinLoseAnimation';
+import { supabase } from '../../lib/supabase';
 
 // Define the steps of our flow, based on your Figma
 const FLOW_STEPS = [
@@ -134,6 +135,12 @@ const MainFlowScreen = () => {
   return (
     <Pressable onPress={handlePress} style={styles.container}>
       {renderCurrentStep()}
+
+      {/* --- TEMPORARY LOG OUT BUTTON --- */}
+      <View style={{ position: 'absolute', bottom: 50, alignSelf: 'center', zIndex: 10 }}>
+        <Button title="Log Out" color="#888" onPress={() => supabase.auth.signOut()} />
+      </View>
+      {/* --- END OF LOG OUT BUTTON --- */}
     </Pressable>
   );
 };
