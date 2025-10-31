@@ -16,6 +16,7 @@ const FLOW_STEPS = [
   'AD_VIDEO',
   'PAYOUT',
   'STREAK',
+  'LOCKED_OUT',
 ];
 
 // This is the magic number for detecting a double-tap (in milliseconds)
@@ -37,6 +38,9 @@ const MainFlowScreen = () => {
 
   // State to hold the user's video URL
   const [userVideoUrl, setUserVideoUrl] = useState<string | null>(null);
+
+  // State to track if the user is locked out for today
+  const [isLockedOut, setIsLockedOut] = useState(false);
 
   // Time-based automatic transitions
   useEffect(() => {
@@ -107,29 +111,66 @@ const MainFlowScreen = () => {
     fetchUserVideo();
   }, [session]);
 
-  // Fetch user's streak every time the screen comes into focus
+  // Fetch user data and check lockout status on focus
   useFocusEffect(
     useCallback(() => {
-      const fetchFreshUserStreak = async () => {
+      const fetchUserDataAndCheckLockout = async () => {
         if (!session) return;
+
         try {
-          // THE DEFINITIVE FIX: Call the non-cacheable RPC function.
-          const { data, error } = await supabase.rpc('get_current_streak');
+          // --- 1. DEFINE THE CURRENT "BLOOM DAY" WINDOW START ---
+          const now = new Date();
+          const windowStart = new Date(now);
 
-          if (error) throw error;
-
-          // The RPC function returns the number directly, not an object.
-          if (typeof data === 'number') {
-            setUserStreak(data);
-          } else {
-            setUserStreak(0); // Default to 0 if no profile exists yet
+          // If it's before 7 AM, the window started at 7 AM *yesterday*
+          if (now.getHours() < 7) {
+            windowStart.setDate(now.getDate() - 1);
           }
+
+          // Set the window start time to 7:00:00 AM
+          windowStart.setHours(7, 0, 0, 0);
+
+          // --- 2. CHECK FOR A SUBMISSION IN THIS WINDOW ---
+          const { data: videoData, error: videoError } = await supabase
+            .from('videos')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .gte('created_at', windowStart.toISOString()) // "greater than or equal to" the window start
+            .limit(1)
+            .maybeSingle();
+
+          if (videoError) throw videoError;
+
+          // --- 3. CHECK FOR STREAK (must be a separate call) ---
+          // We use an RPC call to get the streak, which bypasses caching
+          const { data: streakData, error: streakError } = await supabase.rpc('get_current_streak');
+          if (streakError) throw streakError;
+
+          if (typeof streakData === 'number') {
+            setUserStreak(streakData);
+          } else {
+            setUserStreak(0);
+          }
+
+          // --- 4. SET LOCKOUT STATE ---
+          if (videoData) {
+            // A video exists for this window. USER IS LOCKED OUT.
+            setIsLockedOut(true);
+            setStepIndex(FLOW_STEPS.indexOf('LOCKED_OUT'));
+          } else {
+            // No video found for this window. USER IS FREE TO PLAY.
+            setIsLockedOut(false);
+            setStepIndex(FLOW_STEPS.indexOf('SPLASH'));
+          }
+
         } catch (e) {
-          console.error('Error fetching fresh user streak:', e);
+          console.error('Error fetching user data/lockout:', e);
+          setIsLockedOut(false); // Fail-safe: let the user play
+          setStepIndex(FLOW_STEPS.indexOf('SPLASH'));
         }
       };
 
-      fetchFreshUserStreak();
+      fetchUserDataAndCheckLockout();
     }, [session])
   );
 
@@ -198,6 +239,12 @@ const MainFlowScreen = () => {
             <Text style={styles.streakTextNumber}>{userStreak}</Text>
           </View>
         );
+      case 'LOCKED_OUT':
+        return (
+          <View style={styles.lockoutContainer}>
+            <Text style={styles.lockoutText}>7 am</Text>
+          </View>
+        );
       default:
         // This will show a loading or error state if something is wrong
         return <FullScreenView text="Loading..." backgroundColor="#ccc" />;
@@ -207,7 +254,7 @@ const MainFlowScreen = () => {
   // The 'Pressable' component is how we detect taps.
   // We're wrapping our entire screen in it.
   return (
-    <Pressable onPress={handlePress} style={styles.container}>
+    <Pressable onPress={handlePress} style={styles.container} disabled={currentStep === 'LOCKED_OUT'}>
       {renderCurrentStep()}
 
       {/* --- START: NEW DEBUG PANEL --- */}
@@ -296,6 +343,17 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     marginBottom: 5,
+  },
+  lockoutContainer: {
+    flex: 1,
+    backgroundColor: '#FFD7B5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lockoutText: {
+    color: 'white',
+    fontSize: 48,
+    fontWeight: 'bold',
   },
 });
 
