@@ -4,9 +4,11 @@ import { Pressable, StyleSheet, Text, View, Button } from 'react-native';
 import VideoPlayer from '../../components/VideoPlayer';
 import WinLoseAnimation from '../../components/WinLoseAnimation';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../_layout';
 
 // Define the steps of our flow, based on your Figma
 const FLOW_STEPS = [
+  'SPLASH',
   'USER_VIDEO',
   'WIN_LOSE',
   'WINNER_VIDEO',
@@ -20,6 +22,7 @@ const FLOW_STEPS = [
 const DOUBLE_PRESS_DELAY = 300;
 
 const MainFlowScreen = () => {
+  const { session } = useAuth();
   const [stepIndex, setStepIndex] = useState(0);
   const currentStep = FLOW_STEPS[stepIndex];
 
@@ -29,8 +32,11 @@ const MainFlowScreen = () => {
   // Track if the main ad can be skipped
   const [isAdSkippable, setIsAdSkippable] = useState(false);
 
-  // User's streak number (fake data for now)
-  const userStreak = 5;
+  // User's streak number (real data from database)
+  const [userStreak, setUserStreak] = useState(0);
+
+  // State to hold the user's video URL
+  const [userVideoUrl, setUserVideoUrl] = useState<string | null>(null);
 
   // Time-based automatic transitions
   useEffect(() => {
@@ -65,6 +71,72 @@ const MainFlowScreen = () => {
     }
   }, [currentStep]);
 
+  // Fetch user's video on component load
+  useEffect(() => {
+    const fetchUserVideo = async () => {
+      if (!session) return;
+
+      try {
+        // Query the videos table for the user's most recent video
+        const { data, error } = await supabase
+          .from('videos')
+          .select('storage_path')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (error) {
+          console.error('Error fetching user video:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          // Get the public URL for the video
+          const { data: urlData } = supabase.storage
+            .from('videos')
+            .getPublicUrl(data[0].storage_path);
+
+          setUserVideoUrl(urlData.publicUrl);
+          console.log('User video URL:', urlData.publicUrl);
+        }
+      } catch (error) {
+        console.error('Error in fetchUserVideo:', error);
+      }
+    };
+
+    fetchUserVideo();
+  }, [session]);
+
+  // Fetch user's streak on component load
+  useEffect(() => {
+    const fetchUserStreak = async () => {
+      if (!session) return;
+
+      try {
+        // Query the profile table for the user's current streak
+        const { data, error } = await supabase
+          .from('profile')
+          .select('current_streak')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching user streak:', error);
+          return;
+        }
+
+        if (data) {
+          setUserStreak(data.current_streak || 0);
+          console.log('User streak:', data.current_streak);
+        }
+      } catch (error) {
+        console.error('Error in fetchUserStreak:', error);
+      }
+    };
+
+    fetchUserStreak();
+  }, [session]);
+
   const handlePress = () => {
     const now = Date.now();
     const isDoubleTap = now - lastTap < DOUBLE_PRESS_DELAY;
@@ -97,8 +169,14 @@ const MainFlowScreen = () => {
   // This function decides what to show on the screen
   const renderCurrentStep = () => {
     switch (currentStep) {
+      case 'SPLASH':
+        return (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFD7B5' }}>
+            <Text style={{ fontSize: 64, fontWeight: 'bold', color: 'white' }}>BLOOM</Text>
+          </View>
+        );
       case 'USER_VIDEO':
-        return <VideoPlayer uri="https://idsirmgnimjbvehwdtag.supabase.co/storage/v1/object/public/videos/demo-assets/IMG_0985.MOV" />;
+        return <VideoPlayer uri={userVideoUrl || "https://idsirmgnimjbvehwdtag.supabase.co/storage/v1/object/public/videos/demo-assets/IMG_0985.MOV"} />;
       case 'WIN_LOSE':
         return <WinLoseAnimation />;
       case 'WINNER_VIDEO':

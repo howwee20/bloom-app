@@ -96,6 +96,16 @@ export default function CameraScreen() {
           throw dbError;
         }
 
+        // Increment the user's streak
+        const { error: streakError } = await supabase.rpc('increment_streak', {
+          user_id_param: session.user.id,
+        });
+
+        if (streakError) {
+          console.error('Error incrementing streak:', streakError);
+          // Don't throw - we don't want to fail the whole upload if streak increment fails
+        }
+
         console.log('Video uploaded successfully:', filePath);
         setHasSubmittedToday(true);
       } catch (uploadError) {
