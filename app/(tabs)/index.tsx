@@ -13,7 +13,6 @@ const FLOW_STEPS = [
   'AD_VIDEO',
   'PAYOUT',
   'STREAK',
-  'GO_TO_CAMERA',
 ];
 
 // This is the magic number for detecting a double-tap (in milliseconds)
@@ -55,6 +54,14 @@ const MainFlowScreen = () => {
 
       return () => clearTimeout(timer); // Cleanup the timer
     }
+
+    if (currentStep === 'STREAK') {
+      const timer = setTimeout(() => {
+        router.push('/camera');
+      }, 3000); // 3 seconds
+
+      return () => clearTimeout(timer);
+    }
   }, [currentStep]);
 
   const handlePress = () => {
@@ -62,18 +69,17 @@ const MainFlowScreen = () => {
     const isDoubleTap = now - lastTap < DOUBLE_PRESS_DELAY;
 
     if (isDoubleTap) {
-      // This is the new home for the guard clause
+      // UPDATED Bouncer: Now also blocks taps on the final STREAK screen
       if (
         currentStep === 'AD_BUMPER' ||
-        (currentStep === 'AD_VIDEO' && !isAdSkippable)
+        (currentStep === 'AD_VIDEO' && !isAdSkippable) ||
+        currentStep === 'STREAK'
       ) {
-        return; // Bouncer: Do nothing, screen is unskippable
+        return; // Do nothing, screen is unskippable
       }
 
-      // If the guard clause passes, advance the flow
       advanceToNextStep();
     } else {
-      // It's just a single tap
       setLastTap(now);
     }
   };
