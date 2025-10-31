@@ -42,6 +42,9 @@ const MainFlowScreen = () => {
   // State to track if the user is locked out for today
   const [isLockedOut, setIsLockedOut] = useState(false);
 
+  // State to hold the daily winner's video URL
+  const [winnerVideoUrl, setWinnerVideoUrl] = useState<string | null>(null);
+
   // Time-based automatic transitions
   useEffect(() => {
     // Logic for the unskippable 3-second "Sponsored by" bumper
@@ -152,7 +155,28 @@ const MainFlowScreen = () => {
             setUserStreak(0);
           }
 
-          // --- 4. SET LOCKOUT STATE ---
+          // --- 4. FETCH THE DAILY WINNER ---
+          const today = new Date().toISOString().split('T')[0];
+          const { data: winnerData, error: winnerError } = await supabase
+            .from('daily_winners')
+            .select('video_id, videos ( storage_path )') // Use a join to get the video path
+            .eq('date', today)
+            .maybeSingle();
+
+          if (winnerError) throw winnerError;
+
+          if (winnerData && winnerData.videos) {
+            const videoPath = (winnerData.videos as any).storage_path;
+            const { data: urlData } = supabase.storage
+              .from('videos')
+              .getPublicUrl(videoPath);
+            setWinnerVideoUrl(urlData.publicUrl);
+          } else {
+            // FALLBACK: If no winner is picked yet, use the demo video
+            setWinnerVideoUrl('https://idsirmgnimjbvehwdtag.supabase.co/storage/v1/object/public/videos/demo-assets/IMG_1883.MOV');
+          }
+
+          // --- 5. SET LOCKOUT STATE ---
           if (videoData) {
             // A video exists for this window. USER IS LOCKED OUT.
             setIsLockedOut(true);
@@ -217,7 +241,7 @@ const MainFlowScreen = () => {
       case 'WIN_LOSE':
         return <WinLoseAnimation />;
       case 'WINNER_VIDEO':
-        return <VideoPlayer uri="https://idsirmgnimjbvehwdtag.supabase.co/storage/v1/object/public/videos/demo-assets/IMG_1883.MOV" />;
+        return <VideoPlayer uri={winnerVideoUrl || "https://idsirmgnimjbvehwdtag.supabase.co/storage/v1/object/public/videos/demo-assets/IMG_1883.MOV"} />;
       case 'AD_BUMPER':
         return (
           <View style={styles.adBumperContainer}>
