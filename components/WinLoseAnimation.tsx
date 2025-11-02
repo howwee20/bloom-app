@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-export default function WinLoseAnimation() {
+export default function WinLoseAnimation({ onAnimationEnd }: { onAnimationEnd?: () => void }) {
   const [showText, setShowText] = useState(false);
   const strobeOpacity = useSharedValue(0);
   const textOpacity = useSharedValue(0);
@@ -16,7 +16,12 @@ export default function WinLoseAnimation() {
   useEffect(() => {
     const onAnimationFinish = () => {
       setShowText(true);
-      textOpacity.value = withTiming(1, { duration: 500 });
+      textOpacity.value = withTiming(1, { duration: 500 }, () => {
+        // After text fades in, call the callback if provided
+        if (onAnimationEnd) {
+          runOnJS(onAnimationEnd)();
+        }
+      });
     };
 
     const pulses = [];
