@@ -26,6 +26,7 @@ const MainFlowScreen = () => {
   const [stepIndex, setStepIndex] = useState(FLOW_STEPS.indexOf('SPLASH')); // Start at SPLASH
   const currentStep = FLOW_STEPS[stepIndex];
   const lastTap = React.useRef(0);
+  const [pollChoice, setPollChoice] = useState<string | null>(null);
 
   // --- Auto-advancing logic ---
   useEffect(() => {
@@ -51,6 +52,11 @@ const MainFlowScreen = () => {
     } else {
       setStepIndex(FLOW_STEPS.indexOf('LOCKED_OUT'));
     }
+  };
+
+  const handlePollSelect = (choice: string) => {
+    setPollChoice(choice);
+    setStepIndex(FLOW_STEPS.indexOf('RESULTS'));
   };
 
   const handlePress = () => {
@@ -105,14 +111,21 @@ const MainFlowScreen = () => {
         return (
           <View style={[styles.container, styles.brandBackground]}>
             <Text style={styles.headerText}>Would You Rather?</Text>
-            <Text style={styles.subText}>(Poll UI Placeholder)</Text>
+            <View style={styles.pollContainer}>
+              <Pressable style={styles.pollButton} onPress={() => handlePollSelect('Coffee')}>
+                <Text style={styles.pollButtonText}>Coffee</Text>
+              </Pressable>
+              <Pressable style={styles.pollButton} onPress={() => handlePollSelect('Tea')}>
+                <Text style={styles.pollButtonText}>Tea</Text>
+              </Pressable>
+            </View>
           </View>
         );
       case 'RESULTS':
         return (
           <View style={[styles.container, styles.brandBackground]}>
-            <Text style={styles.headerText}>68% chose Coffee</Text>
-            <Text style={styles.subText}>(Results UI Placeholder)</Text>
+            <Text style={styles.headerText}>You and 68% chose:</Text>
+            <Text style={styles.pollResultText}>{pollChoice}</Text>
           </View>
         );
       case 'STREAK':
@@ -162,6 +175,29 @@ const styles = StyleSheet.create({
     color: 'white',
     opacity: 0.8,
     marginTop: 10,
+  },
+  pollContainer: {
+    flexDirection: 'row',
+    marginTop: 30,
+  },
+  pollButton: {
+    backgroundColor: 'white',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    marginHorizontal: 10,
+  },
+  pollButtonText: {
+    color: '#FFD7B5', // Your brand orange
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  pollResultText: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: 'white',
+    marginTop: 10,
+    textTransform: 'capitalize',
   },
 });
 
