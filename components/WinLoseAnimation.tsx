@@ -8,7 +8,15 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-export default function WinLoseAnimation({ onAnimationEnd }: { onAnimationEnd?: () => void }) {
+export default function WinLoseAnimation({
+  isWinner,
+  backgroundColor,
+  onAnimationComplete
+}: {
+  isWinner: boolean;
+  backgroundColor: string;
+  onAnimationComplete: () => void;
+}) {
   const [showText, setShowText] = useState(false);
   const strobeOpacity = useSharedValue(0);
   const textOpacity = useSharedValue(0);
@@ -17,10 +25,8 @@ export default function WinLoseAnimation({ onAnimationEnd }: { onAnimationEnd?: 
     const onAnimationFinish = () => {
       setShowText(true);
       textOpacity.value = withTiming(1, { duration: 500 }, () => {
-        // After text fades in, call the callback if provided
-        if (onAnimationEnd) {
-          runOnJS(onAnimationEnd)();
-        }
+        // Call the callback after text is fully visible
+        runOnJS(onAnimationComplete)();
       });
     };
 
@@ -68,11 +74,11 @@ export default function WinLoseAnimation({ onAnimationEnd }: { onAnimationEnd?: 
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: backgroundColor }]}>
       <Animated.View style={[styles.strobeOverlay, strobeStyle]} />
       {showText && (
         <Animated.View style={textStyle}>
-          <Text style={styles.text}>Not today.</Text>
+          <Text style={styles.text}>{isWinner ? 'YOU WON!' : 'Not Today.'}</Text>
         </Animated.View>
       )}
     </View>
@@ -84,7 +90,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFD7B5',
   },
   strobeOverlay: {
     ...StyleSheet.absoluteFillObject,

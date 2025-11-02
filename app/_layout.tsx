@@ -114,6 +114,9 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         {/* Additional screens */}
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        {/* Winner flow */}
+        <Stack.Screen name="winner-payout" options={{ headerShown: false }} />
+        <Stack.Screen name="winner-lockout" options={{ headerShown: false }} />
         {/* The authentication flow */}
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
