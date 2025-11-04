@@ -44,6 +44,7 @@ export default function LoginScreen() {
       style={styles.container}
     >
       <View style={styles.formContainer}>
+        <Text style={styles.header}>Bloom</Text>
         <Text style={styles.title}>Log In</Text>
         
         <TextInput
@@ -103,6 +104,13 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignSelf: 'center',
     backgroundColor: 'transparent',
+  },
+  header: {
+    fontSize: 48,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 40,
   },
   title: {
     fontSize: 32,

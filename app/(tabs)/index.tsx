@@ -17,9 +17,8 @@ import { useAuth } from '../_layout';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect } from 'expo-router';
 
-// The 10-step "Pure Play" Flow
+// The 9-step "Pure Play" Flow
 const FLOW_STEPS = [
-  'LOCKED_OUT',
   'SPLASH',
   'STROBE',
   'PULSE',
@@ -137,10 +136,10 @@ const MainFlowScreen = () => {
 
           // --- 6. SET LOCKOUT STATE ---
           if (submissionData) {
-            // User has already submitted. Lock them out.
+            // User has already submitted. Lock them out at STREAK.
             setIsLockedOut(true);
             setUserPollSubmission(submissionData); // Save their submission
-            setStepIndex(FLOW_STEPS.indexOf('LOCKED_OUT'));
+            setStepIndex(FLOW_STEPS.indexOf('STREAK'));
           } else {
             // User is free to play.
             setIsLockedOut(false);
@@ -240,13 +239,11 @@ const MainFlowScreen = () => {
 
     if (manualSteps.includes(currentStep)) {
       if (currentStep === 'STREAK') {
-        // Fork logic: STREAK is the final decision point
+        // STREAK is the final screen - do nothing on double tap when locked out
         if (isWinner) {
           router.replace('/winner-payout'); // Send to winner flow
-        } else {
-          setIsLockedOut(true); // Send to normal lockout
-          setStepIndex(FLOW_STEPS.indexOf('LOCKED_OUT'));
         }
+        // Otherwise just stay on STREAK screen
         return;
       }
 
@@ -276,15 +273,15 @@ const MainFlowScreen = () => {
     }
 
     try {
-      // 2. Save the submission (this runs in the background)
-      const { error } = await supabase.from('poll_submissions').insert({
+      // 2. SAVE THE SUBMISSION
+      const { error: pollError } = await supabase.from('poll_submissions').insert({
         poll_id: dailyPoll.id,
         user_id: session.user.id,
         selected_option: selectedOption,
       });
-      if (error) throw error;
+      if (pollError) throw pollError;
 
-      // 3. Get the results (this runs in the background)
+      // 3. GET THE POLL RESULTS
       const { data: results, error: resultsError } = await supabase.rpc(
         'get_poll_results',
         { poll_id_input: dailyPoll.id }
@@ -292,8 +289,16 @@ const MainFlowScreen = () => {
       if (resultsError) throw resultsError;
       setPollResults(results); // Save results to state
 
+      // 4. INCREMENT STREAK (THE FIX)
+      // Call the RPC and get the new streak back
+      const { data: newStreak, error: streakError } = await supabase.rpc('increment_streak');
+      if (streakError) throw streakError;
+
+      // Update the local state *immediately*
+      setUserStreak(newStreak);
+
     } catch (err) {
-      console.error('Error submitting poll:', err);
+      console.error('Error in handlePollSubmit:', err);
     } finally {
       // 4. After animation, advance to RESULTS
       setTimeout(() => {
@@ -305,12 +310,6 @@ const MainFlowScreen = () => {
   // --- The new UI ---
   const renderCurrentStep = () => {
     switch (currentStep) {
-      case 'LOCKED_OUT':
-        return (
-          <View style={[styles.stepContainer, styles.brandBackground]}>
-            <Text style={styles.headerText}>7 am</Text>
-          </View>
-        );
       case 'SPLASH':
         return (
           <View style={[styles.stepContainer, styles.brandBackground]}>
@@ -420,6 +419,9 @@ const MainFlowScreen = () => {
           <View style={[styles.stepContainer, styles.brandBackground]}>
             <Text style={styles.subText}>BLOOM STREAK</Text>
             <Text style={styles.headerText}>{userStreak}</Text>
+
+            {/* ADD THIS LINE */}
+            <Text style={styles.subText}>Return tomorrow at 7 am</Text>
           </View>
         );
       default:
@@ -435,7 +437,7 @@ const MainFlowScreen = () => {
     <Pressable
       onPress={handlePress}
       style={styles.container}
-      disabled={currentStep === 'LOCKED_OUT' || isLockedOut}
+      disabled={isLockedOut}
     >
       {renderCurrentStep()}
 

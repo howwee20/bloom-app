@@ -14,8 +14,9 @@ import Animated, {
 
 const WHITE = '#FFFFFF';
 const ORANGE = '#FFD7B5'; // Your brand orange
-const FAST_STROBE_DURATION = 4000; // 4 seconds
-const SLOW_STROBE_DURATION = 3000; // 3 seconds
+const FAST_STROBE_DURATION = 2000; // 2 seconds
+const MEDIUM_STROBE_DURATION = 2000; // 2 seconds
+const SLOW_STROBE_DURATION = 2000; // 2 seconds
 
 export default function StrobeAnimation({ onAnimationComplete }) {
   const flash = useSharedValue(0);
@@ -41,6 +42,7 @@ export default function StrobeAnimation({ onAnimationComplete }) {
   useEffect(() => {
     isMounted.current = true;
     let fastTimer: ReturnType<typeof setTimeout>;
+    let mediumTimer: ReturnType<typeof setTimeout>;
     let slowTimer: ReturnType<typeof setTimeout>;
 
     // --- PHASE 1: FAST STROBE ---
@@ -53,41 +55,59 @@ export default function StrobeAnimation({ onAnimationComplete }) {
       -1, true
     );
 
-    // --- PHASE 2: SLOW STROBE ---
-    // Set a timer to switch to the slow strobe
+    // --- PHASE 2: MEDIUM STROBE ---
+    // Set a timer to switch to the medium strobe
     fastTimer = setTimeout(() => {
       if (!isMounted.current) return;
       cancelAnimation(flash); // Stop the fast loop
 
-      // Start a new, slower 250ms infinite loop
+      // Start a new, medium 150ms infinite loop
       flash.value = withRepeat(
         withSequence(
-          withTiming(1, { duration: 250 }), // Slower flash
-          withTiming(0, { duration: 250 })
+          withTiming(1, { duration: 150 }), // Medium flash
+          withTiming(0, { duration: 150 })
         ),
         -1, true
       );
 
-      // --- PHASE 3: FINISH ---
-      // Set a timer to end the slow strobe
-      slowTimer = setTimeout(() => {
+      // --- PHASE 3: SLOW STROBE ---
+      // Set a timer to switch to the slow strobe
+      mediumTimer = setTimeout(() => {
         if (!isMounted.current) return;
-        cancelAnimation(flash); // Stop the slow loop
+        cancelAnimation(flash); // Stop the medium loop
 
-        // Settle on orange and call the callback
-        flash.value = withTiming(0, { duration: 250 }, (isFinished) => {
-          if (isFinished) {
-            runOnJS(stableOnComplete)();
-          }
-        });
-      }, SLOW_STROBE_DURATION); // 2 seconds of slow flashing
+        // Start a new, slower 250ms infinite loop
+        flash.value = withRepeat(
+          withSequence(
+            withTiming(1, { duration: 250 }), // Slower flash
+            withTiming(0, { duration: 250 })
+          ),
+          -1, true
+        );
 
-    }, FAST_STROBE_DURATION); // 5 seconds of fast flashing
+        // --- PHASE 4: FINISH ---
+        // Set a timer to end the slow strobe
+        slowTimer = setTimeout(() => {
+          if (!isMounted.current) return;
+          cancelAnimation(flash); // Stop the slow loop
+
+          // Settle on orange and call the callback
+          flash.value = withTiming(0, { duration: 250 }, (isFinished) => {
+            if (isFinished) {
+              runOnJS(stableOnComplete)();
+            }
+          });
+        }, SLOW_STROBE_DURATION); // 2 seconds of slow flashing
+
+      }, MEDIUM_STROBE_DURATION); // 2 seconds of medium flashing
+
+    }, FAST_STROBE_DURATION); // 3 seconds of fast flashing
 
     // --- CLEANUP ---
     return () => {
       isMounted.current = false;
       clearTimeout(fastTimer);
+      clearTimeout(mediumTimer);
       clearTimeout(slowTimer);
       cancelAnimation(flash);
     };
