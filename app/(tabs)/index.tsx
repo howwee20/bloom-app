@@ -4,15 +4,25 @@
 import { router } from 'expo-router';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View, Button } from 'react-native';
-import WinLoseAnimation from '../../components/WinLoseAnimation';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSequence,
+  withRepeat,
+  runOnJS,
+} from 'react-native-reanimated';
+import StrobeAnimation from '../../components/StrobeAnimation';
 import { useAuth } from '../_layout';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect } from 'expo-router';
 
-// The 8-step "Pure Play" Flow
+// The 10-step "Pure Play" Flow
 const FLOW_STEPS = [
   'LOCKED_OUT',
   'SPLASH',
+  'STROBE',
+  'PULSE',
   'REVEAL',
   'PAYOUT',
   'AD_VIDEO',
@@ -38,7 +48,18 @@ const MainFlowScreen = () => {
   const [dailyPoll, setDailyPoll] = useState<any>(null); // The poll question
   const [userPollSubmission, setUserPollSubmission] = useState<any>(null); // What did I pick?
   const [pollResults, setPollResults] = useState<{ option_a: number, option_b: number } | null>(null); // Aggregate results (faked for now)
-  const [isRevealComplete, setIsRevealComplete] = useState(false);
+
+  // --- Reveal Animation Shared Values ---
+  const revealOpacity = useSharedValue(0);
+  const revealScale = useSharedValue(1);
+
+  // --- Animated Style for Reveal ---
+  const animatedRevealStyle = useAnimatedStyle(() => {
+    return {
+      opacity: revealOpacity.value,
+      transform: [{ scale: revealScale.value }],
+    };
+  });
 
   // --- Data Fetching ---
   useFocusEffect(
@@ -122,16 +143,62 @@ const MainFlowScreen = () => {
 
   // --- Auto-advancing logic ---
   useEffect(() => {
-    if (currentStep === 'AD_VIDEO') {
-      const timer = setTimeout(() => advanceStep(), 6000);
-      return () => clearTimeout(timer);
+    let timeout: ReturnType<typeof setTimeout>;
+
+    // 1. RESET ANIMATIONS ON SPLASH
+    if (currentStep === 'SPLASH') {
+      revealOpacity.value = 0;
+      revealScale.value = 1;
     }
-  }, [currentStep]);
+
+    // 2. HANDLE "PULSE" ANIMATION & AUTO-ADVANCE
+    else if (currentStep === 'PULSE') {
+      // Start the PULSING animation (it will be covered)
+      revealOpacity.value = withTiming(0.7, { duration: 100 });
+      revealScale.value = withRepeat(
+        withSequence(
+          withTiming(1.2, { duration: 150 }), // VIOLENT pulse
+          withTiming(1, { duration: 150 })
+        ),
+        -1, true // Loop infinitely
+      );
+
+      // After 2.5 seconds, advance to the final REVEAL step
+      timeout = setTimeout(() => {
+        runOnJS(advanceStep)();
+      }, 2500); // 2.5 seconds of pulsing
+    }
+
+    // 3. HANDLE FINAL "REVEAL" STATE (THE FIX)
+    else if (currentStep === 'REVEAL') {
+      // This is the final, clear state.
+      // Stop all animations and set to 100% visible.
+      revealOpacity.value = withTiming(1);
+      revealScale.value = withTiming(1);
+    }
+
+    // 4. HANDLE "AD_VIDEO" AUTO-ADVANCE
+    else if (currentStep === 'AD_VIDEO') {
+      timeout = setTimeout(() => {
+        runOnJS(advanceStep)();
+      }, 6000); // 6-second ad
+    }
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [currentStep]); // This hook runs *only* when the step changes
 
   // --- Navigation Logic ---
-  const advanceStep = () => {
+  const advanceStep = useCallback(() => {
     setStepIndex((prevIndex) => Math.min(prevIndex + 1, FLOW_STEPS.length - 1));
-  };
+  }, []); // Empty dependency array means this function *never* changes.
+
+  // This is the new, STABLE callback we will pass as a prop.
+  // It's wrapped in useCallback and depends on the stable advanceStep.
+  const onStrobeComplete = useCallback(() => {
+    advanceStep();
+  }, [advanceStep]);
 
   const handlePress = () => {
     if (isLockedOut) return;
@@ -141,28 +208,31 @@ const MainFlowScreen = () => {
 
     if (!isDoubleTap) return;
 
-    // Fork logic: STREAK is the final decision point
-    if (currentStep === 'STREAK') {
-      // This is the final step. Check if they won.
-      if (isWinner) {
-        router.replace('/winner-payout'); // Send to new winner flow
-      } else {
-        setIsLockedOut(true); // Send to normal lockout
-        setStepIndex(FLOW_STEPS.indexOf('LOCKED_OUT'));
+    // These are the ONLY steps that advance on double-tap
+    const manualSteps = [
+      'SPLASH',
+      'REVEAL', // The final, revealed text
+      'PAYOUT',
+      'RESULTS',
+      'STREAK' // The final step
+    ];
+
+    if (manualSteps.includes(currentStep)) {
+      if (currentStep === 'STREAK') {
+        // Fork logic: STREAK is the final decision point
+        if (isWinner) {
+          router.replace('/winner-payout'); // Send to winner flow
+        } else {
+          setIsLockedOut(true); // Send to normal lockout
+          setStepIndex(FLOW_STEPS.indexOf('LOCKED_OUT'));
+        }
+        return;
       }
-      return; // Stop here
-    }
 
-    // Block double-tap on REVEAL until animation is complete
-    if (currentStep === 'REVEAL' && !isRevealComplete) {
-      return;
+      advanceStep();
     }
-    // Continue to block these other steps
-    if (['AD_VIDEO', 'LOCKED_OUT', 'POLL'].includes(currentStep)) {
-      return;
-    }
-
-    advanceStep();
+    // If the step is 'STROBE', 'PULSE', 'AD_VIDEO', or 'POLL',
+    // this function does NOTHING.
   };
 
   // --- NEW Poll Submission Logic ---
@@ -214,13 +284,35 @@ const MainFlowScreen = () => {
             <Text style={styles.headerText}>BLOOM</Text>
           </View>
         );
-      case 'REVEAL':
+      case 'STROBE':
         return (
-          <WinLoseAnimation
-            isWinner={isWinner}
-            backgroundColor="#FFD7B5"
-            onAnimationComplete={() => setIsRevealComplete(true)}
+          <StrobeAnimation
+            onAnimationComplete={onStrobeComplete}
           />
+        );
+      case 'PULSE':
+        // This is the "blurred, pulsing" state.
+        return (
+          <View style={[styles.stepContainer, styles.brandBackground]}>
+            {/* 1. The text pulses underneath */}
+            <Animated.View style={[styles.stepContainer, animatedRevealStyle]}>
+              <Text style={styles.headerText}>{isWinner ? 'YOU WON!' : 'Not Today.'}</Text>
+            </Animated.View>
+
+            {/* 2. The "blur cover" sits on top, hiding it */}
+            <View style={styles.blurCover} />
+          </View>
+        );
+      case 'REVEAL':
+        // This is the final, stable, "revealed" state that waits
+        // for the user to double-tap.
+        // The logic is now in the useEffect, this just renders.
+        return (
+          <View style={[styles.stepContainer, styles.brandBackground]}>
+            <Animated.View style={[styles.stepContainer, animatedRevealStyle]}>
+              <Text style={styles.headerText}>{isWinner ? 'YOU WON!' : 'Not Today.'}</Text>
+            </Animated.View>
+          </View>
         );
       case 'PAYOUT':
         return (
@@ -389,6 +481,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     marginBottom: 5,
+  },
+  blurCover: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFD7B5', // Your brand orange
+    // This cover is 100% opaque, completely hiding the text pulsing beneath it.
+    // The user will only see the "shape" of the pulse.
   },
 });
 
