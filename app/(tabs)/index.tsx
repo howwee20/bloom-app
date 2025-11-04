@@ -34,7 +34,7 @@ const MainFlowScreen = () => {
   const [isLockedOut, setIsLockedOut] = useState(true); // Default true to be safe
   const [userStreak, setUserStreak] = useState(0);
   const [isWinner, setIsWinner] = useState(false); // Did *I* win?
-  const [dailyWinnerId, setDailyWinnerId] = useState<string | null>(null); // Who won?
+  const [dailyWinnerUsername, setDailyWinnerUsername] = useState<string | null>(null); // Who won?
   const [dailyPoll, setDailyPoll] = useState<any>(null); // The poll question
   const [userPollSubmission, setUserPollSubmission] = useState<any>(null); // What did I pick?
   const [pollResults, setPollResults] = useState<{ option_a: number, option_b: number } | null>(null); // Aggregate results (faked for now)
@@ -78,11 +78,11 @@ const MainFlowScreen = () => {
           }
 
           if (winnerInfo) {
-            setDailyWinnerId(winnerInfo.dailyWinnerId);
+            setDailyWinnerUsername(winnerInfo.dailyWinnerUsername);
             setIsWinner(winnerInfo.isWinner);
           } else {
             // No winner picked yet or function returned null
-            setDailyWinnerId(null);
+            setDailyWinnerUsername(null);
             setIsWinner(false);
           }
 
@@ -232,7 +232,7 @@ const MainFlowScreen = () => {
               </>
             ) : (
               <>
-                <Text style={styles.headerText}>Winner: @{dailyWinnerId ? dailyWinnerId.substring(0, 8) : 'howeej2255'}</Text>
+                <Text style={styles.headerText}>Winner: @{dailyWinnerUsername || 'No winner today'}</Text>
                 <Text style={styles.subText}>Won $5.00 Today</Text>
               </>
             )}

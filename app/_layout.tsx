@@ -33,24 +33,53 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-// Custom hook for protecting routes
+// Custom hook for protecting routes with smart username checking
 function useProtectedRoute(session: Session | null) {
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    const inAuthGroup = segments[0] === '(auth)'; // Assuming you might group auth routes later
-    const inAppGroup = segments[0] === '(tabs)';
+    const checkUserProfile = async (sessionUser: Session['user']) => {
+      try {
+        // 1. Check if the user has a username in their profile
+        const { data, error } = await supabase
+          .from('profile')
+          .select('username')
+          .eq('id', sessionUser.id)
+          .single();
 
-    if (!session && inAppGroup) {
-      // Redirect to the login page if the user is not signed in
-      // and is trying to access a protected route.
-      router.replace('/login');
-    } else if (session && (segments.includes('login') || segments.includes('signup'))) {
-      // Redirect away from the sign-in page if the user is signed in.
-      router.replace('/');
+        if (error && error.code !== 'PGRST116') {
+          // 'PGRST116' means 'No rows found', which is fine.
+          // Any other error, we should log it.
+          throw error;
+        }
+
+        // 2. Decide where to navigate
+        if (data && data.username) {
+          // They have a username, send to main app
+          router.replace('/(tabs)');
+        } else {
+          // They are logged in but have no username, force them to create one
+          router.replace('/create-username');
+        }
+      } catch (e) {
+        console.error('Error checking user profile:', e);
+        // Fallback: just send to login
+        router.replace('/login');
+      }
+    };
+
+    if (session) {
+      // Session exists, check their profile
+      checkUserProfile(session.user);
+    } else {
+      // No session, send to login (unless already on auth screens)
+      const onAuthScreen = segments.includes('login') || segments.includes('signup');
+      if (!onAuthScreen) {
+        router.replace('/login');
+      }
     }
-  }, [session, segments]);
+  }, [session, router]);
 }
 
 // 2. Create the AuthProvider component
@@ -120,6 +149,8 @@ export default function RootLayout() {
         {/* The authentication flow */}
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
+        <Stack.Screen name="please-confirm-email" options={{ headerShown: false }} />
+        <Stack.Screen name="create-username" options={{ headerShown: false }} />
       </Stack>
     </AuthProvider>
   );

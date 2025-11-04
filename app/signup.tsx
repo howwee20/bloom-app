@@ -10,8 +10,12 @@ import {
 import { Text, View } from '@/components/Themed';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
+import * as Linking from 'expo-linking';
 
 export default function SignUpScreen() {
+  const PRIVACY_URL = 'https://docs.google.com/document/d/e/2PACX-1vR8IV8nOlmshct2SP7BK-mEJbsOIym25AzlM-Yl2udekWpvi_HMPrCJkJa4EbvC5Sbg0aHbHBktwgMb/pub';
+  const RULES_URL = 'https://docs.google.com/document/d/e/2PACX-1vR0xmmEntGta26qhqx7ZPbfuZktvRc7U5CX3qE1GjTeCuUm76CY9GX9b99cXjzMhqGie6CusdFl_LoZ/pub';
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,13 +33,14 @@ export default function SignUpScreen() {
       password,
     });
 
-    setLoading(false);
-
     if (error) {
       Alert.alert('Sign Up Error', error.message);
-    } else {
-      router.replace('/');
+      setLoading(false);
+      return; // Stop execution if there was an error
     }
+
+    // Success - navigate to the "please confirm" screen
+    router.replace('/please-confirm-email');
   };
 
   return (
@@ -67,7 +72,25 @@ export default function SignUpScreen() {
           autoCapitalize="none"
           editable={!loading}
         />
-        
+
+        <Text style={{ color: '#6e6e6e', fontSize: 12, textAlign: 'center', marginHorizontal: 30, marginBottom: 15 }}>
+          By signing up, you agree to our
+          <Text
+            style={{ textDecorationLine: 'underline' }}
+            onPress={() => Linking.openURL(RULES_URL)}
+          >
+            {' '}Official Rules
+          </Text>
+          {' '}and
+          <Text
+            style={{ textDecorationLine: 'underline' }}
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+          >
+            {' '}Privacy Policy
+          </Text>
+          .
+        </Text>
+
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleSignUp}
