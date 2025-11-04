@@ -3,7 +3,7 @@
 
 import { router } from 'expo-router';
 import React, { useState, useEffect, useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View, Button } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Button, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -53,11 +53,28 @@ const MainFlowScreen = () => {
   const revealOpacity = useSharedValue(0);
   const revealScale = useSharedValue(1);
 
+  // --- Poll Animation Shared Values ---
+  const widthA = useSharedValue('50%');
+  const widthB = useSharedValue('50%');
+
   // --- Animated Style for Reveal ---
   const animatedRevealStyle = useAnimatedStyle(() => {
     return {
       opacity: revealOpacity.value,
       transform: [{ scale: revealScale.value }],
+    };
+  });
+
+  // --- Animated Styles for Poll ---
+  const animatedStyleA = useAnimatedStyle(() => {
+    return {
+      width: widthA.value,
+    };
+  });
+
+  const animatedStyleB = useAnimatedStyle(() => {
+    return {
+      width: widthB.value,
     };
   });
 
@@ -149,6 +166,10 @@ const MainFlowScreen = () => {
     if (currentStep === 'SPLASH') {
       revealOpacity.value = 0;
       revealScale.value = 1;
+
+      // Reset poll animation
+      widthA.value = '50%';
+      widthB.value = '50%';
     }
 
     // 2. HANDLE "PULSE" ANIMATION & AUTO-ADVANCE
@@ -236,37 +257,49 @@ const MainFlowScreen = () => {
   };
 
   // --- NEW Poll Submission Logic ---
-  const handlePollSelect = async (choice: string) => {
-    if (!session || !dailyPoll) return;
+  const handlePollSubmit = async (selectedOption: 'option_a' | 'option_b') => {
+    if (!dailyPoll || !session?.user) return;
 
-    setUserPollSubmission({ selected_option: choice });
+    // Save the user's choice to state *immediately*
+    // This is needed for the RESULTS screen
+    setUserPollSubmission(selectedOption);
 
-    // FAKE results for now
-    setPollResults({ option_a: 68, option_b: 32 });
-
-    try {
-      // 1. Submit the poll answer
-      const { error: submitError } = await supabase.from('poll_submissions').insert({
-        user_id: session.user.id,
-        poll_id: dailyPoll.id,
-        selected_option: choice,
-      });
-      if (submitError) throw submitError;
-
-      // 2. Increment the streak
-      const { error: streakError } = await supabase.rpc('increment_streak', { user_id_param: session.user.id });
-      if (streakError) throw streakError;
-
-      // 3. Update local streak state to feel instant
-      setUserStreak(userStreak + 1);
-
-    } catch (e) {
-      console.error('Error submitting poll:', e);
-      // In a real app, you'd show an error here
+    // 1. Trigger the "color consume" animation
+    if (selectedOption === 'option_a') {
+      // Orange side (A) expands, White side (B) shrinks
+      widthA.value = withTiming('100%', { duration: 300 });
+      widthB.value = withTiming('0%', { duration: 300 });
+    } else {
+      // White side (B) expands, Orange side (A) shrinks
+      widthB.value = withTiming('100%', { duration: 300 });
+      widthA.value = withTiming('0%', { duration: 300 });
     }
 
-    // Advance to the results screen
-    setStepIndex(FLOW_STEPS.indexOf('RESULTS'));
+    try {
+      // 2. Save the submission (this runs in the background)
+      const { error } = await supabase.from('poll_submissions').insert({
+        poll_id: dailyPoll.id,
+        user_id: session.user.id,
+        selected_option: selectedOption,
+      });
+      if (error) throw error;
+
+      // 3. Get the results (this runs in the background)
+      const { data: results, error: resultsError } = await supabase.rpc(
+        'get_poll_results',
+        { poll_id_input: dailyPoll.id }
+      );
+      if (resultsError) throw resultsError;
+      setPollResults(results); // Save results to state
+
+    } catch (err) {
+      console.error('Error submitting poll:', err);
+    } finally {
+      // 4. After animation, advance to RESULTS
+      setTimeout(() => {
+        advanceStep();
+      }, 500); // 500ms for animation + buffer
+    }
   };
 
   // --- The new UI ---
@@ -338,33 +371,48 @@ const MainFlowScreen = () => {
           </View>
         );
       case 'POLL':
-        if (!dailyPoll) return <View style={[styles.stepContainer, styles.brandBackground]} />;
         return (
-          // Use a new container to hold the split layout
-          <View style={styles.pollSplitContainer}>
-            {/* --- Option A (Left Side) --- */}
-            <Pressable
-              style={[styles.pollSplitButton, styles.pollSplitLeft]}
-              onPress={() => handlePollSelect(dailyPoll.option_a)}
-            >
-              <Text style={styles.pollSplitTextLeft}>{dailyPoll.option_a}</Text>
-            </Pressable>
+          <View style={styles.pollContainer}>
+            {/* Option A (Left) - Orange */}
+            <Animated.View style={[styles.pollOption, styles.pollOptionA, animatedStyleA]}>
+              <Pressable style={styles.pollPressable} onPress={() => handlePollSubmit('option_a')}>
+                <Text style={styles.pollText}>{dailyPoll?.option_a || 'Option A'}</Text>
+              </Pressable>
+            </Animated.View>
 
-            {/* --- Option B (Right Side) --- */}
-            <Pressable
-              style={[styles.pollSplitButton, styles.pollSplitRight]}
-              onPress={() => handlePollSelect(dailyPoll.option_b)}
-            >
-              <Text style={styles.pollSplitText}>{dailyPoll.option_b}</Text>
-            </Pressable>
+            {/* Option B (Right) - White */}
+            <Animated.View style={[styles.pollOption, styles.pollOptionB, animatedStyleB]}>
+              <Pressable style={styles.pollPressable} onPress={() => handlePollSubmit('option_b')}>
+                <Text style={styles.pollText}>{dailyPoll?.option_b || 'Option B'}</Text>
+              </Pressable>
+            </Animated.View>
           </View>
         );
       case 'RESULTS':
+        // Calculate percentages
+        const totalVotes = (pollResults?.option_a_votes || 0) + (pollResults?.option_b_votes || 0);
+        const percentA = totalVotes === 0 ? 0 : Math.round((pollResults.option_a_votes / totalVotes) * 100);
+        const percentB = 100 - percentA;
+
+        // Determine user's choice text
+        const userChoiceText = userPollSubmission === 'option_a' ? dailyPoll?.option_a : dailyPoll?.option_b;
+        // Determine user's percentage
+        const userPercent = userPollSubmission === 'option_a' ? percentA : percentB;
+
         return (
           <View style={[styles.stepContainer, styles.brandBackground]}>
-            <Text style={styles.headerText}>You chose:</Text>
-            <Text style={styles.pollResultText}>{userPollSubmission?.selected_option}</Text>
-            <Text style={styles.subText}>(Real results coming soon)</Text>
+            <Text style={styles.headerText}>
+              You and {userPercent}%
+            </Text>
+            <Text style={styles.subText}>
+              chose {userChoiceText || '...'}
+            </Text>
+            <Text style={styles.pollResultsText}>
+              {dailyPoll?.option_a}: {percentA}%
+            </Text>
+            <Text style={styles.pollResultsText}>
+              {dailyPoll?.option_b}: {percentB}%
+            </Text>
           </View>
         );
       case 'STREAK':
@@ -432,40 +480,35 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginTop: 10,
   },
-  pollSplitContainer: {
+  pollContainer: {
     flex: 1,
     flexDirection: 'row',
   },
-  pollSplitButton: {
-    flex: 1, // Each button takes 50% of the space
+  pollOption: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  pollSplitLeft: {
-    backgroundColor: '#FFD7B5', // Brand Orange
+  pollOptionA: {
+    backgroundColor: '#FFD7B5', // Brand orange
   },
-  pollSplitRight: {
-    backgroundColor: 'white', // White
+  pollOptionB: {
+    backgroundColor: '#FFFFFF', // White
   },
-  pollSplitText: {
-    fontSize: 32,
+  pollPressable: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pollText: {
+    fontSize: 24,
     fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#FFD7B5', // Brand orange for right side (white background)
+    color: '#000', // Black text for both
   },
-  pollSplitTextLeft: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: 'white', // White text for left side (orange background)
-  },
-  pollResultText: {
-    fontSize: 64, // Make the result bigger
-    fontWeight: 'bold',
-    color: 'white',
+  pollResultsText: {
+    fontSize: 18,
+    color: '#fff',
     marginTop: 10,
-    textTransform: 'capitalize',
   },
   debugPanel: {
     position: 'absolute',
