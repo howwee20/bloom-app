@@ -238,15 +238,26 @@ const MainFlowScreen = () => {
     ];
 
     if (manualSteps.includes(currentStep)) {
-      if (currentStep === 'STREAK') {
-        // STREAK is the final screen - do nothing on double tap when locked out
+
+      // NEW FORK LOGIC: Happens on the RESULTS screen
+      if (currentStep === 'RESULTS') {
         if (isWinner) {
-          router.replace('/winner-payout'); // Send to winner flow
+          // WINNER: Go to the payout form
+          router.push('/winner-payout');
+        } else {
+          // LOSER: Go to the streak screen
+          advanceStep();
         }
-        // Otherwise just stay on STREAK screen
+        return; // Stop execution
+      }
+
+      // OLD STREAK LOGIC: is now dumb. It's the final screen.
+      if (currentStep === 'STREAK') {
+        // It's the last screen. Do nothing on double-tap.
         return;
       }
 
+      // All other manual steps
       advanceStep();
     }
     // If the step is 'STROBE', 'PULSE', 'AD_VIDEO', or 'POLL',
@@ -350,10 +361,7 @@ const MainFlowScreen = () => {
         return (
           <View style={[styles.stepContainer, styles.brandBackground]}>
             {isWinner ? (
-              <>
-                <Text style={styles.headerText}>You Won $5.00!</Text>
-                <Text style={styles.subText}>(Payout flow coming soon)</Text>
-              </>
+              <Text style={styles.headerText}>You Won $5.00!</Text>
             ) : (
               <>
                 <Text style={styles.headerText}>Winner: @{dailyWinnerUsername || 'No winner today'}</Text>

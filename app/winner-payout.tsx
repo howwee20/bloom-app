@@ -30,8 +30,8 @@ export default function WinnerPayoutScreen() {
 
       if (error) throw error;
 
-      // Navigate to the winner lockout screen
-      router.replace('/winner-lockout');
+      // Navigate back to main flow - useFocusEffect will detect submission and show STREAK
+      router.replace('/(tabs)');
     } catch (e) {
       console.error('Error submitting payout:', e);
       setIsSubmitting(false);
