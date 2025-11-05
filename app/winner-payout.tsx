@@ -30,6 +30,18 @@ export default function WinnerPayoutScreen() {
 
       if (error) throw error;
 
+      // Reset winner's streak to 0
+      // This will become 1 when they play tomorrow (via increment_streak)
+      const { error: streakError } = await supabase
+        .from('profile')
+        .update({ current_streak: 0 })
+        .eq('id', session.user.id);
+
+      if (streakError) {
+        console.error('Error resetting winner streak:', streakError);
+        // Don't block the form submission - just log the error
+      }
+
       // Navigate back to main flow - useFocusEffect will detect submission and show STREAK
       router.replace('/(tabs)');
     } catch (e) {

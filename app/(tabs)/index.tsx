@@ -201,7 +201,7 @@ const MainFlowScreen = () => {
     else if (currentStep === 'AD_VIDEO') {
       timeout = setTimeout(() => {
         runOnJS(advanceStep)();
-      }, 6000); // 6-second ad
+      }, 15000); // 15-second ad
     }
 
     return () => {
@@ -373,7 +373,7 @@ const MainFlowScreen = () => {
       case 'AD_VIDEO':
         return (
           <View style={[styles.stepContainer, styles.adBackground]}>
-            <Text style={styles.headerText}>6-Second Ad</Text>
+            <Text style={styles.headerText}>15-Second Ad</Text>
             <Text style={styles.subText}>(Auto-advances)</Text>
           </View>
         );
@@ -406,18 +406,22 @@ const MainFlowScreen = () => {
         // Determine user's percentage
         const userPercent = userPollSubmission === 'option_a' ? percentA : percentB;
 
+        // Determine background and text color based on user's choice
+        const resultsBackgroundColor = userPollSubmission === 'option_a' ? '#FFD7B5' : '#FFFFFF';
+        const resultsTextColor = userPollSubmission === 'option_a' ? 'white' : '#FFD7B5';
+
         return (
-          <View style={[styles.stepContainer, styles.brandBackground]}>
-            <Text style={styles.headerText}>
+          <View style={[styles.stepContainer, { backgroundColor: resultsBackgroundColor }]}>
+            <Text style={[styles.headerText, { color: resultsTextColor }]}>
               You and {userPercent}%
             </Text>
-            <Text style={styles.subText}>
+            <Text style={[styles.subText, { color: resultsTextColor }]}>
               chose {userChoiceText || '...'}
             </Text>
-            <Text style={styles.pollResultsText}>
+            <Text style={[styles.pollResultsText, { color: resultsTextColor }]}>
               {dailyPoll?.option_a}: {percentA}%
             </Text>
-            <Text style={styles.pollResultsText}>
+            <Text style={[styles.pollResultsText, { color: resultsTextColor }]}>
               {dailyPoll?.option_b}: {percentB}%
             </Text>
           </View>
