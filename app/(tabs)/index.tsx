@@ -17,7 +17,7 @@ import { useAuth } from '../_layout';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect } from 'expo-router';
 
-// The 9-step "Pure Play" Flow
+// The 7-step "Vending Machine" Flow
 const FLOW_STEPS = [
   'SPLASH',
   'STROBE',
@@ -25,8 +25,6 @@ const FLOW_STEPS = [
   'REVEAL',
   'PAYOUT',
   'AD_VIDEO',
-  'POLL',
-  'RESULTS',
   'STREAK',
 ];
 
@@ -44,36 +42,16 @@ const MainFlowScreen = () => {
   const [userStreak, setUserStreak] = useState(0);
   const [isWinner, setIsWinner] = useState(false); // Did *I* win?
   const [dailyWinnerUsername, setDailyWinnerUsername] = useState<string | null>(null); // Who won?
-  const [dailyPoll, setDailyPoll] = useState<any>(null); // The poll question
-  const [userPollSubmission, setUserPollSubmission] = useState<any>(null); // What did I pick?
-  const [pollResults, setPollResults] = useState<{ option_a: number, option_b: number } | null>(null); // Aggregate results (faked for now)
 
   // --- Reveal Animation Shared Values ---
   const revealOpacity = useSharedValue(0);
   const revealScale = useSharedValue(1);
-
-  // --- Poll Animation Shared Values ---
-  const widthA = useSharedValue('50%');
-  const widthB = useSharedValue('50%');
 
   // --- Animated Style for Reveal ---
   const animatedRevealStyle = useAnimatedStyle(() => {
     return {
       opacity: revealOpacity.value,
       transform: [{ scale: revealScale.value }],
-    };
-  });
-
-  // --- Animated Styles for Poll ---
-  const animatedStyleA = useAnimatedStyle(() => {
-    return {
-      width: widthA.value,
-    };
-  });
-
-  const animatedStyleB = useAnimatedStyle(() => {
-    return {
-      width: widthB.value,
     };
   });
 
@@ -92,10 +70,10 @@ const MainFlowScreen = () => {
           }
           windowStart.setHours(7, 0, 0, 0);
 
-          // --- 2. CHECK FOR A SUBMISSION IN THIS WINDOW ---
+          // --- 2. CHECK IF USER HAS PLAYED TODAY ---
           const { data: submissionData, error: submissionError } = await supabase
-            .from('poll_submissions') // Check the *new* submissions table
-            .select('id, selected_option')
+            .from('poll_submissions') // Track plays (legacy table name)
+            .select('id')
             .eq('user_id', session.user.id)
             .gte('created_at', windowStart.toISOString())
             .maybeSingle();
@@ -123,22 +101,10 @@ const MainFlowScreen = () => {
             setIsWinner(false);
           }
 
-          // --- 5. FETCH THE DAILY POLL ---
-          const today = new Date().toISOString().split('T')[0];
-          const { data: pollData, error: pollError } = await supabase
-            .from('daily_polls')
-            .select('*')
-            .eq('date', today)
-            .single(); // Use .single() - we need a poll to function
-
-          if (pollError) throw pollError;
-          setDailyPoll(pollData);
-
-          // --- 6. SET LOCKOUT STATE ---
+          // --- 5. SET LOCKOUT STATE ---
           if (submissionData) {
-            // User has already submitted. Lock them out at STREAK.
+            // User has already played today. Lock them out at STREAK.
             setIsLockedOut(true);
-            setUserPollSubmission(submissionData); // Save their submission
             setStepIndex(FLOW_STEPS.indexOf('STREAK'));
           } else {
             // User is free to play.
@@ -165,10 +131,6 @@ const MainFlowScreen = () => {
     if (currentStep === 'SPLASH') {
       revealOpacity.value = 0;
       revealScale.value = 1;
-
-      // Reset poll animation
-      widthA.value = '50%';
-      widthB.value = '50%';
     }
 
     // 2. HANDLE "PULSE" ANIMATION & AUTO-ADVANCE
@@ -197,17 +159,59 @@ const MainFlowScreen = () => {
       revealScale.value = withTiming(1);
     }
 
-    // 4. HANDLE "AD_VIDEO" AUTO-ADVANCE
+    // 4. HANDLE "AD_VIDEO" AUTO-ADVANCE WITH FORK
     else if (currentStep === 'AD_VIDEO') {
-      timeout = setTimeout(() => {
-        runOnJS(advanceStep)();
-      }, 15000); // 15-second ad
+      timeout = setTimeout(async () => {
+        // After ad completes, fork based on winner status
+        if (isWinner) {
+          // Record play BEFORE redirecting to payout form
+          await recordPlay();
+          runOnJS(router.push)('/winner-payout'); // Winner goes to payout form
+        } else {
+          runOnJS(advanceStep)(); // Loser advances to STREAK
+        }
+      }, 10000); // 10-second ad
     }
 
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [currentStep]); // This hook runs *only* when the step changes
+  }, [currentStep, isWinner, router]); // Dependencies for auto-advance logic
+
+  // --- Record Play Function ---
+  // Extracted for reuse by both winners (after ad) and losers (at STREAK)
+  const recordPlay = async () => {
+    if (!session?.user || isLockedOut) return;
+
+    try {
+      // 1. INCREMENT STREAK
+      const { data: newStreak, error: streakError } = await supabase.rpc('increment_streak');
+      if (streakError) throw streakError;
+      setUserStreak(newStreak);
+
+      // 2. RECORD SUBMISSION (to prevent replays)
+      const { error: submissionError } = await supabase.from('poll_submissions').insert({
+        user_id: session.user.id,
+      });
+      if (submissionError) throw submissionError;
+
+      // 3. SET LOCKOUT
+      setIsLockedOut(true);
+    } catch (err) {
+      console.error('Error recording play:', err);
+    }
+  };
+
+  // --- Streak Increment & Submission Logic ---
+  // When losers reach STREAK screen, record their play
+  useEffect(() => {
+    const recordPlayOnStreak = async () => {
+      if (currentStep !== 'STREAK') return;
+      await recordPlay();
+    };
+
+    recordPlayOnStreak();
+  }, [currentStep]);
 
   // --- Navigation Logic ---
   const advanceStep = useCallback(() => {
@@ -233,92 +237,30 @@ const MainFlowScreen = () => {
       'SPLASH',
       'REVEAL', // The final, revealed text
       'PAYOUT',
-      'RESULTS',
       'STREAK' // The final step
     ];
 
     if (manualSteps.includes(currentStep)) {
 
-      // NEW FORK LOGIC: Happens on the RESULTS screen
-      if (currentStep === 'RESULTS') {
-        if (isWinner) {
-          // WINNER: Go to the payout form
-          router.push('/winner-payout');
-        } else {
-          // LOSER: Go to the streak screen
-          advanceStep();
-        }
-        return; // Stop execution
+      // PAYOUT LOGIC: Always advance to AD, no fork
+      if (currentStep === 'PAYOUT') {
+        advanceStep(); // Everyone watches the ad
+        return;
       }
 
-      // OLD STREAK LOGIC: is now dumb. It's the final screen.
+      // STREAK LOGIC: It's the final screen. Do nothing on double-tap.
       if (currentStep === 'STREAK') {
-        // It's the last screen. Do nothing on double-tap.
         return;
       }
 
       // All other manual steps
       advanceStep();
     }
-    // If the step is 'STROBE', 'PULSE', 'AD_VIDEO', or 'POLL',
+    // If the step is 'STROBE', 'PULSE', or 'AD_VIDEO',
     // this function does NOTHING.
   };
 
-  // --- NEW Poll Submission Logic ---
-  const handlePollSubmit = async (selectedOption: 'option_a' | 'option_b') => {
-    if (!dailyPoll || !session?.user) return;
-
-    // Save the user's choice to state *immediately*
-    // This is needed for the RESULTS screen
-    setUserPollSubmission(selectedOption);
-
-    // 1. Trigger the "color consume" animation
-    if (selectedOption === 'option_a') {
-      // Orange side (A) expands, White side (B) shrinks
-      widthA.value = withTiming('100%', { duration: 300 });
-      widthB.value = withTiming('0%', { duration: 300 });
-    } else {
-      // White side (B) expands, Orange side (A) shrinks
-      widthB.value = withTiming('100%', { duration: 300 });
-      widthA.value = withTiming('0%', { duration: 300 });
-    }
-
-    try {
-      // 2. SAVE THE SUBMISSION
-      const { error: pollError } = await supabase.from('poll_submissions').insert({
-        poll_id: dailyPoll.id,
-        user_id: session.user.id,
-        selected_option: selectedOption,
-      });
-      if (pollError) throw pollError;
-
-      // 3. GET THE POLL RESULTS
-      const { data: results, error: resultsError } = await supabase.rpc(
-        'get_poll_results',
-        { poll_id_input: dailyPoll.id }
-      );
-      if (resultsError) throw resultsError;
-      setPollResults(results); // Save results to state
-
-      // 4. INCREMENT STREAK (THE FIX)
-      // Call the RPC and get the new streak back
-      const { data: newStreak, error: streakError } = await supabase.rpc('increment_streak');
-      if (streakError) throw streakError;
-
-      // Update the local state *immediately*
-      setUserStreak(newStreak);
-
-    } catch (err) {
-      console.error('Error in handlePollSubmit:', err);
-    } finally {
-      // 4. After animation, advance to RESULTS
-      setTimeout(() => {
-        advanceStep();
-      }, 500); // 500ms for animation + buffer
-    }
-  };
-
-  // --- The new UI ---
+  // --- The UI ---
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 'SPLASH':
@@ -373,57 +315,8 @@ const MainFlowScreen = () => {
       case 'AD_VIDEO':
         return (
           <View style={[styles.stepContainer, styles.adBackground]}>
-            <Text style={styles.headerText}>15-Second Ad</Text>
+            <Text style={styles.headerText}>10-Second Ad</Text>
             <Text style={styles.subText}>(Auto-advances)</Text>
-          </View>
-        );
-      case 'POLL':
-        return (
-          <View style={styles.pollContainer}>
-            {/* Option A (Left) - Orange */}
-            <Animated.View style={[styles.pollOption, styles.pollOptionA, animatedStyleA]}>
-              <Pressable style={styles.pollPressable} onPress={() => handlePollSubmit('option_a')}>
-                <Text style={styles.pollText}>{dailyPoll?.option_a || 'Option A'}</Text>
-              </Pressable>
-            </Animated.View>
-
-            {/* Option B (Right) - White */}
-            <Animated.View style={[styles.pollOption, styles.pollOptionB, animatedStyleB]}>
-              <Pressable style={styles.pollPressable} onPress={() => handlePollSubmit('option_b')}>
-                <Text style={styles.pollText}>{dailyPoll?.option_b || 'Option B'}</Text>
-              </Pressable>
-            </Animated.View>
-          </View>
-        );
-      case 'RESULTS':
-        // Calculate percentages
-        const totalVotes = (pollResults?.option_a_votes || 0) + (pollResults?.option_b_votes || 0);
-        const percentA = totalVotes === 0 ? 0 : Math.round((pollResults.option_a_votes / totalVotes) * 100);
-        const percentB = 100 - percentA;
-
-        // Determine user's choice text
-        const userChoiceText = userPollSubmission === 'option_a' ? dailyPoll?.option_a : dailyPoll?.option_b;
-        // Determine user's percentage
-        const userPercent = userPollSubmission === 'option_a' ? percentA : percentB;
-
-        // Determine background and text color based on user's choice
-        const resultsBackgroundColor = userPollSubmission === 'option_a' ? '#FFD7B5' : '#FFFFFF';
-        const resultsTextColor = userPollSubmission === 'option_a' ? 'white' : '#FFD7B5';
-
-        return (
-          <View style={[styles.stepContainer, { backgroundColor: resultsBackgroundColor }]}>
-            <Text style={[styles.headerText, { color: resultsTextColor }]}>
-              You and {userPercent}%
-            </Text>
-            <Text style={[styles.subText, { color: resultsTextColor }]}>
-              chose {userChoiceText || '...'}
-            </Text>
-            <Text style={[styles.pollResultsText, { color: resultsTextColor }]}>
-              {dailyPoll?.option_a}: {percentA}%
-            </Text>
-            <Text style={[styles.pollResultsText, { color: resultsTextColor }]}>
-              {dailyPoll?.option_b}: {percentB}%
-            </Text>
           </View>
         );
       case 'STREAK':
@@ -492,36 +385,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: 'white',
     opacity: 0.8,
-    marginTop: 10,
-  },
-  pollContainer: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  pollOption: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pollOptionA: {
-    backgroundColor: '#FFD7B5', // Brand orange
-  },
-  pollOptionB: {
-    backgroundColor: '#FFFFFF', // White
-  },
-  pollPressable: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pollText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000', // Black text for both
-  },
-  pollResultsText: {
-    fontSize: 18,
-    color: '#fff',
     marginTop: 10,
   },
   debugPanel: {
