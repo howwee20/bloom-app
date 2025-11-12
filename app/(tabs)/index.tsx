@@ -40,6 +40,9 @@ const MainFlowScreen = () => {
   // --- Real Backend State ---
   const [isLockedOut, setIsLockedOut] = useState(true); // Default true to be safe
   const [userStreak, setUserStreak] = useState(0);
+  const [streakValue, setStreakValue] = useState<number>(0);
+  const [todayPrize, setTodayPrize] = useState<number>(5.00);
+  const [yesterdayPrizeAmount, setYesterdayPrizeAmount] = useState<number>(5.00);
   const [isWinner, setIsWinner] = useState(false); // Did *I* win?
   const [dailyWinnerUsername, setDailyWinnerUsername] = useState<string | null>(null); // Who won?
 
@@ -85,21 +88,59 @@ const MainFlowScreen = () => {
           if (streakError) throw streakError;
           setUserStreak(typeof streakData === 'number' ? streakData : 0);
 
-          // --- 4. FETCH THE DAILY WINNER (CACHE-PROOF) ---
-          const { data: winnerInfo, error: winnerError } = await supabase.rpc('get_winner_info');
+          // --- 3.5. FETCH TODAY'S PRIZE ---
+          const today = new Date();
+          const todayDateString = today.toISOString().split('T')[0];
+          const { data: prizeData, error: prizeError } = await supabase
+            .from('daily_prizes')
+            .select('prize_amount')
+            .eq('date', todayDateString)
+            .single();
+
+          if (!prizeError && prizeData) {
+            setTodayPrize(prizeData.prize_amount);
+          }
+
+          // --- 4. FETCH YESTERDAY'S WINNER ---
+          // Users should see who won YESTERDAY's lottery (completed this morning at 7 AM)
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayDateString = yesterday.toISOString().split('T')[0]; // Format: "2025-11-09"
+
+          console.log('[DEBUG] Looking for winner on date:', yesterdayDateString); // Debug log
+
+          const { data: winnerData, error: winnerError } = await supabase
+            .from('daily_winners')
+            .select('user_id, prize_amount')
+            .eq('date', yesterdayDateString) // Fetch yesterday's winner
+            .maybeSingle();
+
           if (winnerError) {
             console.error("Error fetching winner info:", winnerError);
             throw winnerError;
           }
 
-          if (winnerInfo) {
-            setDailyWinnerUsername(winnerInfo.dailyWinnerUsername);
-            setIsWinner(winnerInfo.isWinner);
-          } else {
-            // No winner picked yet or function returned null
-            setDailyWinnerUsername(null);
-            setIsWinner(false);
+          console.log('[DEBUG] Winner data:', winnerData); // Debug log
+
+          // Fetch winner's username if winner exists
+          let winnerUsername = null;
+          if (winnerData) {
+            const { data: winnerProfile } = await supabase
+              .from('profile')
+              .select('username')
+              .eq('id', winnerData.user_id)
+              .single();
+
+            winnerUsername = winnerProfile?.username || 'Unknown';
+            console.log('[DEBUG] Winner username:', winnerUsername); // Debug log
+
+            // Store yesterday's prize amount
+            setYesterdayPrizeAmount(winnerData.prize_amount || 5.00);
           }
+
+          // Check if current user is the winner
+          setIsWinner(winnerData ? winnerData.user_id === session.user.id : false);
+          setDailyWinnerUsername(winnerUsername);
 
           // --- 5. SET LOCKOUT STATE ---
           if (submissionData) {
@@ -122,6 +163,40 @@ const MainFlowScreen = () => {
       fetchAllData();
     }, [session])
   );
+
+  // --- Fetch Streak Value with Retry Logic ---
+  const fetchStreakValue = async (retryCount = 0) => {
+    try {
+      // Add small delay to let database update propagate
+      if (retryCount === 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      const { data, error } = await supabase.rpc('get_streak_value');
+      if (error) throw error;
+
+      const value = data || 0;
+
+      // If value is 0 and we have a streak, retry once
+      if (value === 0 && userStreak > 0 && retryCount === 0) {
+        console.log('[DEBUG] Streak value is 0 but streak > 0, retrying...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return fetchStreakValue(1);
+      }
+
+      setStreakValue(value);
+    } catch (error) {
+      console.error('Error fetching streak value:', error);
+      setStreakValue(0);
+    }
+  };
+
+  // --- Refetch Streak Value When Streak Changes ---
+  useEffect(() => {
+    if (userStreak > 0) {
+      fetchStreakValue();
+    }
+  }, [userStreak]);
 
   // --- Auto-advancing logic ---
   useEffect(() => {
@@ -302,13 +377,11 @@ const MainFlowScreen = () => {
       case 'PAYOUT':
         return (
           <View style={[styles.stepContainer, styles.brandBackground]}>
+            <Text style={styles.prizeText}>Today's Prize: ${todayPrize.toFixed(2)}</Text>
             {isWinner ? (
-              <Text style={styles.headerText}>You Won $5.00!</Text>
+              <Text style={styles.headerText}>You Won!</Text>
             ) : (
-              <>
-                <Text style={styles.headerText}>Winner: @{dailyWinnerUsername || 'No winner today'}</Text>
-                <Text style={styles.subText}>Won $5.00 Today</Text>
-              </>
+              <Text style={styles.headerText}>Winner: @{dailyWinnerUsername || 'No winner yet'}</Text>
             )}
           </View>
         );
@@ -322,10 +395,11 @@ const MainFlowScreen = () => {
       case 'STREAK':
         return (
           <View style={[styles.stepContainer, styles.brandBackground]}>
-            <Text style={styles.subText}>BLOOM STREAK</Text>
+            <Text style={styles.streakLabel}>BLOOM STREAK</Text>
             <Text style={styles.headerText}>{userStreak}</Text>
-
-            {/* ADD THIS LINE */}
+            <Text style={styles.streakValue}>
+              ${streakValue.toFixed(2)} value
+            </Text>
             <Text style={styles.subText}>Return tomorrow at 7 am</Text>
           </View>
         );
@@ -348,9 +422,6 @@ const MainFlowScreen = () => {
 
       {/* --- DEBUG PANEL --- */}
       <View style={styles.debugPanel}>
-        <Text style={styles.debugText}>-- DEBUG --</Text>
-        <Text style={styles.debugText}>Email: {session?.user?.email}</Text>
-        <Text style={styles.debugText}>Streak: {userStreak}</Text>
         <Button title="Log Out" color="#888" onPress={() => supabase.auth.signOut()} />
       </View>
     </Pressable>
@@ -386,6 +457,27 @@ const styles = StyleSheet.create({
     color: 'white',
     opacity: 0.8,
     marginTop: 10,
+  },
+  streakLabel: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  streakValue: {
+    fontSize: 18,
+    color: '#666',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  prizeText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   debugPanel: {
     position: 'absolute',
