@@ -2,8 +2,8 @@
 // REPLACE THE ENTIRE FILE CONTENT WITH THIS:
 
 import { router } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View, Button, Dimensions } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Pressable, StyleSheet, Text, View, Button, Dimensions, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -12,6 +12,8 @@ import Animated, {
   withRepeat,
   runOnJS,
 } from 'react-native-reanimated';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import StrobeAnimation from '../../components/StrobeAnimation';
 import { useAuth } from '../_layout';
 import { supabase } from '../../lib/supabase';
@@ -36,6 +38,7 @@ const MainFlowScreen = () => {
   const [stepIndex, setStepIndex] = useState(FLOW_STEPS.indexOf('SPLASH'));
   const currentStep = FLOW_STEPS[stepIndex];
   const lastTap = React.useRef(0);
+  const streakScreenRef = useRef<View>(null);
 
   // --- Real Backend State ---
   const [isLockedOut, setIsLockedOut] = useState(true); // Default true to be safe
@@ -299,6 +302,27 @@ const MainFlowScreen = () => {
     advanceStep();
   }, [advanceStep]);
 
+  // --- Share Handler ---
+  const handleShare = async () => {
+    try {
+      if (streakScreenRef.current) {
+        // Automatically capture the streak screen
+        const uri = await captureRef(streakScreenRef.current, {
+          format: 'png',
+          quality: 1,
+        });
+
+        // Open native iOS share sheet with the captured image
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: 'Share your Bloom Streak',
+        });
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
   const handlePress = () => {
     if (isLockedOut) return;
     const now = Date.now();
@@ -394,7 +418,11 @@ const MainFlowScreen = () => {
         );
       case 'STREAK':
         return (
-          <View style={[styles.stepContainer, styles.brandBackground]}>
+          <View
+            ref={streakScreenRef}
+            style={[styles.stepContainer, styles.brandBackground]}
+            collapsable={false}
+          >
             <Text style={styles.streakLabel}>BLOOM STREAK</Text>
             <Text style={styles.headerText}>{userStreak}</Text>
             <Text style={styles.streakValue}>
@@ -420,10 +448,28 @@ const MainFlowScreen = () => {
     >
       {renderCurrentStep()}
 
-      {/* --- DEBUG PANEL --- */}
-      <View style={styles.debugPanel}>
-        <Button title="Log Out" color="#888" onPress={() => supabase.auth.signOut()} />
-      </View>
+      {/* --- BUTTONS --- */}
+      {currentStep === 'STREAK' ? (
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={handleShare}
+          >
+            <Text style={styles.shareButtonText}>Share</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => supabase.auth.signOut()}
+          >
+            <Text style={styles.logoutButtonText}>Log Out</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.debugPanel}>
+          <Button title="Log Out" color="#888" onPress={() => supabase.auth.signOut()} />
+        </View>
+      )}
     </Pressable>
   );
 };
@@ -493,6 +539,35 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     marginBottom: 5,
+  },
+  buttonContainer: {
+    width: '100%',
+    paddingHorizontal: 20,
+    position: 'absolute',
+    bottom: 40,
+    gap: 12,
+  },
+  shareButton: {
+    backgroundColor: '#E8997E',
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  shareButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logoutButton: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   blurCover: {
     ...StyleSheet.absoluteFillObject,
