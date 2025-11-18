@@ -4,7 +4,6 @@ import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Alert } from 
 import { useRouter } from 'expo-router';
 import { useAuth } from './_layout';
 import { supabase } from '../lib/supabase';
-import Slider from '@react-native-community/slider';
 
 // Constants
 const EQUITY_PER_DAY_CENTS = 10;
@@ -17,7 +16,8 @@ export default function LiquidateStreakScreen() {
   const { session } = useAuth();
 
   const [userStreak, setUserStreak] = useState(0);
-  const [daysToLiquidate, setDaysToLiquidate] = useState(MIN_DAYS_TO_BURN);
+  const [daysInput, setDaysInput] = useState('');
+  const [validationError, setValidationError] = useState('');
   const [payoutMethod, setPayoutMethod] = useState<'venmo' | 'cashapp' | null>(null);
   const [handle, setHandle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,7 +40,70 @@ export default function LiquidateStreakScreen() {
     fetchStreak();
   }, [session]);
 
-  // Calculate values in cents
+  // Schema verification - check if required columns exist
+  useEffect(() => {
+    const checkSchema = async () => {
+      if (!session) return;
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.log('🔍 Schema check: No user authenticated');
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('profile')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        console.log('🔍 Profile schema check:', {
+          hasCurrentStreak: 'current_streak' in (data || {}),
+          hasLastLiquidationDate: 'last_liquidation_date' in (data || {}),
+          hasTotalCashedOut: 'total_cashed_out_cents' in (data || {}),
+          currentStreakValue: data?.current_streak,
+          lastLiquidationDate: data?.last_liquidation_date,
+          totalCashedOutCents: data?.total_cashed_out_cents,
+          error: error?.message
+        });
+
+        if (error) {
+          console.error('❌ Schema check error:', error);
+        }
+      } catch (e) {
+        console.error('❌ Schema verification failed:', e);
+      }
+    };
+
+    checkSchema();
+  }, [session]);
+
+  // Validation function
+  const validateDays = () => {
+    const days = parseInt(daysInput, 10);
+
+    if (!daysInput || isNaN(days)) {
+      setValidationError('Please enter a valid number');
+      return false;
+    }
+
+    if (days < MIN_DAYS_TO_BURN) {
+      setValidationError(`Minimum ${MIN_DAYS_TO_BURN} day required`);
+      return false;
+    }
+
+    if (days > userStreak) {
+      setValidationError(`You only have ${userStreak} days in your streak`);
+      return false;
+    }
+
+    setValidationError('');
+    return true;
+  };
+
+  // Calculate values in cents (use parsed input or 0)
+  const daysToLiquidate = parseInt(daysInput, 10) || 0;
   const equityCents = daysToLiquidate * EQUITY_PER_DAY_CENTS;
   const payoutCents = Math.round(equityCents * PAYOUT_FRACTION);
 
@@ -49,9 +112,20 @@ export default function LiquidateStreakScreen() {
   const payoutDollars = (payoutCents / 100).toFixed(2);
 
   const handleSubmit = async () => {
-    // Validation
+    console.log('=== LIQUIDATION DEBUG START ===');
+
+    // Validate days input first
+    if (!validateDays()) {
+      console.log('❌ Days validation failed');
+      return;
+    }
+
+    const daysToLiquidate = parseInt(daysInput, 10);
+
+    // Validate payment info
     if (!payoutMethod || !handle.trim() || !session) {
       Alert.alert('Error', 'Please select payment method and enter your handle');
+      console.log('❌ Missing payment info or session');
       return;
     }
 
@@ -65,73 +139,98 @@ export default function LiquidateStreakScreen() {
       return;
     }
 
-    if (daysToLiquidate < MIN_DAYS_TO_BURN) {
-      Alert.alert('Error', `Minimum ${MIN_DAYS_TO_BURN} days required`);
-      return;
-    }
-
-    if (daysToLiquidate > userStreak) {
-      Alert.alert('Error', 'Insufficient streak days');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
-      console.log('🔥 Calling process_liquidation with:', {
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('👤 Current user:', user?.id ? `Authenticated (${user.id})` : 'Not authenticated');
+
+      if (!user) {
+        Alert.alert('Error', 'You must be logged in to liquidate');
+        return;
+      }
+
+      // Check current profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profile')
+        .select('current_streak, last_liquidation_date, total_cashed_out_cents')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      console.log('📊 Current profile:', profileData);
+      if (profileError) {
+        console.error('📊 Profile error:', profileError);
+      }
+
+      // Log what we're about to send
+      console.log('🔥 Attempting liquidation with params:', {
         days_to_burn: daysToLiquidate,
         payment_method_input: payoutMethod,
         payment_handle_input: handle.trim(),
+        userStreak: userStreak,
+        profileStreak: profileData?.current_streak,
       });
 
-      // Call RPC function to process liquidation
+      // Call RPC function
+      console.log('📡 Calling process_liquidation RPC...');
+
       const { data, error } = await supabase.rpc('process_liquidation', {
         days_to_burn: daysToLiquidate,
         payment_method_input: payoutMethod,
         payment_handle_input: handle.trim(),
       });
 
-      console.log('📡 RPC response:', { data, error });
+      console.log('📡 RPC Response:', { data, error });
 
       if (error) {
-        console.error('❌ Supabase error:', error);
+        console.error('❌ Supabase RPC error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: error
+        });
 
-        // Check for specific error messages
-        if (error.message.includes('Weekly cashout limit')) {
-          throw new Error('Weekly cashout limit exceeded ($5.00 max per week)');
-        } else if (error.message.includes('Insufficient streak')) {
-          throw new Error('Insufficient streak days');
-        } else if (error.message.includes('Minimum')) {
-          throw new Error(`Minimum ${MIN_DAYS_TO_BURN} days required`);
-        } else if (error.message.includes('only liquidate once per day')) {
-          throw new Error('You can only liquidate once per day. Try again tomorrow.');
+        // Handle specific errors
+        if (error.message.includes('daily') || error.message.includes('once per day')) {
+          Alert.alert('Daily Limit', 'You can only liquidate once per day. Try again tomorrow.');
+        } else if (error.message.includes('weekly') || error.message.includes('Weekly cashout')) {
+          Alert.alert('Weekly Limit', error.message);
+        } else if (error.message.includes('Insufficient')) {
+          Alert.alert('Error', 'Insufficient streak days');
+        } else {
+          Alert.alert('Error', error.message || 'Failed to process liquidation');
         }
-        throw error;
+        return;
       }
 
-      console.log('✅ Liquidation successful!');
+      // Success!
+      console.log('✅ Liquidation successful!', data);
 
-      // Success! Navigate back to main flow
       Alert.alert(
         'Success!',
-        `Liquidated ${daysToLiquidate} days for $${payoutDollars}. Payment will be sent to ${handle}.`,
+        `Liquidated ${daysToLiquidate} days for $${data?.payoutDollars?.toFixed(2) || payoutDollars}.\n\nPayment will be sent to ${handle} via ${payoutMethod}.`,
         [
           {
             text: 'OK',
-            onPress: () => router.replace('/(tabs)'),
+            onPress: () => {
+              console.log('🔙 Navigating back to main flow');
+              router.replace('/(tabs)');
+            },
           },
         ]
       );
-    } catch (e: any) {
-      console.error('❌ Error submitting liquidation:', e);
-      Alert.alert('Error', e.message || 'Failed to process liquidation. Please try again.');
+    } catch (err: any) {
+      console.error('❌ Unexpected error:', err);
+      Alert.alert('Error', 'An unexpected error occurred. Check console for details.');
     } finally {
+      console.log('=== LIQUIDATION DEBUG END ===');
       setIsSubmitting(false);
     }
   };
 
-  // Generate slider marks (every day up to user's streak)
-  const maxDays = userStreak;
+  // Check if user can liquidate
   const canLiquidate = userStreak >= MIN_DAYS_TO_BURN;
 
   if (!canLiquidate) {
@@ -159,35 +258,37 @@ export default function LiquidateStreakScreen() {
           Burn streak days for cash (you receive 10% of equity value)
         </Text>
 
-        {/* Slider Section */}
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderLabel}>Days to Liquidate: {daysToLiquidate}</Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={MIN_DAYS_TO_BURN}
-            maximumValue={maxDays}
-            step={1}
-            value={daysToLiquidate}
-            onValueChange={setDaysToLiquidate}
-            minimumTrackTintColor="#E8997E"
-            maximumTrackTintColor="rgba(232, 153, 126, 0.3)"
-            thumbTintColor="#E8997E"
+        {/* Days Input Section */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>How many days do you want to liquidate?</Text>
+          <TextInput
+            style={styles.daysInput}
+            value={daysInput}
+            onChangeText={(text) => {
+              setDaysInput(text);
+              setValidationError('');
+            }}
+            placeholder="Enter number of days"
+            placeholderTextColor="rgba(92, 64, 51, 0.4)"
+            keyboardType="numeric"
+            maxLength={3}
           />
-          <View style={styles.sliderLabels}>
-            <Text style={styles.sliderLabelText}>{MIN_DAYS_TO_BURN}</Text>
-            <Text style={styles.sliderLabelText}>{maxDays}</Text>
-          </View>
+          {validationError ? (
+            <Text style={styles.validationError}>{validationError}</Text>
+          ) : null}
         </View>
 
         {/* Calculation Display */}
-        <View style={styles.calculationContainer}>
-          <Text style={styles.calculationText}>
-            Liquidating {daysToLiquidate} days = <Text style={styles.highlightText}>${payoutDollars}</Text>
-          </Text>
-          <Text style={styles.calculationSubtext}>
-            (10% of ${equityDollars} equity value)
-          </Text>
-        </View>
+        {daysToLiquidate > 0 && (
+          <View style={styles.calculationContainer}>
+            <Text style={styles.calculationText}>
+              Liquidating {daysToLiquidate} days = <Text style={styles.highlightText}>${payoutDollars}</Text>
+            </Text>
+            <Text style={styles.calculationSubtext}>
+              (10% of ${equityDollars} equity value)
+            </Text>
+          </View>
+        )}
 
         {/* Payment Method Selection (copied from winner-payout.tsx) */}
         <View style={styles.methodContainer}>
@@ -241,7 +342,7 @@ export default function LiquidateStreakScreen() {
         <Pressable
           style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
           onPress={handleSubmit}
-          disabled={isSubmitting || !payoutMethod || !handle.trim()}
+          disabled={isSubmitting || !payoutMethod || !handle.trim() || !daysInput.trim()}
         >
           <Text style={styles.submitButtonText}>
             {isSubmitting ? 'Processing...' : 'Confirm Cash Out'}
@@ -292,30 +393,34 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     textAlign: 'center',
   },
-  sliderContainer: {
+  inputContainer: {
     width: '100%',
-    paddingHorizontal: 20,
-    marginBottom: 30,
+    paddingHorizontal: 30,
+    marginBottom: 20,
   },
-  sliderLabel: {
+  label: {
     fontSize: 16,
     fontWeight: '500',
     color: '#5C4033',
+    marginBottom: 12,
     textAlign: 'center',
-    marginBottom: 20,
   },
-  slider: {
-    width: '100%',
-    height: 40,
+  daysInput: {
+    backgroundColor: '#FFF5EE',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 153, 126, 0.3)',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#5C4033',
+    textAlign: 'center',
   },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 5,
-  },
-  sliderLabelText: {
+  validationError: {
+    color: '#E85555',
     fontSize: 14,
-    color: '#8B6F5C',
+    marginTop: 8,
+    textAlign: 'center',
   },
   calculationContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
