@@ -319,11 +319,6 @@ export default function LiquidateStreakScreen() {
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container}>
-        <Text style={styles.title}>Liquidate Streak</Text>
-        <Text style={styles.subtitle}>
-          Burn streak days for cash (you receive 10% of the equity you lose)
-        </Text>
-
         {/* Days Input Section */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>How many days do you want to liquidate?</Text>
