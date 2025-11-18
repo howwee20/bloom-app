@@ -47,8 +47,6 @@ const MainFlowScreen = () => {
   const [isWinner, setIsWinner] = useState(false); // Did *I* win?
   const [dailyWinnerUsername, setDailyWinnerUsername] = useState<string | null>(null); // Who won?
   const [canLiquidateToday, setCanLiquidateToday] = useState(true); // Can user liquidate today?
-  const [totalNetworkStreaks, setTotalNetworkStreaks] = useState(0); // Total streaks across all users
-  const [totalPlayers, setTotalPlayers] = useState(0); // Number of active players
 
   // --- Reveal Animation Shared Values ---
   const revealOpacity = useSharedValue(0);
@@ -239,70 +237,6 @@ const MainFlowScreen = () => {
       fetchStreakValue();
     }
   }, [userStreak]);
-
-  // --- Fetch Network Stats with Real-Time Updates ---
-  useEffect(() => {
-    const fetchNetworkStats = async () => {
-      try {
-        // 1. Calculate total network streaks from all users
-        const { data: streaksData } = await supabase
-          .from('profile')
-          .select('current_streak')
-          .gt('current_streak', 0);
-
-        const total = streaksData?.reduce((sum, p) => sum + (p.current_streak || 0), 0) || 0;
-        setTotalNetworkStreaks(total);
-        console.log('📊 Total network streaks:', total);
-
-        // 2. Calculate REAL-TIME player count (who played TODAY)
-        // Define the current "Bloom Day" window (7 AM to 7 AM)
-        const now = new Date();
-        const windowStart = new Date(now);
-        if (now.getHours() < 7) {
-          windowStart.setDate(now.getDate() - 1);
-        }
-        windowStart.setHours(7, 0, 0, 0);
-
-        console.log('🔍 Searching for submissions after:', windowStart.toISOString());
-
-        // Count how many unique users have played in this window
-        const { data: submissionsData, error: submissionsError } = await supabase
-          .from('poll_submissions')
-          .select('user_id')
-          .gte('created_at', windowStart.toISOString());
-
-        if (submissionsError) {
-          console.error('❌ Error fetching submissions:', submissionsError);
-        } else if (submissionsData) {
-          console.log('📥 Raw submissions data:', submissionsData?.length, 'entries');
-
-          // Count UNIQUE user_ids using Array spread and Set
-          const uniqueUserIds = [...new Set(submissionsData?.map(s => s.user_id) || [])];
-          const playerCount = uniqueUserIds.length;
-
-          setTotalPlayers(playerCount);
-
-          console.log('✅ Network stats updated:', {
-            totalStreaks: total,
-            playersToday: playerCount,
-            uniqueUsers: uniqueUserIds.length,
-            rawSubmissions: submissionsData?.length || 0,
-            windowStart: windowStart.toISOString()
-          });
-        }
-      } catch (e) {
-        console.error('❌ Error fetching network stats:', e);
-      }
-    };
-
-    // Fetch immediately
-    fetchNetworkStats();
-
-    // Then poll every 10 seconds for real-time updates
-    const interval = setInterval(fetchNetworkStats, 10000);
-
-    return () => clearInterval(interval);
-  }, [currentStep]); // Refresh when screen changes
 
   // --- Auto-advancing logic ---
   useEffect(() => {
@@ -505,25 +439,18 @@ const MainFlowScreen = () => {
             style={[styles.stepContainer, styles.brandBackground]}
             collapsable={false}
           >
-            {/* Top section - Streak info */}
+            {/* Top spacer - pushes streak to center */}
+            <View style={{ flex: 1 }} />
+
+            {/* User's streak info - CENTERED */}
             <View style={styles.streakTopSection}>
               <Text style={styles.streakLabel}>BLOOM STREAK</Text>
               <Text style={styles.streakNumber}>{userStreak}</Text>
               <Text style={styles.streakValue}>${streakValue.toFixed(2)} value</Text>
             </View>
 
-            {/* Spacer - pushes network stats and buttons to bottom */}
+            {/* Bottom spacer - pushes buttons to bottom */}
             <View style={{ flex: 1 }} />
-
-            {/* Middle section - Network stats (closer to bottom) */}
-            <View style={styles.networkStatsSection}>
-              <Text style={styles.networkStatsText}>
-                {totalNetworkStreaks} total streaks
-              </Text>
-              <Text style={styles.networkStatsSubtext}>
-                {totalPlayers} {totalPlayers === 1 ? 'player' : 'players'}
-              </Text>
-            </View>
 
             {/* Bottom section - Actions */}
             <View style={styles.streakBottomSection}>
@@ -625,7 +552,6 @@ const styles = StyleSheet.create({
   },
   // --- STREAK SCREEN LAYOUT ---
   streakTopSection: {
-    paddingTop: 120,
     gap: 24,
     alignItems: 'center',
   },
@@ -649,30 +575,10 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.85)',
     textAlign: 'center',
   },
-  networkStatsSection: {
-    marginBottom: 40,
-    gap: 20,
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  networkStatsText: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  networkStatsSubtext: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.75)',
-    textAlign: 'center',
-    marginTop: 4,
-  },
   streakBottomSection: {
-    gap: 32,
+    gap: 40,
     alignItems: 'center',
-    paddingBottom: 60,
+    paddingBottom: 40,
   },
   returnText: {
     fontFamily: 'ZenDots_400Regular',
