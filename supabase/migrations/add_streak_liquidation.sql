@@ -9,7 +9,7 @@ ADD COLUMN IF NOT EXISTS total_cashed_out_cents INTEGER DEFAULT 0;
 CREATE TABLE IF NOT EXISTS streak_liquidations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  days_liquidated INTEGER NOT NULL CHECK (days_liquidated >= 5),
+  days_liquidated INTEGER NOT NULL CHECK (days_liquidated >= 1),
   equity_cents INTEGER NOT NULL CHECK (equity_cents > 0),
   payout_cents INTEGER NOT NULL CHECK (payout_cents > 0),
   payment_method TEXT NOT NULL CHECK (payment_method IN ('venmo', 'cashapp')),
@@ -66,8 +66,8 @@ BEGIN
   WHERE id = auth.uid();
 
   -- Validate minimum days
-  IF days_to_burn < 5 THEN
-    RAISE EXCEPTION 'Minimum 5 days required to liquidate';
+  IF days_to_burn < 1 THEN
+    RAISE EXCEPTION 'Minimum 1 day required to liquidate';
   END IF;
 
   -- Validate user has enough streak days

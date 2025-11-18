@@ -9,7 +9,7 @@ import Slider from '@react-native-community/slider';
 // Constants
 const EQUITY_PER_DAY_CENTS = 10;
 const PAYOUT_FRACTION = 0.10;
-const MIN_DAYS_TO_BURN = 5;
+const MIN_DAYS_TO_BURN = 1;
 const MAX_CASHOUT_PER_WEEK_CENTS = 500;
 
 export default function LiquidateStreakScreen() {
@@ -115,8 +115,8 @@ export default function LiquidateStreakScreen() {
     }
   };
 
-  // Generate slider marks (every 5 days up to user's streak)
-  const maxDays = Math.floor(userStreak / 5) * 5; // Round down to nearest 5
+  // Generate slider marks (every day up to user's streak)
+  const maxDays = userStreak;
   const canLiquidate = userStreak >= MIN_DAYS_TO_BURN;
 
   if (!canLiquidate) {
@@ -124,7 +124,7 @@ export default function LiquidateStreakScreen() {
       <View style={styles.container}>
         <Text style={styles.title}>Liquidate Streak</Text>
         <Text style={styles.errorText}>
-          You need at least {MIN_DAYS_TO_BURN} streak days to liquidate.
+          You need at least {MIN_DAYS_TO_BURN} streak day to liquidate.
         </Text>
         <Pressable
           style={styles.submitButton}
@@ -151,11 +151,11 @@ export default function LiquidateStreakScreen() {
             style={styles.slider}
             minimumValue={MIN_DAYS_TO_BURN}
             maximumValue={maxDays}
-            step={5}
+            step={1}
             value={daysToLiquidate}
             onValueChange={setDaysToLiquidate}
             minimumTrackTintColor="#E8997E"
-            maximumTrackTintColor="#ffffff"
+            maximumTrackTintColor="rgba(232, 153, 126, 0.3)"
             thumbTintColor="#E8997E"
           />
           <View style={styles.sliderLabels}>
@@ -215,7 +215,7 @@ export default function LiquidateStreakScreen() {
         <TextInput
           style={styles.input}
           placeholder="@your-handle"
-          placeholderTextColor="#999"
+          placeholderTextColor="rgba(92, 64, 51, 0.5)"
           value={handle}
           onChangeText={setHandle}
           autoCapitalize="none"
@@ -259,33 +259,33 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: 'white',
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#5C4033',
     marginBottom: 10,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    color: 'white',
-    opacity: 0.9,
+    fontSize: 14,
+    color: '#8B6F5C',
     marginBottom: 40,
     textAlign: 'center',
   },
   errorText: {
     fontSize: 18,
-    color: 'white',
+    color: '#5C4033',
     marginBottom: 40,
     textAlign: 'center',
   },
   sliderContainer: {
     width: '100%',
+    paddingHorizontal: 20,
     marginBottom: 30,
   },
   sliderLabel: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#5C4033',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -300,11 +300,10 @@ const styles = StyleSheet.create({
   },
   sliderLabelText: {
     fontSize: 14,
-    color: 'white',
-    opacity: 0.8,
+    color: '#8B6F5C',
   },
   calculationContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     padding: 20,
     borderRadius: 12,
     marginBottom: 30,
@@ -312,7 +311,8 @@ const styles = StyleSheet.create({
   },
   calculationText: {
     fontSize: 18,
-    color: 'white',
+    fontWeight: '600',
+    color: '#E8997E',
     textAlign: 'center',
     marginBottom: 5,
   },
@@ -321,49 +321,51 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   calculationSubtext: {
-    fontSize: 14,
-    color: 'white',
-    opacity: 0.8,
+    fontSize: 12,
+    color: '#8B6F5C',
     textAlign: 'center',
   },
   methodContainer: {
     flexDirection: 'row',
-    gap: 20,
+    gap: 12,
     marginBottom: 30,
+    justifyContent: 'center',
   },
   methodButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    backgroundColor: 'white',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#fff',
     borderRadius: 12,
-    borderWidth: 3,
-    borderColor: 'white',
+    borderWidth: 1,
+    borderColor: '#E8997E',
   },
   methodButtonSelected: {
-    backgroundColor: '#FFD7B5',
-    borderColor: 'white',
+    backgroundColor: '#E8997E',
+    borderColor: '#E8997E',
   },
   methodButtonText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFD7B5',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#E8997E',
   },
   methodButtonTextSelected: {
-    color: 'white',
+    color: '#fff',
   },
   input: {
     width: '100%',
-    backgroundColor: 'white',
+    backgroundColor: '#FFF5EE',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 153, 126, 0.3)',
     paddingVertical: 16,
     paddingHorizontal: 20,
     fontSize: 18,
     borderRadius: 12,
     marginBottom: 30,
-    color: '#333',
+    color: '#5C4033',
   },
   submitButton: {
     width: '100%',
-    backgroundColor: 'white',
+    backgroundColor: '#E8997E',
     paddingVertical: 18,
     borderRadius: 12,
     alignItems: 'center',
@@ -373,9 +375,9 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   submitButtonText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFD7B5',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
   cancelButton: {
     width: '100%',
@@ -383,12 +385,10 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 12,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
   },
   cancelButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#8B6F5C',
   },
 });

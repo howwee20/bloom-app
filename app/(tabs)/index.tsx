@@ -467,13 +467,16 @@ const MainFlowScreen = () => {
             </TouchableOpacity>
           )}
 
-          {userStreak >= 5 && (
-            <TouchableOpacity
-              style={styles.liquidateButton}
+          {userStreak >= 1 && (
+            <Pressable
               onPress={() => router.push('/liquidate-streak')}
+              style={({ pressed }) => [
+                styles.liquidateTextContainer,
+                pressed && styles.liquidateTextPressed
+              ]}
             >
-              <Text style={styles.liquidateButtonText}>Liquidate Streak</Text>
-            </TouchableOpacity>
+              <Text style={styles.liquidateText}>Liquidate</Text>
+            </Pressable>
           )}
 
           <TouchableOpacity
@@ -576,18 +579,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  liquidateButton: {
-    backgroundColor: '#fff',
+  liquidateTextContainer: {
     padding: 18,
-    borderRadius: 12,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E8997E',
   },
-  liquidateButtonText: {
-    color: '#E8997E',
+  liquidateText: {
+    color: 'rgba(232, 153, 126, 0.6)',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  liquidateTextPressed: {
+    opacity: 0.4,
   },
   logoutButton: {
     backgroundColor: 'rgba(0,0,0,0.3)',
