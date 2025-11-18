@@ -6,8 +6,7 @@ import { useAuth } from './_layout';
 import { supabase } from '../lib/supabase';
 
 // Constants
-const EQUITY_PER_DAY_CENTS = 10;
-const PAYOUT_FRACTION = 0.10;
+const PAYOUT_FRACTION = 0.10; // User gets 10% of equity lost
 const MIN_DAYS_TO_BURN = 1;
 const MAX_CASHOUT_PER_WEEK_CENTS = 500;
 
@@ -16,28 +15,46 @@ export default function LiquidateStreakScreen() {
   const { session } = useAuth();
 
   const [userStreak, setUserStreak] = useState(0);
+  const [currentStreakValue, setCurrentStreakValue] = useState(0); // Current total value in dollars
   const [daysInput, setDaysInput] = useState('');
   const [validationError, setValidationError] = useState('');
+  const [previewPayout, setPreviewPayout] = useState<any>(null); // Preview calculation
+  const [isCalculating, setIsCalculating] = useState(false);
   const [payoutMethod, setPayoutMethod] = useState<'venmo' | 'cashapp' | null>(null);
   const [handle, setHandle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch user's current streak
+  // Fetch user's current streak and value
   useEffect(() => {
-    const fetchStreak = async () => {
+    const fetchStreakData = async () => {
       if (!session) return;
 
       try {
-        const { data, error } = await supabase.rpc('get_current_streak');
-        if (error) throw error;
-        setUserStreak(typeof data === 'number' ? data : 0);
+        // Fetch streak count
+        const { data: streakData, error: streakError } = await supabase.rpc('get_current_streak');
+        if (streakError) throw streakError;
+        const streak = typeof streakData === 'number' ? streakData : 0;
+        setUserStreak(streak);
+
+        // Fetch streak value (dynamic based on network)
+        const { data: valueData, error: valueError } = await supabase.rpc('get_streak_value');
+        if (valueError) throw valueError;
+        const value = typeof valueData === 'number' ? valueData : 0;
+        setCurrentStreakValue(value);
+
+        console.log('📊 Streak data loaded:', {
+          streak,
+          currentValue: `$${value.toFixed(2)}`,
+          perDayAverage: streak > 0 ? `$${(value / streak).toFixed(4)}` : '$0.00'
+        });
       } catch (e) {
-        console.error('Error fetching streak:', e);
+        console.error('Error fetching streak data:', e);
         setUserStreak(0);
+        setCurrentStreakValue(0);
       }
     };
 
-    fetchStreak();
+    fetchStreakData();
   }, [session]);
 
   // Schema verification - check if required columns exist
@@ -79,6 +96,56 @@ export default function LiquidateStreakScreen() {
     checkSchema();
   }, [session]);
 
+  // Calculate preview payout using RPC
+  useEffect(() => {
+    const calculatePreview = async () => {
+      const days = parseInt(daysInput, 10);
+
+      // Only calculate if valid input
+      if (!daysInput || isNaN(days) || days < 1 || days > userStreak) {
+        setPreviewPayout(null);
+        return;
+      }
+
+      setIsCalculating(true);
+      try {
+        console.log('🧮 Calculating preview for', days, 'days...');
+
+        const { data, error } = await supabase.rpc('calculate_liquidation_payout', {
+          days_to_burn: days
+        });
+
+        if (error) {
+          console.error('❌ Preview calculation error:', {
+            message: error.message,
+            code: error.code,
+            details: error.details
+          });
+          throw error;
+        }
+
+        console.log('💰 Preview calculation:', data);
+        setPreviewPayout(data);
+      } catch (e: any) {
+        console.error('❌ Error calculating preview:', e);
+        setPreviewPayout(null);
+        // Show error to user if RPC function doesn't exist
+        if (e?.message?.includes('function') || e?.message?.includes('not exist')) {
+          Alert.alert(
+            'Setup Required',
+            'The liquidation calculation function needs to be set up. Please run the SQL migration in Supabase first.'
+          );
+        }
+      } finally {
+        setIsCalculating(false);
+      }
+    };
+
+    // Debounce the calculation for smooth real-time updates
+    const timer = setTimeout(calculatePreview, 150);
+    return () => clearTimeout(timer);
+  }, [daysInput, userStreak]);
+
   // Validation function
   const validateDays = () => {
     const days = parseInt(daysInput, 10);
@@ -101,15 +168,6 @@ export default function LiquidateStreakScreen() {
     setValidationError('');
     return true;
   };
-
-  // Calculate values in cents (use parsed input or 0)
-  const daysToLiquidate = parseInt(daysInput, 10) || 0;
-  const equityCents = daysToLiquidate * EQUITY_PER_DAY_CENTS;
-  const payoutCents = Math.round(equityCents * PAYOUT_FRACTION);
-
-  // Format cents to dollars
-  const equityDollars = (equityCents / 100).toFixed(2);
-  const payoutDollars = (payoutCents / 100).toFixed(2);
 
   const handleSubmit = async () => {
     console.log('=== LIQUIDATION DEBUG START ===');
@@ -135,7 +193,7 @@ export default function LiquidateStreakScreen() {
     }
 
     if (handle.length < 3 || handle.length > 30) {
-      Alert.alert('Error', 'Handle must be 3-30 characters');
+      Alert.alert('Error', 'Handle must be at least 2 characters (plus @)');
       return;
     }
 
@@ -208,9 +266,17 @@ export default function LiquidateStreakScreen() {
       // Success!
       console.log('✅ Liquidation successful!', data);
 
+      const payoutAmount = data?.payoutDollars?.toFixed(2) || '0.00';
+      const equityLost = data?.equityCents ? (data.equityCents / 100).toFixed(2) : '0.00';
+      const newValue = data?.newValueDollars?.toFixed(2) || '0.00';
+
       Alert.alert(
         'Success!',
-        `Liquidated ${daysToLiquidate} days for $${data?.payoutDollars?.toFixed(2) || payoutDollars}.\n\nPayment will be sent to ${handle} via ${payoutMethod}.`,
+        `Liquidated ${daysToLiquidate} days!\n\n` +
+        `You lost $${equityLost} in equity\n` +
+        `You receive: $${payoutAmount} (10%)\n\n` +
+        `New streak value: $${newValue}\n\n` +
+        `Payment will be sent to ${handle} via ${payoutMethod}.`,
         [
           {
             text: 'OK',
@@ -255,7 +321,7 @@ export default function LiquidateStreakScreen() {
       <View style={styles.container}>
         <Text style={styles.title}>Liquidate Streak</Text>
         <Text style={styles.subtitle}>
-          Burn streak days for cash (you receive 10% of equity value)
+          Burn streak days for cash (you receive 10% of the equity you lose)
         </Text>
 
         {/* Days Input Section */}
@@ -275,18 +341,87 @@ export default function LiquidateStreakScreen() {
           />
           {validationError ? (
             <Text style={styles.validationError}>{validationError}</Text>
-          ) : null}
+          ) : (
+            <Text style={styles.inputHint}>
+              Try different amounts (1, 2, 3...) to see how your payout changes
+            </Text>
+          )}
         </View>
 
-        {/* Calculation Display */}
-        {daysToLiquidate > 0 && (
-          <View style={styles.calculationContainer}>
-            <Text style={styles.calculationText}>
-              Liquidating {daysToLiquidate} days = <Text style={styles.highlightText}>${payoutDollars}</Text>
-            </Text>
-            <Text style={styles.calculationSubtext}>
-              (10% of ${equityDollars} equity value)
-            </Text>
+        {/* Before/After Comparison - Always Visible */}
+        <View style={styles.comparisonContainer}>
+          {/* BEFORE Section */}
+          <View style={styles.comparisonBox}>
+            <Text style={styles.comparisonLabel}>CURRENT</Text>
+            <View style={styles.comparisonContent}>
+              <Text style={styles.comparisonStreak}>
+                {userStreak} day{userStreak !== 1 ? 's' : ''}
+              </Text>
+              <Text style={styles.comparisonValue}>
+                ${currentStreakValue.toFixed(2)}
+              </Text>
+              <Text style={styles.comparisonSubtext}>
+                {userStreak > 0 ? `$${(currentStreakValue / userStreak).toFixed(4)}/day` : 'No avg'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Arrow */}
+          <View style={styles.arrowContainer}>
+            <Text style={styles.arrowText}>→</Text>
+          </View>
+
+          {/* AFTER Section */}
+          <View style={styles.comparisonBox}>
+            <Text style={styles.comparisonLabel}>AFTER BURN</Text>
+            {isCalculating ? (
+              <View style={styles.comparisonContent}>
+                <Text style={styles.calculatingText}>...</Text>
+              </View>
+            ) : previewPayout ? (
+              <View style={styles.comparisonContent}>
+                <Text style={styles.comparisonStreak}>
+                  {previewPayout.newStreak} day{previewPayout.newStreak !== 1 ? 's' : ''}
+                </Text>
+                <Text style={styles.comparisonValue}>
+                  ${previewPayout.newValueDollars?.toFixed(2) || '0.00'}
+                </Text>
+                <Text style={styles.comparisonSubtext}>
+                  -{parseInt(daysInput, 10) || 0} day{parseInt(daysInput, 10) !== 1 ? 's' : ''}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.comparisonContent}>
+                <Text style={styles.comparisonPlaceholder}>
+                  Enter days above
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Payout Preview - Only show when we have calculation */}
+        {previewPayout && !isCalculating && (
+          <View style={styles.payoutPreview}>
+            <View style={styles.payoutRow}>
+              <Text style={styles.payoutRowLabel}>You're burning:</Text>
+              <Text style={styles.payoutRowValue}>
+                {parseInt(daysInput, 10)} day{parseInt(daysInput, 10) !== 1 ? 's' : ''}
+              </Text>
+            </View>
+            <View style={styles.payoutRow}>
+              <Text style={styles.payoutRowLabel}>Equity lost:</Text>
+              <Text style={styles.payoutRowValue}>
+                ${previewPayout.equityLostDollars?.toFixed(2) || '0.00'}
+              </Text>
+            </View>
+            <View style={styles.payoutDivider} />
+            <View style={styles.payoutRow}>
+              <Text style={styles.payoutRowLabelBig}>You receive (10%):</Text>
+              <Text style={styles.payoutRowValueBig}>
+                ${previewPayout.payoutDollars?.toFixed(2) || '0.00'}
+              </Text>
+            </View>
           </View>
         )}
 
@@ -330,22 +465,38 @@ export default function LiquidateStreakScreen() {
         {/* Handle Input (copied from winner-payout.tsx) */}
         <TextInput
           style={styles.input}
-          placeholder="@your-handle"
+          placeholder="your-handle"
           placeholderTextColor="rgba(92, 64, 51, 0.5)"
           value={handle}
-          onChangeText={setHandle}
+          onChangeText={(text) => {
+            // Auto-add @ symbol if user doesn't include it
+            if (text === '' || text === '@') {
+              // Allow clearing the field
+              setHandle('');
+            } else {
+              const formattedHandle = text.startsWith('@') ? text : '@' + text;
+              setHandle(formattedHandle);
+            }
+          }}
           autoCapitalize="none"
           autoCorrect={false}
         />
 
         {/* Submit Button */}
         <Pressable
-          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+          style={[
+            styles.submitButton,
+            (isSubmitting || !payoutMethod || !handle.trim() || !previewPayout) && styles.submitButtonDisabled
+          ]}
           onPress={handleSubmit}
-          disabled={isSubmitting || !payoutMethod || !handle.trim() || !daysInput.trim()}
+          disabled={isSubmitting || !payoutMethod || !handle.trim() || !previewPayout}
         >
           <Text style={styles.submitButtonText}>
-            {isSubmitting ? 'Processing...' : 'Confirm Cash Out'}
+            {isSubmitting ? 'Processing...' :
+             !previewPayout ? 'Enter days to continue' :
+             !payoutMethod ? 'Select payment method' :
+             !handle.trim() ? 'Enter payment handle' :
+             'Confirm Cash Out'}
           </Text>
         </Pressable>
 
@@ -422,28 +573,116 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  calculationContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 30,
-    width: '100%',
-  },
-  calculationText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#E8997E',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  highlightText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  calculationSubtext: {
+  inputHint: {
+    color: 'rgba(139, 111, 92, 0.7)',
     fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  comparisonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 24,
+    paddingHorizontal: 10,
+  },
+  comparisonBox: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(232, 153, 126, 0.3)',
+  },
+  comparisonLabel: {
+    fontSize: 10,
+    fontWeight: '700',
     color: '#8B6F5C',
     textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  comparisonContent: {
+    alignItems: 'center',
+  },
+  comparisonStreak: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#5C4033',
+    marginBottom: 4,
+  },
+  comparisonValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#E8997E',
+    marginBottom: 4,
+  },
+  comparisonSubtext: {
+    fontSize: 11,
+    color: '#8B6F5C',
+  },
+  comparisonPlaceholder: {
+    fontSize: 14,
+    color: 'rgba(139, 111, 92, 0.5)',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  arrowContainer: {
+    paddingHorizontal: 12,
+  },
+  arrowText: {
+    fontSize: 32,
+    color: '#E8997E',
+    fontWeight: 'bold',
+  },
+  payoutPreview: {
+    backgroundColor: 'rgba(232, 153, 126, 0.15)',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 30,
+    width: '100%',
+    borderWidth: 2,
+    borderColor: '#E8997E',
+  },
+  payoutRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  payoutRowLabel: {
+    fontSize: 14,
+    color: '#5C4033',
+    fontWeight: '500',
+  },
+  payoutRowValue: {
+    fontSize: 14,
+    color: '#5C4033',
+    fontWeight: '600',
+  },
+  payoutDivider: {
+    height: 1,
+    backgroundColor: 'rgba(232, 153, 126, 0.3)',
+    marginVertical: 8,
+  },
+  payoutRowLabelBig: {
+    fontSize: 16,
+    color: '#E8997E',
+    fontWeight: '700',
+  },
+  payoutRowValueBig: {
+    fontSize: 22,
+    color: '#E8997E',
+    fontWeight: 'bold',
+  },
+  calculatingText: {
+    fontSize: 16,
+    color: '#8B6F5C',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   methodContainer: {
     flexDirection: 'row',
