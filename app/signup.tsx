@@ -73,17 +73,17 @@ export default function SignUpScreen() {
           editable={!loading}
         />
 
-        <Text style={{ color: '#6e6e6e', fontSize: 12, textAlign: 'center', marginHorizontal: 30, marginBottom: 15 }}>
+        <Text style={{ fontFamily: 'ZenDots_400Regular', color: '#6e6e6e', fontSize: 12, textAlign: 'center', marginHorizontal: 30, marginBottom: 15 }}>
           By signing up, you agree to our
           <Text
-            style={{ textDecorationLine: 'underline' }}
+            style={{ fontFamily: 'ZenDots_400Regular', textDecorationLine: 'underline' }}
             onPress={() => Linking.openURL(RULES_URL)}
           >
             {' '}Official Rules
           </Text>
           {' '}and
           <Text
-            style={{ textDecorationLine: 'underline' }}
+            style={{ fontFamily: 'ZenDots_400Regular', textDecorationLine: 'underline' }}
             onPress={() => Linking.openURL(PRIVACY_URL)}
           >
             {' '}Privacy Policy
@@ -128,12 +128,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   title: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 40,
     textAlign: 'center',
   },
   input: {
+    fontFamily: 'ZenDots_400Regular',
     backgroundColor: '#f0f0f0',
     padding: 15,
     borderRadius: 8,
@@ -152,11 +154,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
+    fontFamily: 'ZenDots_400Regular',
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
   linkText: {
+    fontFamily: 'ZenDots_400Regular',
     color: '#007AFF',
     textAlign: 'center',
     marginTop: 20,

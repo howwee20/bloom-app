@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   header: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 48,
     fontWeight: '900',
     color: '#FFFFFF',
@@ -113,12 +114,14 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   title: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 40,
     textAlign: 'center',
   },
   input: {
+    fontFamily: 'ZenDots_400Regular',
     backgroundColor: '#f0f0f0',
     padding: 15,
     borderRadius: 8,
@@ -137,11 +140,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
+    fontFamily: 'ZenDots_400Regular',
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
   linkText: {
+    fontFamily: 'ZenDots_400Regular',
     color: '#007AFF',
     textAlign: 'center',
     marginTop: 20,

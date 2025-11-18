@@ -123,6 +123,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   title: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 48,
     fontWeight: 'bold',
     color: 'white',
@@ -147,6 +148,7 @@ const styles = StyleSheet.create({
     borderColor: 'white',
   },
   methodButtonText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFD7B5',
@@ -155,6 +157,7 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   input: {
+    fontFamily: 'ZenDots_400Regular',
     width: '100%',
     backgroundColor: 'white',
     paddingVertical: 16,
@@ -175,6 +178,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   submitButtonText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFD7B5',

@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 
 // Constants
 const PAYOUT_FRACTION = 0.10; // User gets 10% of equity lost
-const MIN_DAYS_TO_BURN = 1;
+const MIN_DAYS_TO_BURN = 3; // Minimum 3-day streak required to liquidate
 const MAX_CASHOUT_PER_WEEK_CENTS = 500;
 
 export default function LiquidateStreakScreen() {
@@ -156,7 +156,7 @@ export default function LiquidateStreakScreen() {
     }
 
     if (days < MIN_DAYS_TO_BURN) {
-      setValidationError(`Minimum ${MIN_DAYS_TO_BURN} day required`);
+      setValidationError(`Minimum ${MIN_DAYS_TO_BURN} days required`);
       return false;
     }
 
@@ -304,7 +304,7 @@ export default function LiquidateStreakScreen() {
       <View style={styles.container}>
         <Text style={styles.title}>Liquidate Streak</Text>
         <Text style={styles.errorText}>
-          You need at least {MIN_DAYS_TO_BURN} streak day to liquidate.
+          You need at least {MIN_DAYS_TO_BURN} streak days to liquidate.
         </Text>
         <Pressable
           style={styles.submitButton}
@@ -526,6 +526,7 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   title: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 28,
     fontWeight: '600',
     color: '#5C4033',
@@ -533,12 +534,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 14,
     color: '#8B6F5C',
     marginBottom: 40,
     textAlign: 'center',
   },
   errorText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 18,
     color: '#5C4033',
     marginBottom: 40,
@@ -550,6 +553,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 16,
     fontWeight: '500',
     color: '#5C4033',
@@ -557,6 +561,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   daysInput: {
+    fontFamily: 'ZenDots_400Regular',
     backgroundColor: '#FFF5EE',
     borderWidth: 1,
     borderColor: 'rgba(232, 153, 126, 0.3)',
@@ -568,12 +573,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   validationError: {
+    fontFamily: 'ZenDots_400Regular',
     color: '#E85555',
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',
   },
   inputHint: {
+    fontFamily: 'ZenDots_400Regular',
     color: 'rgba(139, 111, 92, 0.7)',
     fontSize: 12,
     marginTop: 8,
@@ -597,6 +604,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(232, 153, 126, 0.3)',
   },
   comparisonLabel: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 10,
     fontWeight: '700',
     color: '#8B6F5C',
@@ -608,22 +616,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   comparisonStreak: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 16,
     fontWeight: '600',
     color: '#5C4033',
     marginBottom: 4,
   },
   comparisonValue: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 28,
     fontWeight: 'bold',
     color: '#E8997E',
     marginBottom: 4,
   },
   comparisonSubtext: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 11,
     color: '#8B6F5C',
   },
   comparisonPlaceholder: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 14,
     color: 'rgba(139, 111, 92, 0.5)',
     fontStyle: 'italic',
@@ -634,6 +646,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   arrowText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 32,
     color: '#E8997E',
     fontWeight: 'bold',
@@ -654,11 +667,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   payoutRowLabel: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 14,
     color: '#5C4033',
     fontWeight: '500',
   },
   payoutRowValue: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 14,
     color: '#5C4033',
     fontWeight: '600',
@@ -669,16 +684,19 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   payoutRowLabelBig: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 16,
     color: '#E8997E',
     fontWeight: '700',
   },
   payoutRowValueBig: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 22,
     color: '#E8997E',
     fontWeight: 'bold',
   },
   calculatingText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 16,
     color: '#8B6F5C',
     textAlign: 'center',
@@ -703,6 +721,7 @@ const styles = StyleSheet.create({
     borderColor: '#E8997E',
   },
   methodButtonText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 18,
     fontWeight: '600',
     color: '#E8997E',
@@ -711,6 +730,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   input: {
+    fontFamily: 'ZenDots_400Regular',
     width: '100%',
     backgroundColor: '#FFF5EE',
     borderWidth: 1,
@@ -734,6 +754,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   submitButtonText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
@@ -746,6 +767,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButtonText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 16,
     fontWeight: '500',
     color: '#8B6F5C',

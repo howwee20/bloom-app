@@ -10,6 +10,7 @@
     "build": "expo export --platform web"
   },
   "dependencies": {
+    "@expo-google-fonts/zen-dots": "^0.4.2",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/slider": "5.0.1",

@@ -77,8 +77,13 @@ BEGIN
   FROM profile
   WHERE id = auth.uid();
 
-  -- Validate
-  IF user_current_streak IS NULL OR user_current_streak < days_to_burn THEN
+  -- Validate minimum 3-day streak requirement
+  IF user_current_streak IS NULL OR user_current_streak < 3 THEN
+    RAISE EXCEPTION 'Need a Bloom Streak of 3 to liquidate';
+  END IF;
+
+  -- Validate sufficient days to burn
+  IF user_current_streak < days_to_burn THEN
     RAISE EXCEPTION 'Insufficient streak days';
   END IF;
 
@@ -172,9 +177,14 @@ BEGIN
     RAISE EXCEPTION 'You can only liquidate once per day. Try again tomorrow.';
   END IF;
 
-  -- Validate minimum days
-  IF days_to_burn < 1 THEN
-    RAISE EXCEPTION 'Minimum 1 day required to liquidate';
+  -- Validate minimum 3-day streak requirement
+  IF user_current_streak < 3 THEN
+    RAISE EXCEPTION 'Need a Bloom Streak of 3 to liquidate';
+  END IF;
+
+  -- Validate minimum days to burn
+  IF days_to_burn < 3 THEN
+    RAISE EXCEPTION 'Minimum 3 days required to liquidate';
   END IF;
 
   -- Validate user has enough streak days

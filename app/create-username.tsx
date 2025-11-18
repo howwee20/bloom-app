@@ -96,6 +96,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFD7B5', // Your brand orange
   },
   title: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -103,12 +104,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   subtitle: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 30,
     color: '#fff',
   },
   input: {
+    fontFamily: 'ZenDots_400Regular',
     height: 50,
     backgroundColor: 'white',
     borderRadius: 10,

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useFonts } from 'expo-font';
+import { useFonts, ZenDots_400Regular } from '@expo-google-fonts/zen-dots';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
@@ -118,6 +118,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    ZenDots_400Regular,
     ...FontAwesome.font,
   });
 

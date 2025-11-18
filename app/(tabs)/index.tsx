@@ -3,7 +3,7 @@
 
 import { router } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, Button, Dimensions, TouchableOpacity, Platform } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Button, Platform, Alert } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -12,8 +12,6 @@ import Animated, {
   withRepeat,
   runOnJS,
 } from 'react-native-reanimated';
-import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import StrobeAnimation from '../../components/StrobeAnimation';
 import { useAuth } from '../_layout';
 import { supabase } from '../../lib/supabase';
@@ -49,6 +47,8 @@ const MainFlowScreen = () => {
   const [isWinner, setIsWinner] = useState(false); // Did *I* win?
   const [dailyWinnerUsername, setDailyWinnerUsername] = useState<string | null>(null); // Who won?
   const [canLiquidateToday, setCanLiquidateToday] = useState(true); // Can user liquidate today?
+  const [totalNetworkStreaks, setTotalNetworkStreaks] = useState(0); // Total streaks across all users
+  const [totalPlayers, setTotalPlayers] = useState(0); // Number of active players
 
   // --- Reveal Animation Shared Values ---
   const revealOpacity = useSharedValue(0);
@@ -61,6 +61,16 @@ const MainFlowScreen = () => {
       transform: [{ scale: revealScale.value }],
     };
   });
+
+  // --- Helper: Cross-platform Alert ---
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+      // Web fallback - use window.alert
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
 
   // --- Data Fetching ---
   useFocusEffect(
@@ -230,6 +240,70 @@ const MainFlowScreen = () => {
     }
   }, [userStreak]);
 
+  // --- Fetch Network Stats with Real-Time Updates ---
+  useEffect(() => {
+    const fetchNetworkStats = async () => {
+      try {
+        // 1. Calculate total network streaks from all users
+        const { data: streaksData } = await supabase
+          .from('profile')
+          .select('current_streak')
+          .gt('current_streak', 0);
+
+        const total = streaksData?.reduce((sum, p) => sum + (p.current_streak || 0), 0) || 0;
+        setTotalNetworkStreaks(total);
+        console.log('📊 Total network streaks:', total);
+
+        // 2. Calculate REAL-TIME player count (who played TODAY)
+        // Define the current "Bloom Day" window (7 AM to 7 AM)
+        const now = new Date();
+        const windowStart = new Date(now);
+        if (now.getHours() < 7) {
+          windowStart.setDate(now.getDate() - 1);
+        }
+        windowStart.setHours(7, 0, 0, 0);
+
+        console.log('🔍 Searching for submissions after:', windowStart.toISOString());
+
+        // Count how many unique users have played in this window
+        const { data: submissionsData, error: submissionsError } = await supabase
+          .from('poll_submissions')
+          .select('user_id')
+          .gte('created_at', windowStart.toISOString());
+
+        if (submissionsError) {
+          console.error('❌ Error fetching submissions:', submissionsError);
+        } else if (submissionsData) {
+          console.log('📥 Raw submissions data:', submissionsData?.length, 'entries');
+
+          // Count UNIQUE user_ids using Array spread and Set
+          const uniqueUserIds = [...new Set(submissionsData?.map(s => s.user_id) || [])];
+          const playerCount = uniqueUserIds.length;
+
+          setTotalPlayers(playerCount);
+
+          console.log('✅ Network stats updated:', {
+            totalStreaks: total,
+            playersToday: playerCount,
+            uniqueUsers: uniqueUserIds.length,
+            rawSubmissions: submissionsData?.length || 0,
+            windowStart: windowStart.toISOString()
+          });
+        }
+      } catch (e) {
+        console.error('❌ Error fetching network stats:', e);
+      }
+    };
+
+    // Fetch immediately
+    fetchNetworkStats();
+
+    // Then poll every 10 seconds for real-time updates
+    const interval = setInterval(fetchNetworkStats, 10000);
+
+    return () => clearInterval(interval);
+  }, [currentStep]); // Refresh when screen changes
+
   // --- Auto-advancing logic ---
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
@@ -331,34 +405,6 @@ const MainFlowScreen = () => {
     advanceStep();
   }, [advanceStep]);
 
-  // --- Share Handler ---
-  const handleShare = async () => {
-    // Web doesn't support react-native-view-shot
-    if (Platform.OS === 'web') {
-      alert('Sharing is not available on web. Download the mobile app to share your streak!');
-      return;
-    }
-
-    // Native iOS/Android screenshot sharing
-    try {
-      if (streakScreenRef.current) {
-        // Automatically capture the streak screen
-        const uri = await captureRef(streakScreenRef.current, {
-          format: 'png',
-          quality: 1,
-        });
-
-        // Open native iOS share sheet with the captured image
-        await Sharing.shareAsync(uri, {
-          mimeType: 'image/png',
-          dialogTitle: 'Share your Bloom Streak',
-        });
-      }
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
-  };
-
   const handlePress = () => {
     if (isLockedOut) return;
     const now = Date.now();
@@ -459,12 +505,63 @@ const MainFlowScreen = () => {
             style={[styles.stepContainer, styles.brandBackground]}
             collapsable={false}
           >
-            <Text style={styles.streakLabel}>BLOOM STREAK</Text>
-            <Text style={styles.headerText}>{userStreak}</Text>
-            <Text style={styles.streakValue}>
-              ${streakValue.toFixed(2)} value
-            </Text>
-            <Text style={styles.subText}>Return tomorrow at 7 am</Text>
+            {/* Top section - Streak info */}
+            <View style={styles.streakTopSection}>
+              <Text style={styles.streakLabel}>BLOOM STREAK</Text>
+              <Text style={styles.streakNumber}>{userStreak}</Text>
+              <Text style={styles.streakValue}>${streakValue.toFixed(2)} value</Text>
+            </View>
+
+            {/* Spacer - pushes network stats and buttons to bottom */}
+            <View style={{ flex: 1 }} />
+
+            {/* Middle section - Network stats (closer to bottom) */}
+            <View style={styles.networkStatsSection}>
+              <Text style={styles.networkStatsText}>
+                {totalNetworkStreaks} total streaks
+              </Text>
+              <Text style={styles.networkStatsSubtext}>
+                {totalPlayers} {totalPlayers === 1 ? 'player' : 'players'}
+              </Text>
+            </View>
+
+            {/* Bottom section - Actions */}
+            <View style={styles.streakBottomSection}>
+              <Text style={styles.returnText}>Return tomorrow at 7 am</Text>
+
+              {canLiquidateToday && (
+                <Pressable
+                  onPress={() => {
+                    if (userStreak < 3) {
+                      showAlert('Locked', 'Need a Bloom Streak of 3 to liquidate');
+                      return;
+                    }
+                    router.push('/liquidate-streak');
+                  }}
+                  style={({ pressed }) => [
+                    styles.liquidateButton,
+                    pressed && { opacity: 0.6 }
+                  ]}
+                >
+                  <Text style={[
+                    styles.liquidateButtonText,
+                    userStreak < 3 && { opacity: 0.4 }
+                  ]}>
+                    Liquidate
+                  </Text>
+                </Pressable>
+              )}
+
+              <Pressable
+                onPress={() => supabase.auth.signOut()}
+                style={({ pressed }) => [
+                  styles.logoutButton,
+                  pressed && { opacity: 0.6 }
+                ]}
+              >
+                <Text style={styles.logoutButtonText}>Log Out</Text>
+              </Pressable>
+            </View>
           </View>
         );
       default:
@@ -484,38 +581,8 @@ const MainFlowScreen = () => {
     >
       {renderCurrentStep()}
 
-      {/* --- BUTTONS --- */}
-      {currentStep === 'STREAK' ? (
-        <View style={styles.buttonContainer}>
-          {Platform.OS !== 'web' && (
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={handleShare}
-            >
-              <Text style={styles.shareButtonText}>Share</Text>
-            </TouchableOpacity>
-          )}
-
-          {userStreak >= 1 && canLiquidateToday && (
-            <Pressable
-              onPress={() => router.push('/liquidate-streak')}
-              style={({ pressed }) => [
-                styles.liquidateTextContainer,
-                pressed && styles.liquidateTextPressed
-              ]}
-            >
-              <Text style={styles.liquidateText}>Liquidate</Text>
-            </Pressable>
-          )}
-
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={() => supabase.auth.signOut()}
-          >
-            <Text style={styles.logoutButtonText}>Log Out</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
+      {/* Debug panel for non-STREAK screens */}
+      {currentStep !== 'STREAK' && (
         <View style={styles.debugPanel}>
           <Button title="Log Out" color="#888" onPress={() => supabase.auth.signOut()} />
         </View>
@@ -542,6 +609,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#A0A0A0', // Grey for the ad
   },
   headerText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 48,
     fontWeight: 'bold',
     color: 'white',
@@ -549,26 +617,89 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   subText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 24,
     color: 'white',
     opacity: 0.8,
     marginTop: 10,
   },
+  // --- STREAK SCREEN LAYOUT ---
+  streakTopSection: {
+    paddingTop: 120,
+    gap: 24,
+    alignItems: 'center',
+  },
   streakLabel: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: 'white',
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 18,
+    letterSpacing: 2,
+    color: '#fff',
     textAlign: 'center',
-    marginBottom: 10,
+  },
+  streakNumber: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 100,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
   },
   streakValue: {
-    fontSize: 18,
-    color: '#666',
-    fontWeight: '600',
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 28,
+    color: 'rgba(255, 255, 255, 0.85)',
     textAlign: 'center',
-    marginTop: 8,
+  },
+  networkStatsSection: {
+    marginBottom: 40,
+    gap: 20,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  networkStatsText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  networkStatsSubtext: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.75)',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  streakBottomSection: {
+    gap: 32,
+    alignItems: 'center',
+    paddingBottom: 60,
+  },
+  returnText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+  liquidateButton: {
+    paddingVertical: 8,
+  },
+  liquidateButtonText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    color: '#6ccff0', // Bright cyan blue - perfect!
+    textAlign: 'center',
+  },
+  logoutButton: {
+    paddingVertical: 8,
+  },
+  logoutButtonText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
   },
   prizeText: {
+    fontFamily: 'ZenDots_400Regular',
     fontSize: 32,
     fontWeight: '700',
     color: '#fff',
@@ -589,47 +720,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     marginBottom: 5,
-  },
-  buttonContainer: {
-    width: '100%',
-    paddingHorizontal: 20,
-    position: 'absolute',
-    bottom: 40,
-    gap: 12,
-  },
-  shareButton: {
-    backgroundColor: '#E8997E',
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  shareButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  liquidateTextContainer: {
-    padding: 18,
-    alignItems: 'center',
-  },
-  liquidateText: {
-    color: 'rgba(232, 153, 126, 0.6)',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  liquidateTextPressed: {
-    opacity: 0.4,
-  },
-  logoutButton: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  logoutButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   blurCover: {
     ...StyleSheet.absoluteFillObject,
