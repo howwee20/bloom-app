@@ -78,6 +78,12 @@ export default function LiquidateStreakScreen() {
     setIsSubmitting(true);
 
     try {
+      console.log('🔥 Calling process_liquidation with:', {
+        days_to_burn: daysToLiquidate,
+        payment_method_input: payoutMethod,
+        payment_handle_input: handle.trim(),
+      });
+
       // Call RPC function to process liquidation
       const { data, error } = await supabase.rpc('process_liquidation', {
         days_to_burn: daysToLiquidate,
@@ -85,7 +91,11 @@ export default function LiquidateStreakScreen() {
         payment_handle_input: handle.trim(),
       });
 
+      console.log('📡 RPC response:', { data, error });
+
       if (error) {
+        console.error('❌ Supabase error:', error);
+
         // Check for specific error messages
         if (error.message.includes('Weekly cashout limit')) {
           throw new Error('Weekly cashout limit exceeded ($5.00 max per week)');
@@ -93,9 +103,13 @@ export default function LiquidateStreakScreen() {
           throw new Error('Insufficient streak days');
         } else if (error.message.includes('Minimum')) {
           throw new Error(`Minimum ${MIN_DAYS_TO_BURN} days required`);
+        } else if (error.message.includes('only liquidate once per day')) {
+          throw new Error('You can only liquidate once per day. Try again tomorrow.');
         }
         throw error;
       }
+
+      console.log('✅ Liquidation successful!');
 
       // Success! Navigate back to main flow
       Alert.alert(
@@ -109,9 +123,10 @@ export default function LiquidateStreakScreen() {
         ]
       );
     } catch (e: any) {
-      console.error('Error submitting liquidation:', e);
-      setIsSubmitting(false);
+      console.error('❌ Error submitting liquidation:', e);
       Alert.alert('Error', e.message || 'Failed to process liquidation. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

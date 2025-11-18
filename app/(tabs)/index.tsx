@@ -48,6 +48,7 @@ const MainFlowScreen = () => {
   const [yesterdayPrizeAmount, setYesterdayPrizeAmount] = useState<number>(5.00);
   const [isWinner, setIsWinner] = useState(false); // Did *I* win?
   const [dailyWinnerUsername, setDailyWinnerUsername] = useState<string | null>(null); // Who won?
+  const [canLiquidateToday, setCanLiquidateToday] = useState(true); // Can user liquidate today?
 
   // --- Reveal Animation Shared Values ---
   const revealOpacity = useSharedValue(0);
@@ -144,6 +145,34 @@ const MainFlowScreen = () => {
           // Check if current user is the winner
           setIsWinner(winnerData ? winnerData.user_id === session.user.id : false);
           setDailyWinnerUsername(winnerUsername);
+
+          // --- 4.5. CHECK IF USER CAN LIQUIDATE TODAY ---
+          const { data: profileData } = await supabase
+            .from('profile')
+            .select('last_liquidation_date')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+          if (profileData?.last_liquidation_date) {
+            const lastLiquidation = new Date(profileData.last_liquidation_date);
+            const todayDate = new Date();
+
+            // Compare dates (ignoring time)
+            const lastLiquidationDateStr = lastLiquidation.toISOString().split('T')[0];
+            const todayDateStr = todayDate.toISOString().split('T')[0];
+
+            const isSameDay = lastLiquidationDateStr === todayDateStr;
+            setCanLiquidateToday(!isSameDay);
+
+            console.log('[DEBUG] Liquidation check:', {
+              lastLiquidationDateStr,
+              todayDateStr,
+              canLiquidate: !isSameDay
+            });
+          } else {
+            // No liquidation record, user can liquidate
+            setCanLiquidateToday(true);
+          }
 
           // --- 5. SET LOCKOUT STATE ---
           if (submissionData) {
@@ -467,7 +496,7 @@ const MainFlowScreen = () => {
             </TouchableOpacity>
           )}
 
-          {userStreak >= 1 && (
+          {userStreak >= 1 && canLiquidateToday && (
             <Pressable
               onPress={() => router.push('/liquidate-streak')}
               style={({ pressed }) => [
