@@ -504,7 +504,6 @@ const MainFlowScreen = () => {
     <Pressable
       onPress={handlePress}
       style={styles.container}
-      disabled={isLockedOut}
     >
       {renderCurrentStep()}
 
