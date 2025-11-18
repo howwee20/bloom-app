@@ -447,6 +447,7 @@ const MainFlowScreen = () => {
               <Text style={styles.streakLabel}>BLOOM STREAK</Text>
               <Text style={styles.streakNumber}>{userStreak}</Text>
               <Text style={styles.streakValue}>${streakValue.toFixed(2)} value</Text>
+              <Text style={styles.returnText}>Return tomorrow at 7 am</Text>
             </View>
 
             {/* Bottom spacer - pushes buttons to bottom */}
@@ -454,8 +455,6 @@ const MainFlowScreen = () => {
 
             {/* Bottom section - Actions */}
             <View style={styles.streakBottomSection}>
-              <Text style={styles.returnText}>Return tomorrow at 7 am</Text>
-
               {canLiquidateToday && (
                 <Pressable
                   onPress={() => {
@@ -478,6 +477,27 @@ const MainFlowScreen = () => {
                   </Text>
                 </Pressable>
               )}
+
+              <Pressable
+                onPress={() => {
+                  if (userStreak < 3) {
+                    showAlert('Locked', 'Need at least 3 days in your streak to send');
+                    return;
+                  }
+                  router.push('/send-streak');
+                }}
+                style={({ pressed }) => [
+                  styles.sendDaysButton,
+                  pressed && { opacity: 0.6 }
+                ]}
+              >
+                <Text style={[
+                  styles.sendDaysButtonText,
+                  userStreak < 3 && { opacity: 0.4 }
+                ]}>
+                  Send
+                </Text>
+              </Pressable>
 
               <Pressable
                 onPress={() => supabase.auth.signOut()}
@@ -592,6 +612,16 @@ const styles = StyleSheet.create({
     fontFamily: 'ZenDots_400Regular',
     fontSize: 16,
     color: '#6ccff0', // Bright cyan blue - perfect!
+    textAlign: 'center',
+  },
+  sendDaysButton: {
+    paddingVertical: 8,
+  },
+  sendDaysButtonText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E3A8A', // Navy blue - highly visible!
     textAlign: 'center',
   },
   logoutButton: {
