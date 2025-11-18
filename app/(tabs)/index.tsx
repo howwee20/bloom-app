@@ -3,7 +3,7 @@
 
 import { router } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, Button, Dimensions, TouchableOpacity } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Button, Dimensions, TouchableOpacity, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -304,6 +304,13 @@ const MainFlowScreen = () => {
 
   // --- Share Handler ---
   const handleShare = async () => {
+    // Web doesn't support react-native-view-shot
+    if (Platform.OS === 'web') {
+      alert('Sharing is not available on web. Download the mobile app to share your streak!');
+      return;
+    }
+
+    // Native iOS/Android screenshot sharing
     try {
       if (streakScreenRef.current) {
         // Automatically capture the streak screen
@@ -451,12 +458,23 @@ const MainFlowScreen = () => {
       {/* --- BUTTONS --- */}
       {currentStep === 'STREAK' ? (
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.shareButton}
-            onPress={handleShare}
-          >
-            <Text style={styles.shareButtonText}>Share</Text>
-          </TouchableOpacity>
+          {Platform.OS !== 'web' && (
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={handleShare}
+            >
+              <Text style={styles.shareButtonText}>Share</Text>
+            </TouchableOpacity>
+          )}
+
+          {userStreak >= 5 && (
+            <TouchableOpacity
+              style={styles.liquidateButton}
+              onPress={() => router.push('/liquidate-streak')}
+            >
+              <Text style={styles.liquidateButtonText}>Liquidate Streak</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.logoutButton}
@@ -555,6 +573,19 @@ const styles = StyleSheet.create({
   },
   shareButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  liquidateButton: {
+    backgroundColor: '#fff',
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E8997E',
+  },
+  liquidateButtonText: {
+    color: '#E8997E',
     fontSize: 16,
     fontWeight: '600',
   },
