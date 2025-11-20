@@ -334,12 +334,8 @@ export default function LiquidateStreakScreen() {
             keyboardType="numeric"
             maxLength={3}
           />
-          {validationError ? (
+          {validationError && (
             <Text style={styles.validationError}>{validationError}</Text>
-          ) : (
-            <Text style={styles.inputHint}>
-              Try different amounts (1, 2, 3...) to see how your payout changes
-            </Text>
           )}
         </View>
 

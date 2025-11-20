@@ -141,7 +141,7 @@ export default function SendStreakScreen() {
       <View style={styles.container}>
         {/* Username Input */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Who do you want to send days to?</Text>
+          <Text style={styles.label}>Username</Text>
           <TextInput
             style={styles.input}
             placeholder="username"
@@ -165,7 +165,7 @@ export default function SendStreakScreen() {
 
         {/* Days Input */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>How many days do you want to send?</Text>
+          <Text style={styles.label}>Days</Text>
           <TextInput
             style={styles.daysInput}
             value={daysInput}

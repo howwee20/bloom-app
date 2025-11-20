@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
     fontFamily: 'ZenDots_400Regular',
     fontSize: 16,
     fontWeight: '600',
-    color: '#0437F2', // Blue
+    color: '#A84296', // Magenta
     textAlign: 'center',
   },
   liquidateButton: {

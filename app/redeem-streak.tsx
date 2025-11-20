@@ -5,6 +5,13 @@ import { useRouter } from 'expo-router';
 import { useAuth } from './_layout';
 import { supabase } from '../lib/supabase';
 
+// Redemption options
+const REDEMPTION_OPTIONS = [
+  { id: 'starbucks', name: 'Starbucks', color: '#00704A' },
+  { id: 'target', name: 'Target', color: '#CC0000' },
+  { id: 'xbox', name: 'Xbox', color: '#107C10' },
+];
+
 export default function RedeemStreakScreen() {
   const router = useRouter();
   const { session } = useAuth();
@@ -13,9 +20,10 @@ export default function RedeemStreakScreen() {
   const [userEmail, setUserEmail] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedOption, setSelectedOption] = useState<typeof REDEMPTION_OPTIONS[0] | null>(null);
 
   const DAYS_REQUIRED = 10;
-  const ITEM_NAME = '$5 Starbucks';
   const ITEM_VALUE = 5.00;
 
   // Fetch user's current streak and email
@@ -51,6 +59,11 @@ export default function RedeemStreakScreen() {
   const handleRedeem = async () => {
     console.log('=== REDEEM DEBUG START ===');
 
+    if (!selectedOption) {
+      Alert.alert('Error', 'Please select an option');
+      return;
+    }
+
     if (!isValidEmail(userEmail)) {
       Alert.alert('Invalid Email', 'Please enter a valid email address');
       return;
@@ -59,14 +72,18 @@ export default function RedeemStreakScreen() {
     setShowConfirmModal(false);
     setIsSubmitting(true);
 
+    const itemName = `$5 ${selectedOption.name}`;
+
     try {
       console.log('Processing redemption:', {
         email: userEmail,
         days: DAYS_REQUIRED,
+        item: itemName,
       });
 
       const { data, error } = await supabase.rpc('process_redemption', {
         user_email_input: userEmail.trim(),
+        item_name_input: itemName,
       });
 
       console.log('RPC Response:', { data, error });
@@ -86,7 +103,7 @@ export default function RedeemStreakScreen() {
       setTimeout(() => {
         Alert.alert(
           'Redeemed!',
-          `${ITEM_NAME} will be sent to ${userEmail}\n\nYour new streak: ${data.newStreak} days`
+          `${itemName} will be sent to ${userEmail}\n\nYour new streak: ${data.newStreak} days`
         );
       }, 300);
 
@@ -118,17 +135,102 @@ export default function RedeemStreakScreen() {
     );
   }
 
+  // Show category menu first
+  if (!selectedCategory) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.headerText}>Redeem Your Streak</Text>
+
+        <View style={styles.categoryList}>
+          {/* Gift Cards - Active */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.categoryItem,
+              pressed && { opacity: 0.6 }
+            ]}
+            onPress={() => setSelectedCategory('gift-cards')}
+          >
+            <Text style={styles.categoryText}>Gift Cards</Text>
+            <Text style={styles.categoryArrow}>→</Text>
+          </Pressable>
+
+          {/* Food/Drink - Coming Soon */}
+          <View style={styles.categoryItemDisabled}>
+            <Text style={styles.categoryTextDisabled}>Food & Drink</Text>
+            <Text style={styles.comingSoonBadge}>Coming Soon</Text>
+          </View>
+
+          {/* Bloom Store - Coming Soon */}
+          <View style={styles.categoryItemDisabled}>
+            <Text style={styles.categoryTextDisabled}>Bloom Store</Text>
+            <Text style={styles.comingSoonBadge}>Coming Soon</Text>
+          </View>
+        </View>
+
+        <Pressable style={styles.cancelButton} onPress={() => router.back()}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // Show gift card options if category selected
+  if (selectedCategory === 'gift-cards' && !selectedOption) {
+    return (
+      <View style={styles.container}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => setSelectedCategory(null)}
+        >
+          <Text style={styles.backButtonText}>← Back</Text>
+        </Pressable>
+
+        <Text style={styles.headerText}>Gift Cards</Text>
+
+        <View style={styles.optionsList}>
+          {REDEMPTION_OPTIONS.map((option) => (
+            <Pressable
+              key={option.id}
+              style={({ pressed }) => [
+                styles.optionItem,
+                pressed && { opacity: 0.6 }
+              ]}
+              onPress={() => setSelectedOption(option)}
+            >
+              <Text style={[styles.optionText, { color: option.color }]}>
+                {option.name}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Pressable style={styles.cancelButton} onPress={() => router.back()}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // Option selected - show detailed card
+  const itemName = `$5 ${selectedOption.name}`;
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container}>
-        {/* Header */}
-        <Text style={styles.headerText}>Redeem Your Streak</Text>
-        <Text style={styles.subheaderText}>Exchange Bloom Days for real rewards</Text>
+        {/* Back to gift cards list */}
+        <Pressable
+          style={styles.backButton}
+          onPress={() => setSelectedOption(null)}
+        >
+          <Text style={styles.backButtonText}>← Gift Cards</Text>
+        </Pressable>
 
         {/* Redemption Card */}
         <View style={styles.redeemCard}>
           <View style={styles.cardHeader}>
-            <Text style={styles.brandText}>Starbucks</Text>
+            <Text style={[styles.brandText, { color: selectedOption.color }]}>
+              {selectedOption.name}
+            </Text>
             <View style={styles.digitalBadge}>
               <Text style={styles.digitalBadgeText}>Digital Code</Text>
             </View>
@@ -141,7 +243,9 @@ export default function RedeemStreakScreen() {
             </View>
             <Text style={styles.arrowText}>→</Text>
             <View style={styles.exchangeItem}>
-              <Text style={styles.exchangeValue}>${ITEM_VALUE.toFixed(0)}</Text>
+              <Text style={[styles.exchangeValue, { color: selectedOption.color }]}>
+                ${ITEM_VALUE.toFixed(0)}
+              </Text>
               <Text style={styles.exchangeLabel}>Gift Card</Text>
             </View>
           </View>
@@ -185,7 +289,7 @@ export default function RedeemStreakScreen() {
           disabled={isSubmitting || !userEmail.trim()}
         >
           <Text style={styles.submitButtonText}>
-            {isSubmitting ? 'Processing...' : `Redeem ${ITEM_NAME}`}
+            {isSubmitting ? 'Processing...' : `Redeem ${itemName}`}
           </Text>
         </Pressable>
 
@@ -205,7 +309,7 @@ export default function RedeemStreakScreen() {
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Confirm Redemption</Text>
               <Text style={styles.modalBody}>
-                Exchange {DAYS_REQUIRED} Bloom Days for {ITEM_NAME}?
+                Exchange {DAYS_REQUIRED} Bloom Days for {itemName}?
               </Text>
               <Text style={styles.modalSubtext}>
                 Your new streak: {userStreak - DAYS_REQUIRED} days
@@ -277,6 +381,75 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     textAlign: 'center',
   },
+  categoryList: {
+    width: '100%',
+    marginBottom: 30,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFF5EE',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  categoryText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#5C4033',
+  },
+  categoryArrow: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 18,
+    color: '#E8997E',
+  },
+  categoryItemDisabled: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255, 245, 238, 0.5)',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  categoryTextDisabled: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(92, 64, 51, 0.4)',
+  },
+  comingSoonBadge: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 10,
+    color: 'rgba(92, 64, 51, 0.5)',
+    fontStyle: 'italic',
+  },
+  optionsList: {
+    width: '100%',
+    marginBottom: 30,
+  },
+  optionItem: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  optionText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 20,
+  },
+  backButtonText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 14,
+    color: '#8B6F5C',
+  },
   redeemCard: {
     backgroundColor: '#FFF5EE',
     borderRadius: 16,
@@ -299,7 +472,6 @@ const styles = StyleSheet.create({
     fontFamily: 'ZenDots_400Regular',
     fontSize: 18,
     fontWeight: '700',
-    color: '#00704A', // Starbucks green
   },
   digitalBadge: {
     backgroundColor: '#4CAF50',
@@ -332,7 +504,6 @@ const styles = StyleSheet.create({
     fontFamily: 'ZenDots_400Regular',
     fontSize: 32,
     fontWeight: '700',
-    color: '#00704A',
   },
   exchangeLabel: {
     fontFamily: 'ZenDots_400Regular',

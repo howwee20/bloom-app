@@ -36,13 +36,14 @@ CREATE POLICY "Users can create redemptions"
 
 -- 6. RPC Function: Process Redemption
 CREATE OR REPLACE FUNCTION process_redemption(
-  user_email_input TEXT
+  user_email_input TEXT,
+  item_name_input TEXT
 ) RETURNS JSON AS $$
 DECLARE
   redeemer_user_id UUID;
   redeemer_current_streak INTEGER;
   days_required INTEGER := 10;
-  item_name_val TEXT := 'Starbucks $5';
+  item_name_val TEXT := item_name_input;
   item_value_val DECIMAL := 5.00;
   result JSON;
 BEGIN
@@ -92,7 +93,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION process_redemption(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION process_redemption(TEXT, TEXT) TO authenticated;
 
 -- Migration complete!
 -- Users can now redeem Bloom streak days for gift cards
