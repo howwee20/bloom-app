@@ -382,6 +382,10 @@ const MainFlowScreen = () => {
         return (
           <View style={[styles.stepContainer, styles.brandBackground]}>
             <Text style={styles.headerText}>BLOOM</Text>
+            <View style={styles.warningContainer}>
+              <Text style={styles.warningText}>Flash warning</Text>
+              <Text style={styles.warningText}>Double tap to navigate</Text>
+            </View>
           </View>
         );
       case 'STROBE':
@@ -499,6 +503,28 @@ const MainFlowScreen = () => {
                 </Text>
               </Pressable>
 
+              {/* Redeem button */}
+              <Pressable
+                onPress={() => {
+                  if (userStreak < 10) {
+                    showAlert('Locked', 'Need at least 10 days in your streak to redeem');
+                    return;
+                  }
+                  router.push('/redeem-streak');
+                }}
+                style={({ pressed }) => [
+                  styles.redeemButton,
+                  pressed && { opacity: 0.6 }
+                ]}
+              >
+                <Text style={[
+                  styles.redeemButtonText,
+                  userStreak < 10 && { opacity: 0.4 }
+                ]}>
+                  Redeem
+                </Text>
+              </Pressable>
+
               <Pressable
                 onPress={() => supabase.auth.signOut()}
                 style={({ pressed }) => [
@@ -603,6 +629,28 @@ const styles = StyleSheet.create({
     fontFamily: 'ZenDots_400Regular',
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+  warningContainer: {
+    position: 'absolute',
+    bottom: 100,
+    alignItems: 'center',
+  },
+  warningText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  redeemButton: {
+    paddingVertical: 8,
+  },
+  redeemButtonText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0437F2', // Blue
     textAlign: 'center',
   },
   liquidateButton: {

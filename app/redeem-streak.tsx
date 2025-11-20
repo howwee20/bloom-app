@@ -1,0 +1,518 @@
+// File: app/redeem-streak.tsx
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Alert, Modal } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useAuth } from './_layout';
+import { supabase } from '../lib/supabase';
+
+export default function RedeemStreakScreen() {
+  const router = useRouter();
+  const { session } = useAuth();
+
+  const [userStreak, setUserStreak] = useState(0);
+  const [userEmail, setUserEmail] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const DAYS_REQUIRED = 10;
+  const ITEM_NAME = '$5 Starbucks';
+  const ITEM_VALUE = 5.00;
+
+  // Fetch user's current streak and email
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!session) return;
+
+      try {
+        // Get streak
+        const { data: streakData, error: streakError } = await supabase.rpc('get_current_streak');
+        if (streakError) throw streakError;
+        setUserStreak(typeof streakData === 'number' ? streakData : 0);
+
+        // Pre-fill email if available
+        if (session.user.email) {
+          setUserEmail(session.user.email);
+        }
+      } catch (e) {
+        console.error('Error fetching user data:', e);
+        setUserStreak(0);
+      }
+    };
+
+    fetchUserData();
+  }, [session]);
+
+  // Validate email format
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleRedeem = async () => {
+    console.log('=== REDEEM DEBUG START ===');
+
+    if (!isValidEmail(userEmail)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      return;
+    }
+
+    setShowConfirmModal(false);
+    setIsSubmitting(true);
+
+    try {
+      console.log('Processing redemption:', {
+        email: userEmail,
+        days: DAYS_REQUIRED,
+      });
+
+      const { data, error } = await supabase.rpc('process_redemption', {
+        user_email_input: userEmail.trim(),
+      });
+
+      console.log('RPC Response:', { data, error });
+
+      if (error) {
+        console.error('Supabase RPC error:', error);
+        Alert.alert('Error', error.message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // SUCCESS - redirect back immediately
+      console.log('Redemption successful! Redirecting...', data);
+      router.replace('/(tabs)');
+
+      // Show confirmation alert AFTER redirect
+      setTimeout(() => {
+        Alert.alert(
+          'Redeemed!',
+          `${ITEM_NAME} will be sent to ${userEmail}\n\nYour new streak: ${data.newStreak} days`
+        );
+      }, 300);
+
+    } catch (err: any) {
+      console.error('Unexpected error:', err);
+      Alert.alert('Error', 'Failed to process redemption. Try again.');
+      setIsSubmitting(false);
+    } finally {
+      console.log('=== REDEEM DEBUG END ===');
+    }
+  };
+
+  // Check if user can redeem
+  const canRedeem = userStreak >= DAYS_REQUIRED;
+
+  if (!canRedeem) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>
+          You need at least {DAYS_REQUIRED} streak days to redeem.
+        </Text>
+        <Text style={styles.errorSubtext}>
+          You currently have {userStreak} days.
+        </Text>
+        <Pressable style={styles.submitButton} onPress={() => router.back()}>
+          <Text style={styles.submitButtonText}>Go Back</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <View style={styles.container}>
+        {/* Header */}
+        <Text style={styles.headerText}>Redeem Your Streak</Text>
+        <Text style={styles.subheaderText}>Exchange Bloom Days for real rewards</Text>
+
+        {/* Redemption Card */}
+        <View style={styles.redeemCard}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.brandText}>Starbucks</Text>
+            <View style={styles.digitalBadge}>
+              <Text style={styles.digitalBadgeText}>Digital Code</Text>
+            </View>
+          </View>
+
+          <View style={styles.exchangeRow}>
+            <View style={styles.exchangeItem}>
+              <Text style={styles.exchangeDays}>{DAYS_REQUIRED}</Text>
+              <Text style={styles.exchangeLabel}>Bloom Days</Text>
+            </View>
+            <Text style={styles.arrowText}>→</Text>
+            <View style={styles.exchangeItem}>
+              <Text style={styles.exchangeValue}>${ITEM_VALUE.toFixed(0)}</Text>
+              <Text style={styles.exchangeLabel}>Gift Card</Text>
+            </View>
+          </View>
+
+          <Text style={styles.deliveryText}>Instant delivery to your email</Text>
+        </View>
+
+        {/* Email Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Delivery Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="your@email.com"
+            placeholderTextColor="rgba(92, 64, 51, 0.4)"
+            value={userEmail}
+            onChangeText={setUserEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            editable={!isSubmitting}
+          />
+        </View>
+
+        {/* Preview Box */}
+        <View style={styles.previewBox}>
+          <Text style={styles.previewLabel}>PREVIEW</Text>
+          <View style={styles.previewRow}>
+            <Text style={styles.previewText}>Your current streak:</Text>
+            <Text style={styles.previewValue}>{userStreak} days</Text>
+          </View>
+          <View style={styles.previewRow}>
+            <Text style={styles.previewText}>After redeeming:</Text>
+            <Text style={styles.previewValue}>{userStreak - DAYS_REQUIRED} days</Text>
+          </View>
+        </View>
+
+        {/* Redeem Button */}
+        <Pressable
+          style={[styles.submitButton, (isSubmitting || !userEmail.trim()) && styles.submitButtonDisabled]}
+          onPress={() => setShowConfirmModal(true)}
+          disabled={isSubmitting || !userEmail.trim()}
+        >
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? 'Processing...' : `Redeem ${ITEM_NAME}`}
+          </Text>
+        </Pressable>
+
+        {/* Cancel Button */}
+        <Pressable style={styles.cancelButton} onPress={() => router.back()} disabled={isSubmitting}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </Pressable>
+
+        {/* Confirmation Modal */}
+        <Modal
+          visible={showConfirmModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowConfirmModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Confirm Redemption</Text>
+              <Text style={styles.modalBody}>
+                Exchange {DAYS_REQUIRED} Bloom Days for {ITEM_NAME}?
+              </Text>
+              <Text style={styles.modalSubtext}>
+                Your new streak: {userStreak - DAYS_REQUIRED} days
+              </Text>
+              <Text style={styles.modalEmail}>
+                Sending to: {userEmail}
+              </Text>
+
+              <View style={styles.modalButtons}>
+                <Pressable
+                  style={styles.modalCancelButton}
+                  onPress={() => setShowConfirmModal(false)}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.modalConfirmButton}
+                  onPress={handleRedeem}
+                >
+                  <Text style={styles.modalConfirmText}>Confirm</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrollContainer: {
+    flexGrow: 1,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#FFD7B5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  errorText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 18,
+    color: '#5C4033',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  errorSubtext: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 14,
+    color: 'rgba(92, 64, 51, 0.7)',
+    marginBottom: 40,
+    textAlign: 'center',
+  },
+  headerText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#5C4033',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subheaderText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 12,
+    color: 'rgba(92, 64, 51, 0.7)',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  redeemCard: {
+    backgroundColor: '#FFF5EE',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  brandText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#00704A', // Starbucks green
+  },
+  digitalBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  digitalBadgeText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  exchangeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  exchangeItem: {
+    alignItems: 'center',
+  },
+  exchangeDays: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#5C4033',
+  },
+  exchangeValue: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#00704A',
+  },
+  exchangeLabel: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 10,
+    color: 'rgba(92, 64, 51, 0.6)',
+    marginTop: 4,
+  },
+  arrowText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 24,
+    color: '#E8997E',
+    marginHorizontal: 20,
+  },
+  deliveryText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 10,
+    color: 'rgba(92, 64, 51, 0.5)',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  inputContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  label: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#5C4033',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  input: {
+    fontFamily: 'ZenDots_400Regular',
+    backgroundColor: '#FFF5EE',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 153, 126, 0.3)',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#5C4033',
+    textAlign: 'center',
+  },
+  previewBox: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    width: '100%',
+    borderWidth: 2,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+  },
+  previewLabel: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#4CAF50',
+    textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  previewText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 12,
+    color: '#5C4033',
+  },
+  previewValue: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 12,
+    color: '#5C4033',
+    fontWeight: '600',
+  },
+  submitButton: {
+    width: '100%',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitButtonText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  cancelButton: {
+    width: '100%',
+    backgroundColor: 'transparent',
+    paddingVertical: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#8B6F5C',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  modalContent: {
+    backgroundColor: '#FFF5EE',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#5C4033',
+    marginBottom: 16,
+  },
+  modalBody: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 14,
+    color: '#5C4033',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalSubtext: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 12,
+    color: 'rgba(92, 64, 51, 0.7)',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalEmail: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 10,
+    color: 'rgba(92, 64, 51, 0.5)',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#E0E0E0',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  modalConfirmButton: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+});
