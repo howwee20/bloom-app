@@ -3,7 +3,7 @@
 
 import { router } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, Button, Platform, Alert } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Platform, Alert } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -552,13 +552,6 @@ const MainFlowScreen = () => {
       style={styles.container}
     >
       {renderCurrentStep()}
-
-      {/* Debug panel for non-STREAK screens */}
-      {currentStep !== 'STREAK' && (
-        <View style={styles.debugPanel}>
-          <Button title="Log Out" color="#888" onPress={() => supabase.auth.signOut()} />
-        </View>
-      )}
     </Pressable>
   );
 };
@@ -688,21 +681,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     marginBottom: 20,
-  },
-  debugPanel: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 15,
-    borderRadius: 10,
-    zIndex: 10,
-  },
-  debugText: {
-    color: 'white',
-    fontSize: 12,
-    marginBottom: 5,
   },
   blurCover: {
     ...StyleSheet.absoluteFillObject,
