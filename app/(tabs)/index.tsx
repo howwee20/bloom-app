@@ -505,22 +505,13 @@ const MainFlowScreen = () => {
 
               {/* Redeem button */}
               <Pressable
-                onPress={() => {
-                  if (userStreak < 10) {
-                    showAlert('Locked', 'Need at least 10 days in your streak to redeem');
-                    return;
-                  }
-                  router.push('/redeem-streak');
-                }}
+                onPress={() => router.push('/redeem-streak')}
                 style={({ pressed }) => [
                   styles.redeemButton,
                   pressed && { opacity: 0.6 }
                 ]}
               >
-                <Text style={[
-                  styles.redeemButtonText,
-                  userStreak < 10 && { opacity: 0.4 }
-                ]}>
+                <Text style={styles.redeemButtonText}>
                   Redeem
                 </Text>
               </Pressable>

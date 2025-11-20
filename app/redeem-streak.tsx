@@ -118,22 +118,7 @@ export default function RedeemStreakScreen() {
 
   // Check if user can redeem
   const canRedeem = userStreak >= DAYS_REQUIRED;
-
-  if (!canRedeem) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>
-          You need at least {DAYS_REQUIRED} streak days to redeem.
-        </Text>
-        <Text style={styles.errorSubtext}>
-          You currently have {userStreak} days.
-        </Text>
-        <Pressable style={styles.submitButton} onPress={() => router.back()}>
-          <Text style={styles.submitButtonText}>Go Back</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const daysNeeded = DAYS_REQUIRED - userStreak;
 
   // Show category menu first
   if (!selectedCategory) {
@@ -270,26 +255,43 @@ export default function RedeemStreakScreen() {
         </View>
 
         {/* Preview Box */}
-        <View style={styles.previewBox}>
-          <Text style={styles.previewLabel}>PREVIEW</Text>
+        <View style={[styles.previewBox, !canRedeem && styles.previewBoxInsufficient]}>
+          <Text style={[styles.previewLabel, !canRedeem && styles.previewLabelInsufficient]}>
+            {canRedeem ? 'PREVIEW' : 'NOT ENOUGH DAYS'}
+          </Text>
           <View style={styles.previewRow}>
             <Text style={styles.previewText}>Your current streak:</Text>
             <Text style={styles.previewValue}>{userStreak} days</Text>
           </View>
           <View style={styles.previewRow}>
-            <Text style={styles.previewText}>After redeeming:</Text>
-            <Text style={styles.previewValue}>{userStreak - DAYS_REQUIRED} days</Text>
+            <Text style={styles.previewText}>Required:</Text>
+            <Text style={styles.previewValue}>{DAYS_REQUIRED} days</Text>
           </View>
+          {!canRedeem && (
+            <View style={styles.previewRow}>
+              <Text style={[styles.previewText, { color: '#E85555' }]}>Need:</Text>
+              <Text style={[styles.previewValue, { color: '#E85555' }]}>{daysNeeded} more days</Text>
+            </View>
+          )}
         </View>
 
         {/* Redeem Button */}
         <Pressable
-          style={[styles.submitButton, (isSubmitting || !userEmail.trim()) && styles.submitButtonDisabled]}
-          onPress={() => setShowConfirmModal(true)}
-          disabled={isSubmitting || !userEmail.trim()}
+          style={[styles.submitButton, (isSubmitting || !userEmail.trim() || !canRedeem) && styles.submitButtonDisabled]}
+          onPress={() => {
+            if (!canRedeem) {
+              Alert.alert(
+                'Not Enough Days',
+                `You need ${daysNeeded} more days to redeem this. Keep your streak going!`
+              );
+              return;
+            }
+            setShowConfirmModal(true);
+          }}
+          disabled={isSubmitting}
         >
           <Text style={styles.submitButtonText}>
-            {isSubmitting ? 'Processing...' : `Redeem ${itemName}`}
+            {isSubmitting ? 'Processing...' : canRedeem ? `Redeem ${itemName}` : `Need ${daysNeeded} More Days`}
           </Text>
         </Pressable>
 
@@ -557,6 +559,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(76, 175, 80, 0.3)',
   },
+  previewBoxInsufficient: {
+    backgroundColor: 'rgba(232, 85, 85, 0.1)',
+    borderColor: 'rgba(232, 85, 85, 0.3)',
+  },
   previewLabel: {
     fontFamily: 'ZenDots_400Regular',
     fontSize: 10,
@@ -565,6 +571,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
     letterSpacing: 1,
+  },
+  previewLabelInsufficient: {
+    color: '#E85555',
   },
   previewRow: {
     flexDirection: 'row',
