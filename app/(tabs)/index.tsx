@@ -1,29 +1,16 @@
 // In File: app/(tabs)/index.tsx
-// REPLACE THE ENTIRE FILE CONTENT WITH THIS:
+// Time Savings Account - Simplified Flow
 
 import { router } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, Platform, Alert } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSequence,
-  withRepeat,
-  runOnJS,
-} from 'react-native-reanimated';
-import StrobeAnimation from '../../components/StrobeAnimation';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../_layout';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect } from 'expo-router';
 
-// The 7-step "Vending Machine" Flow
+// Simplified 3-step flow: Splash → Ad → Streak
 const FLOW_STEPS = [
   'SPLASH',
-  'STROBE',
-  'PULSE',
-  'REVEAL',
-  'PAYOUT',
   'AD_VIDEO',
   'STREAK',
 ];
@@ -41,34 +28,7 @@ const MainFlowScreen = () => {
   // --- Real Backend State ---
   const [isLockedOut, setIsLockedOut] = useState(true); // Default true to be safe
   const [userStreak, setUserStreak] = useState(0);
-  const [streakValue, setStreakValue] = useState<number>(0);
-  const [todayPrize, setTodayPrize] = useState<number>(5.00);
-  const [yesterdayPrizeAmount, setYesterdayPrizeAmount] = useState<number>(5.00);
-  const [isWinner, setIsWinner] = useState(false); // Did *I* win?
-  const [dailyWinnerUsername, setDailyWinnerUsername] = useState<string | null>(null); // Who won?
-  const [canLiquidateToday, setCanLiquidateToday] = useState(true); // Can user liquidate today?
-
-  // --- Reveal Animation Shared Values ---
-  const revealOpacity = useSharedValue(0);
-  const revealScale = useSharedValue(1);
-
-  // --- Animated Style for Reveal ---
-  const animatedRevealStyle = useAnimatedStyle(() => {
-    return {
-      opacity: revealOpacity.value,
-      transform: [{ scale: revealScale.value }],
-    };
-  });
-
-  // --- Helper: Cross-platform Alert ---
-  const showAlert = (title: string, message: string) => {
-    if (Platform.OS === 'web') {
-      // Web fallback - use window.alert
-      window.alert(`${title}\n\n${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
-  };
+  const [lifetimeDays, setLifetimeDays] = useState<number>(0);
 
   // --- Data Fetching ---
   useFocusEffect(
@@ -100,86 +60,15 @@ const MainFlowScreen = () => {
           if (streakError) throw streakError;
           setUserStreak(typeof streakData === 'number' ? streakData : 0);
 
-          // --- 3.5. FETCH TODAY'S PRIZE ---
-          const today = new Date();
-          const todayDateString = today.toISOString().split('T')[0];
-          const { data: prizeData, error: prizeError } = await supabase
-            .from('daily_prizes')
-            .select('prize_amount')
-            .eq('date', todayDateString)
-            .single();
-
-          if (!prizeError && prizeData) {
-            setTodayPrize(prizeData.prize_amount);
-          }
-
-          // --- 4. FETCH YESTERDAY'S WINNER ---
-          // Users should see who won YESTERDAY's lottery (completed this morning at 7 AM)
-          const yesterday = new Date(today);
-          yesterday.setDate(yesterday.getDate() - 1);
-          const yesterdayDateString = yesterday.toISOString().split('T')[0]; // Format: "2025-11-09"
-
-          console.log('[DEBUG] Looking for winner on date:', yesterdayDateString); // Debug log
-
-          const { data: winnerData, error: winnerError } = await supabase
-            .from('daily_winners')
-            .select('user_id, prize_amount')
-            .eq('date', yesterdayDateString) // Fetch yesterday's winner
-            .maybeSingle();
-
-          if (winnerError) {
-            console.error("Error fetching winner info:", winnerError);
-            throw winnerError;
-          }
-
-          console.log('[DEBUG] Winner data:', winnerData); // Debug log
-
-          // Fetch winner's username if winner exists
-          let winnerUsername = null;
-          if (winnerData) {
-            const { data: winnerProfile } = await supabase
-              .from('profile')
-              .select('username')
-              .eq('id', winnerData.user_id)
-              .single();
-
-            winnerUsername = winnerProfile?.username || 'Unknown';
-            console.log('[DEBUG] Winner username:', winnerUsername); // Debug log
-
-            // Store yesterday's prize amount
-            setYesterdayPrizeAmount(winnerData.prize_amount || 5.00);
-          }
-
-          // Check if current user is the winner
-          setIsWinner(winnerData ? winnerData.user_id === session.user.id : false);
-          setDailyWinnerUsername(winnerUsername);
-
-          // --- 4.5. CHECK IF USER CAN LIQUIDATE TODAY ---
+          // --- 4. FETCH LIFETIME DAYS ---
           const { data: profileData } = await supabase
             .from('profile')
-            .select('last_liquidation_date')
+            .select('lifetime_days')
             .eq('id', session.user.id)
             .maybeSingle();
 
-          if (profileData?.last_liquidation_date) {
-            const lastLiquidation = new Date(profileData.last_liquidation_date);
-            const todayDate = new Date();
-
-            // Compare dates (ignoring time)
-            const lastLiquidationDateStr = lastLiquidation.toISOString().split('T')[0];
-            const todayDateStr = todayDate.toISOString().split('T')[0];
-
-            const isSameDay = lastLiquidationDateStr === todayDateStr;
-            setCanLiquidateToday(!isSameDay);
-
-            console.log('[DEBUG] Liquidation check:', {
-              lastLiquidationDateStr,
-              todayDateStr,
-              canLiquidate: !isSameDay
-            });
-          } else {
-            // No liquidation record, user can liquidate
-            setCanLiquidateToday(true);
+          if (profileData) {
+            setLifetimeDays(profileData.lifetime_days || 0);
           }
 
           // --- 5. SET LOCKOUT STATE ---
@@ -204,94 +93,22 @@ const MainFlowScreen = () => {
     }, [session])
   );
 
-  // --- Fetch Streak Value with Retry Logic ---
-  const fetchStreakValue = async (retryCount = 0) => {
-    try {
-      // Add small delay to let database update propagate
-      if (retryCount === 0) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      const { data, error } = await supabase.rpc('get_streak_value');
-      if (error) throw error;
-
-      const value = data || 0;
-
-      // If value is 0 and we have a streak, retry once
-      if (value === 0 && userStreak > 0 && retryCount === 0) {
-        console.log('[DEBUG] Streak value is 0 but streak > 0, retrying...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return fetchStreakValue(1);
-      }
-
-      setStreakValue(value);
-    } catch (error) {
-      console.error('Error fetching streak value:', error);
-      setStreakValue(0);
-    }
-  };
-
-  // --- Refetch Streak Value When Streak Changes ---
-  useEffect(() => {
-    if (userStreak > 0) {
-      fetchStreakValue();
-    }
-  }, [userStreak]);
 
   // --- Auto-advancing logic ---
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
 
-    // 1. RESET ANIMATIONS ON SPLASH
-    if (currentStep === 'SPLASH') {
-      revealOpacity.value = 0;
-      revealScale.value = 1;
-    }
-
-    // 2. HANDLE "PULSE" ANIMATION & AUTO-ADVANCE
-    else if (currentStep === 'PULSE') {
-      // Start the PULSING animation (it will be covered)
-      revealOpacity.value = withTiming(0.7, { duration: 100 });
-      revealScale.value = withRepeat(
-        withSequence(
-          withTiming(1.2, { duration: 150 }), // VIOLENT pulse
-          withTiming(1, { duration: 150 })
-        ),
-        -1, true // Loop infinitely
-      );
-
-      // After 2.5 seconds, advance to the final REVEAL step
+    // AD_VIDEO auto-advances to STREAK after 10 seconds
+    if (currentStep === 'AD_VIDEO') {
       timeout = setTimeout(() => {
-        runOnJS(advanceStep)();
-      }, 2500); // 2.5 seconds of pulsing
-    }
-
-    // 3. HANDLE FINAL "REVEAL" STATE (THE FIX)
-    else if (currentStep === 'REVEAL') {
-      // This is the final, clear state.
-      // Stop all animations and set to 100% visible.
-      revealOpacity.value = withTiming(1);
-      revealScale.value = withTiming(1);
-    }
-
-    // 4. HANDLE "AD_VIDEO" AUTO-ADVANCE WITH FORK
-    else if (currentStep === 'AD_VIDEO') {
-      timeout = setTimeout(async () => {
-        // After ad completes, fork based on winner status
-        if (isWinner) {
-          // Record play BEFORE redirecting to payout form
-          await recordPlay();
-          runOnJS(router.push)('/winner-payout'); // Winner goes to payout form
-        } else {
-          runOnJS(advanceStep)(); // Loser advances to STREAK
-        }
+        advanceStep();
       }, 10000); // 10-second ad
     }
 
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [currentStep, isWinner, router]); // Dependencies for auto-advance logic
+  }, [currentStep]);
 
   // --- Record Play Function ---
   // Extracted for reuse by both winners (after ad) and losers (at STREAK)
@@ -331,13 +148,7 @@ const MainFlowScreen = () => {
   // --- Navigation Logic ---
   const advanceStep = useCallback(() => {
     setStepIndex((prevIndex) => Math.min(prevIndex + 1, FLOW_STEPS.length - 1));
-  }, []); // Empty dependency array means this function *never* changes.
-
-  // This is the new, STABLE callback we will pass as a prop.
-  // It's wrapped in useCallback and depends on the stable advanceStep.
-  const onStrobeComplete = useCallback(() => {
-    advanceStep();
-  }, [advanceStep]);
+  }, []);
 
   const handlePress = () => {
     if (isLockedOut) return;
@@ -347,32 +158,12 @@ const MainFlowScreen = () => {
 
     if (!isDoubleTap) return;
 
-    // These are the ONLY steps that advance on double-tap
-    const manualSteps = [
-      'SPLASH',
-      'REVEAL', // The final, revealed text
-      'PAYOUT',
-      'STREAK' // The final step
-    ];
-
-    if (manualSteps.includes(currentStep)) {
-
-      // PAYOUT LOGIC: Always advance to AD, no fork
-      if (currentStep === 'PAYOUT') {
-        advanceStep(); // Everyone watches the ad
-        return;
-      }
-
-      // STREAK LOGIC: It's the final screen. Do nothing on double-tap.
-      if (currentStep === 'STREAK') {
-        return;
-      }
-
-      // All other manual steps
+    // SPLASH advances on double-tap
+    // AD_VIDEO auto-advances (no tap)
+    // STREAK is final (no tap)
+    if (currentStep === 'SPLASH') {
       advanceStep();
     }
-    // If the step is 'STROBE', 'PULSE', or 'AD_VIDEO',
-    // this function does NOTHING.
   };
 
   // --- The UI ---
@@ -383,56 +174,14 @@ const MainFlowScreen = () => {
           <View style={[styles.stepContainer, styles.brandBackground]}>
             <Text style={styles.headerText}>BLOOM</Text>
             <View style={styles.warningContainer}>
-              <Text style={styles.warningText}>Flash warning</Text>
-              <Text style={styles.warningText}>Double tap to navigate</Text>
+              <Text style={styles.warningText}>Double tap to start</Text>
             </View>
-          </View>
-        );
-      case 'STROBE':
-        return (
-          <StrobeAnimation
-            onAnimationComplete={onStrobeComplete}
-          />
-        );
-      case 'PULSE':
-        // This is the "blurred, pulsing" state.
-        return (
-          <View style={[styles.stepContainer, styles.brandBackground]}>
-            {/* 1. The text pulses underneath */}
-            <Animated.View style={[styles.stepContainer, animatedRevealStyle]}>
-              <Text style={styles.headerText}>{isWinner ? 'YOU WON!' : 'Not Today.'}</Text>
-            </Animated.View>
-
-            {/* 2. The "blur cover" sits on top, hiding it */}
-            <View style={styles.blurCover} />
-          </View>
-        );
-      case 'REVEAL':
-        // This is the final, stable, "revealed" state that waits
-        // for the user to double-tap.
-        // The logic is now in the useEffect, this just renders.
-        return (
-          <View style={[styles.stepContainer, styles.brandBackground]}>
-            <Animated.View style={[styles.stepContainer, animatedRevealStyle]}>
-              <Text style={styles.headerText}>{isWinner ? 'YOU WON!' : 'Not Today.'}</Text>
-            </Animated.View>
-          </View>
-        );
-      case 'PAYOUT':
-        return (
-          <View style={[styles.stepContainer, styles.brandBackground]}>
-            <Text style={styles.prizeText}>Today's Prize: ${todayPrize.toFixed(2)}</Text>
-            {isWinner ? (
-              <Text style={styles.headerText}>You Won!</Text>
-            ) : (
-              <Text style={styles.headerText}>Winner: @{dailyWinnerUsername || 'No winner yet'}</Text>
-            )}
           </View>
         );
       case 'AD_VIDEO':
         return (
           <View style={[styles.stepContainer, styles.adBackground]}>
-            <Text style={styles.headerText}>10-Second Ad</Text>
+            <Text style={styles.headerText}>15-Second Ad</Text>
             <Text style={styles.subText}>(Auto-advances)</Text>
           </View>
         );
@@ -450,7 +199,7 @@ const MainFlowScreen = () => {
             <View style={styles.streakTopSection}>
               <Text style={styles.streakLabel}>BLOOM STREAK</Text>
               <Text style={styles.streakNumber}>{userStreak}</Text>
-              <Text style={styles.streakValue}>${streakValue.toFixed(2)} value</Text>
+              <Text style={styles.lifetimeText}>Lifetime: {lifetimeDays}</Text>
               <Text style={styles.returnText}>Return tomorrow at 7 am</Text>
             </View>
 
@@ -459,51 +208,7 @@ const MainFlowScreen = () => {
 
             {/* Bottom section - Actions */}
             <View style={styles.streakBottomSection}>
-              {canLiquidateToday && (
-                <Pressable
-                  onPress={() => {
-                    if (userStreak < 3) {
-                      showAlert('Locked', 'Need a Bloom Streak of 3 to liquidate');
-                      return;
-                    }
-                    router.push('/liquidate-streak');
-                  }}
-                  style={({ pressed }) => [
-                    styles.liquidateButton,
-                    pressed && { opacity: 0.6 }
-                  ]}
-                >
-                  <Text style={[
-                    styles.liquidateButtonText,
-                    userStreak < 3 && { opacity: 0.4 }
-                  ]}>
-                    Liquidate
-                  </Text>
-                </Pressable>
-              )}
-
-              <Pressable
-                onPress={() => {
-                  if (userStreak < 3) {
-                    showAlert('Locked', 'Need at least 3 days in your streak to send');
-                    return;
-                  }
-                  router.push('/send-streak');
-                }}
-                style={({ pressed }) => [
-                  styles.sendDaysButton,
-                  pressed && { opacity: 0.6 }
-                ]}
-              >
-                <Text style={[
-                  styles.sendDaysButtonText,
-                  userStreak < 3 && { opacity: 0.4 }
-                ]}>
-                  Send
-                </Text>
-              </Pressable>
-
-              {/* Redeem button */}
+              {/* Store button */}
               <Pressable
                 onPress={() => router.push('/redeem-streak')}
                 style={({ pressed }) => [
@@ -512,7 +217,7 @@ const MainFlowScreen = () => {
                 ]}
               >
                 <Text style={styles.redeemButtonText}>
-                  Redeem
+                  Store
                 </Text>
               </Pressable>
 
@@ -598,16 +303,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
   },
-  streakValue: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 28,
-    color: 'rgba(255, 255, 255, 0.85)',
-    textAlign: 'center',
-  },
   streakBottomSection: {
     gap: 40,
     alignItems: 'center',
     paddingBottom: 40,
+  },
+  lifetimeText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginTop: 8,
   },
   returnText: {
     fontFamily: 'ZenDots_400Regular',
@@ -637,25 +343,6 @@ const styles = StyleSheet.create({
     color: '#A84296', // Magenta
     textAlign: 'center',
   },
-  liquidateButton: {
-    paddingVertical: 8,
-  },
-  liquidateButtonText: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 16,
-    color: '#6ccff0', // Bright cyan blue - perfect!
-    textAlign: 'center',
-  },
-  sendDaysButton: {
-    paddingVertical: 8,
-  },
-  sendDaysButtonText: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E3A8A', // Navy blue - highly visible!
-    textAlign: 'center',
-  },
   logoutButton: {
     paddingVertical: 8,
   },
@@ -664,20 +351,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
-  },
-  prizeText: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  blurCover: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#FFD7B5', // Your brand orange
-    // This cover is 100% opaque, completely hiding the text pulsing beneath it.
-    // The user will only see the "shape" of the pulse.
   },
 });
 

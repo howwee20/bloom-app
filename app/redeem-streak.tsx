@@ -4,6 +4,7 @@ import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Alert, Modal 
 import { useRouter } from 'expo-router';
 import { useAuth } from './_layout';
 import { supabase } from '../lib/supabase';
+import { getDiscount, getTierName } from './lifetime-info';
 
 // Redemption options
 const REDEMPTION_OPTIONS = [
@@ -17,14 +18,20 @@ export default function RedeemStreakScreen() {
   const { session } = useAuth();
 
   const [userStreak, setUserStreak] = useState(0);
+  const [lifetimeDays, setLifetimeDays] = useState(0);
   const [userEmail, setUserEmail] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedOption, setSelectedOption] = useState<typeof REDEMPTION_OPTIONS[0] | null>(null);
 
-  const DAYS_REQUIRED = 10;
+  const BASE_COST = 10;
   const ITEM_VALUE = 5.00;
+
+  // Calculate discount based on lifetime days
+  const discount = getDiscount(lifetimeDays);
+  const tierName = getTierName(lifetimeDays);
+  const finalCost = Math.max(BASE_COST - discount, Math.ceil(BASE_COST * 0.5)); // 50% floor
 
   // Fetch user's current streak and email
   useEffect(() => {
@@ -36,6 +43,17 @@ export default function RedeemStreakScreen() {
         const { data: streakData, error: streakError } = await supabase.rpc('get_current_streak');
         if (streakError) throw streakError;
         setUserStreak(typeof streakData === 'number' ? streakData : 0);
+
+        // Get lifetime days
+        const { data: profileData } = await supabase
+          .from('profile')
+          .select('lifetime_days')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profileData) {
+          setLifetimeDays(profileData.lifetime_days || 0);
+        }
 
         // Pre-fill email if available
         if (session.user.email) {
@@ -77,13 +95,14 @@ export default function RedeemStreakScreen() {
     try {
       console.log('Processing redemption:', {
         email: userEmail,
-        days: DAYS_REQUIRED,
+        days: finalCost,
         item: itemName,
       });
 
       const { data, error } = await supabase.rpc('process_redemption', {
         user_email_input: userEmail.trim(),
         item_name_input: itemName,
+        days_to_redeem: finalCost,
       });
 
       console.log('RPC Response:', { data, error });
@@ -117,14 +136,19 @@ export default function RedeemStreakScreen() {
   };
 
   // Check if user can redeem
-  const canRedeem = userStreak >= DAYS_REQUIRED;
-  const daysNeeded = DAYS_REQUIRED - userStreak;
+  const canRedeem = userStreak >= finalCost;
+  const daysNeeded = finalCost - userStreak;
 
   // Show category menu first
   if (!selectedCategory) {
     return (
       <View style={styles.container}>
-        <Text style={styles.headerText}>Redeem Your Streak</Text>
+        <Text style={styles.headerText}>Bloom Store</Text>
+        <Pressable onPress={() => router.push('/lifetime-info')}>
+          <Text style={styles.tierInfoLink}>
+            {tierName} • {discount > 0 ? `-${discount} days off everything` : 'Base pricing'}
+          </Text>
+        </Pressable>
 
         <View style={styles.categoryList}>
           {/* Gift Cards - Active */}
@@ -223,7 +247,14 @@ export default function RedeemStreakScreen() {
 
           <View style={styles.exchangeRow}>
             <View style={styles.exchangeItem}>
-              <Text style={styles.exchangeDays}>{DAYS_REQUIRED}</Text>
+              {discount > 0 ? (
+                <>
+                  <Text style={styles.exchangeDaysStrike}>{BASE_COST}</Text>
+                  <Text style={styles.exchangeDays}>{finalCost}</Text>
+                </>
+              ) : (
+                <Text style={styles.exchangeDays}>{finalCost}</Text>
+              )}
               <Text style={styles.exchangeLabel}>Bloom Days</Text>
             </View>
             <Text style={styles.arrowText}>→</Text>
@@ -234,6 +265,14 @@ export default function RedeemStreakScreen() {
               <Text style={styles.exchangeLabel}>Gift Card</Text>
             </View>
           </View>
+
+          {discount > 0 && (
+            <View style={styles.discountBanner}>
+              <Text style={styles.discountBannerText}>
+                {tierName} Discount: -{discount} days
+              </Text>
+            </View>
+          )}
 
           <Text style={styles.deliveryText}>Instant delivery to your email</Text>
         </View>
@@ -264,8 +303,8 @@ export default function RedeemStreakScreen() {
             <Text style={styles.previewValue}>{userStreak} days</Text>
           </View>
           <View style={styles.previewRow}>
-            <Text style={styles.previewText}>Required:</Text>
-            <Text style={styles.previewValue}>{DAYS_REQUIRED} days</Text>
+            <Text style={styles.previewText}>Your price:</Text>
+            <Text style={styles.previewValue}>{finalCost} days</Text>
           </View>
           {!canRedeem && (
             <View style={styles.previewRow}>
@@ -311,10 +350,10 @@ export default function RedeemStreakScreen() {
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Confirm Redemption</Text>
               <Text style={styles.modalBody}>
-                Exchange {DAYS_REQUIRED} Bloom Days for {itemName}?
+                Exchange {finalCost} Bloom Days for {itemName}?
               </Text>
               <Text style={styles.modalSubtext}>
-                Your new streak: {userStreak - DAYS_REQUIRED} days
+                Your new streak: {userStreak - finalCost} days
               </Text>
               <Text style={styles.modalEmail}>
                 Sending to: {userEmail}
@@ -373,8 +412,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#5C4033',
-    marginBottom: 8,
+    marginBottom: 4,
     textAlign: 'center',
+  },
+  tierInfoLink: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 11,
+    color: 'rgba(92, 64, 51, 0.7)',
+    textAlign: 'center',
+    marginBottom: 20,
+    textDecorationLine: 'underline',
   },
   subheaderText: {
     fontFamily: 'ZenDots_400Regular',
@@ -502,6 +549,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#5C4033',
   },
+  exchangeDaysStrike: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(92, 64, 51, 0.4)',
+    textDecorationLine: 'line-through',
+  },
   exchangeValue: {
     fontFamily: 'ZenDots_400Regular',
     fontSize: 32,
@@ -525,6 +579,20 @@ const styles = StyleSheet.create({
     color: 'rgba(92, 64, 51, 0.5)',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  discountBanner: {
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignSelf: 'center',
+  },
+  discountBannerText: {
+    fontFamily: 'ZenDots_400Regular',
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#4CAF50',
   },
   inputContainer: {
     width: '100%',
