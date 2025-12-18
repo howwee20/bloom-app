@@ -13,7 +13,11 @@ const RAPIDAPI_URL = `https://${RAPIDAPI_HOST}/getproducts`;
  * @returns {Promise<{lowestAsk: number, productName: string}>}
  */
 async function fetchPrice(sku, size = '10') {
-  const apiKey = process.env.RAPIDAPI_KEY;
+  // HARDCODED FOR TESTING - Remove after confirming it works
+  const HARDCODED_KEY = '0840563baemsh52aef100825d2d4p156784jsn88f14e5aec4a';
+  const apiKey = process.env.RAPIDAPI_KEY || HARDCODED_KEY;
+
+  console.log(`[DEBUG] Using ${process.env.RAPIDAPI_KEY ? 'ENV' : 'HARDCODED'} API Key`);
 
   if (!apiKey) {
     throw new Error('RAPIDAPI_KEY not configured');
