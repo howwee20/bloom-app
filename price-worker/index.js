@@ -12,22 +12,43 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// Michigan All-In Formula (EXACT - calibrated from real StockX checkout)
-// For $302 base: processing=$14.59, tax=$19.00, shipping=$14.95, total=$350.54
-function calculateAllIn(base) {
-  const processing = Math.round(base * 0.04831 * 100) / 100;
-  const tax = Math.round((base + processing) * 0.06 * 100) / 100;
-  const shipping = 14.95;
-  const total = Math.round((base + processing + tax + shipping) * 100) / 100;
-  return { base, processing, tax, shipping, total };
+// Pricing Constants (Calibrated from real StockX checkout - Michigan)
+const STOCKX_PROCESSING_RATE = 0.0483;  // 4.83% (Derived from $14.49/$300)
+const MI_TAX_RATE = 0.06;               // 6% Michigan Sales Tax
+const STOCKX_SHIPPING = 14.95;          // Exact Flat Rate
+const VOLATILITY_BUFFER = 1.015;        // 1.5% safety margin for API lag
+
+// Calculate Bloom Price from StockX lowest ask
+// Example: Ask: $300 | Landed: $348.31 | Bloom Price: $353.53 (Buffer: 1.5%)
+function calculateAllIn(lowestAsk) {
+  // Step 1: Calculate the Raw StockX Cost (The "Break Even" point)
+  const processingFee = Math.round(lowestAsk * STOCKX_PROCESSING_RATE * 100) / 100;
+  const taxBase = lowestAsk + processingFee;
+  const estimatedTax = Math.round(taxBase * MI_TAX_RATE * 100) / 100;
+  const landedCost = Math.round((lowestAsk + processingFee + estimatedTax + STOCKX_SHIPPING) * 100) / 100;
+
+  // Step 2: Add Safety Buffer (Final Customer Price)
+  const bloomPrice = Math.ceil(landedCost * VOLATILITY_BUFFER * 100) / 100;
+
+  return {
+    lowestAsk,
+    processingFee,
+    estimatedTax,
+    shipping: STOCKX_SHIPPING,
+    landedCost,
+    bloomPrice,
+    buffer: '1.5%'
+  };
 }
 
 // Health check
 app.get('/', (req, res) => {
+  const example = calculateAllIn(300);
   res.json({
     status: 'Bloom Price Worker Running',
-    formula: 'base + (base × 4.831%) + ((base + processing) × 6%) + $14.95',
-    example: calculateAllIn(302)
+    formula: '(Ask + Processing + Tax + Shipping) × 1.015 Buffer',
+    example,
+    verification: `Ask: $${example.lowestAsk} | Landed: $${example.landedCost} | Bloom Price: $${example.bloomPrice} (Buffer: ${example.buffer})`
   });
 });
 
@@ -69,6 +90,7 @@ app.get('/price/:sku/:size', (req, res) => {
     }
 
     const breakdown = calculateAllIn(basePrice);
+    console.log(`💰 ${sku} size ${size}: Ask: $${breakdown.lowestAsk} | Landed: $${breakdown.landedCost} | Bloom Price: $${breakdown.bloomPrice} (Buffer: ${breakdown.buffer})`);
     res.json({
       sku,
       size,
@@ -89,11 +111,12 @@ app.post('/manual-update', async (req, res) => {
   }
 
   const breakdown = calculateAllIn(base_price);
+  console.log(`📝 Manual update ${asset_id}: Ask: $${breakdown.lowestAsk} | Landed: $${breakdown.landedCost} | Bloom Price: $${breakdown.bloomPrice} (Buffer: ${breakdown.buffer})`);
 
   // Update asset
   const { error } = await supabase.from('assets').update({
-    base_price: breakdown.base,
-    price: breakdown.total,
+    base_price: breakdown.lowestAsk,
+    price: breakdown.bloomPrice,
     price_updated_at: new Date().toISOString(),
     last_price_update: new Date().toISOString()
   }).eq('id', asset_id);
@@ -105,7 +128,7 @@ app.post('/manual-update', async (req, res) => {
   // Insert history
   await supabase.from('price_history').insert({
     asset_id: asset_id,
-    price: breakdown.total,
+    price: breakdown.bloomPrice,
     source: 'manual',
     created_at: new Date().toISOString()
   });
@@ -206,8 +229,8 @@ app.post('/refresh-all', async (req, res) => {
 
       // Update asset
       await supabase.from('assets').update({
-        base_price: breakdown.base,
-        price: breakdown.total,
+        base_price: breakdown.lowestAsk,
+        price: breakdown.bloomPrice,
         price_updated_at: new Date().toISOString(),
         last_price_update: new Date().toISOString()
       }).eq('id', asset.id);
@@ -215,14 +238,14 @@ app.post('/refresh-all', async (req, res) => {
       // Insert history
       await supabase.from('price_history').insert({
         asset_id: asset.id,
-        price: breakdown.total,
+        price: breakdown.bloomPrice,
         source: 'sneaks_api',
         created_at: new Date().toISOString()
       });
 
       results.success++;
-      results.details.push({ name: asset.name, base: breakdown.base, total: breakdown.total });
-      console.log(`✅ ${asset.name}: $${breakdown.base} → $${breakdown.total}`);
+      results.details.push({ name: asset.name, lowestAsk: breakdown.lowestAsk, landedCost: breakdown.landedCost, bloomPrice: breakdown.bloomPrice });
+      console.log(`✅ ${asset.name}: Ask: $${breakdown.lowestAsk} | Landed: $${breakdown.landedCost} | Bloom Price: $${breakdown.bloomPrice} (Buffer: ${breakdown.buffer})`);
 
       // Wait 3 seconds between requests (rate limiting)
       await new Promise(r => setTimeout(r, 3000));
@@ -265,11 +288,12 @@ app.post('/refresh/:id', async (req, res) => {
     });
 
     const breakdown = calculateAllIn(price);
+    console.log(`🔄 ${asset.name}: Ask: $${breakdown.lowestAsk} | Landed: $${breakdown.landedCost} | Bloom Price: $${breakdown.bloomPrice} (Buffer: ${breakdown.buffer})`);
 
     // Update asset
     await supabase.from('assets').update({
-      base_price: breakdown.base,
-      price: breakdown.total,
+      base_price: breakdown.lowestAsk,
+      price: breakdown.bloomPrice,
       price_updated_at: new Date().toISOString(),
       last_price_update: new Date().toISOString()
     }).eq('id', asset.id);
@@ -277,7 +301,7 @@ app.post('/refresh/:id', async (req, res) => {
     // Insert history
     await supabase.from('price_history').insert({
       asset_id: asset.id,
-      price: breakdown.total,
+      price: breakdown.bloomPrice,
       source: 'sneaks_api',
       created_at: new Date().toISOString()
     });
@@ -294,6 +318,8 @@ app.post('/refresh/:id', async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
+  const example = calculateAllIn(300);
   console.log(`🚀 Price Worker running on port ${PORT}`);
-  console.log(`   Formula: base + (base × 4.831%) + ((base + processing) × 6%) + $14.95`);
+  console.log(`   Formula: (Ask + Processing + Tax + Shipping) × 1.015 Buffer`);
+  console.log(`   Example: Ask: $${example.lowestAsk} | Landed: $${example.landedCost} | Bloom Price: $${example.bloomPrice} (Buffer: ${example.buffer})`);
 });
