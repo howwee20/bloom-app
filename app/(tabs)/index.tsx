@@ -1,357 +1,545 @@
-// In File: app/(tabs)/index.tsx
-// Time Savings Account - Simplified Flow
-
-import { router } from 'expo-router';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useAuth } from '../_layout';
+// HOME Screen - Portfolio View (Coinbase Style with Zen Dots)
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { useFocusEffect } from 'expo-router';
+import { useAuth } from '../_layout';
+import { theme, fonts } from '../../constants/Colors';
 
-// Simplified 3-step flow: Splash → Ad → Streak
-const FLOW_STEPS = [
-  'SPLASH',
-  'AD_VIDEO',
-  'STREAK',
-];
+interface Asset {
+  id: string;
+  name: string;
+  image_url: string | null;
+  size: string | null;
+  category: string | null;
+  stockx_sku: string | null;
+  current_price: number;
+  entry_price: number | null;
+  pnl_dollars: number | null;
+  pnl_percent: number | null;
+  last_price_update: string | null;
+}
 
-const DOUBLE_PRESS_DELAY = 300;
+interface PortfolioSummary {
+  total_value: number;
+  total_cost: number;
+  total_pnl_dollars: number | null;
+  total_pnl_percent: number | null;
+  asset_count: number;
+}
 
-const MainFlowScreen = () => {
-  // --- Real Auth & State ---
+interface PriceHistory {
+  price: number;
+  created_at: string;
+}
+
+export default function HomeScreen() {
   const { session } = useAuth();
-  const [stepIndex, setStepIndex] = useState(FLOW_STEPS.indexOf('SPLASH'));
-  const currentStep = FLOW_STEPS[stepIndex];
-  const lastTap = React.useRef(0);
-  const streakScreenRef = useRef<View>(null);
+  const [summary, setSummary] = useState<PortfolioSummary | null>(null);
+  const [ownedAssets, setOwnedAssets] = useState<Asset[]>([]);
+  const [priceHistories, setPriceHistories] = useState<Record<string, PriceHistory[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [updatingPrices, setUpdatingPrices] = useState(false);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
-  // --- Real Backend State ---
-  const [isLockedOut, setIsLockedOut] = useState(true); // Default true to be safe
-  const [userStreak, setUserStreak] = useState(0);
-  const [lifetimeDays, setLifetimeDays] = useState<number>(0);
+  const handleImageError = (assetId: string) => {
+    setFailedImages(prev => new Set(prev).add(assetId));
+  };
 
-  // --- Data Fetching ---
-  useFocusEffect(
-    useCallback(() => {
-      const fetchAllData = async () => {
-        if (!session) return;
-
-        try {
-          // --- 1. DEFINE THE CURRENT "BLOOM DAY" WINDOW START ---
-          const now = new Date();
-          const windowStart = new Date(now);
-          if (now.getHours() < 7) {
-            windowStart.setDate(now.getDate() - 1);
-          }
-          windowStart.setHours(7, 0, 0, 0);
-
-          // --- 2. CHECK IF USER HAS PLAYED TODAY ---
-          const { data: submissionData, error: submissionError } = await supabase
-            .from('poll_submissions') // Track plays (legacy table name)
-            .select('id')
-            .eq('user_id', session.user.id)
-            .gte('created_at', windowStart.toISOString())
-            .maybeSingle();
-
-          if (submissionError) throw submissionError;
-
-          // --- 3. CHECK FOR STREAK ---
-          const { data: streakData, error: streakError } = await supabase.rpc('get_current_streak');
-          if (streakError) throw streakError;
-          setUserStreak(typeof streakData === 'number' ? streakData : 0);
-
-          // --- 4. FETCH LIFETIME DAYS ---
-          const { data: profileData } = await supabase
-            .from('profile')
-            .select('lifetime_days')
-            .eq('id', session.user.id)
-            .maybeSingle();
-
-          if (profileData) {
-            setLifetimeDays(profileData.lifetime_days || 0);
-          }
-
-          // --- 5. SET LOCKOUT STATE ---
-          if (submissionData) {
-            // User has already played today. Lock them out at STREAK.
-            setIsLockedOut(true);
-            setStepIndex(FLOW_STEPS.indexOf('STREAK'));
-          } else {
-            // User is free to play.
-            setIsLockedOut(false);
-            setStepIndex(FLOW_STEPS.indexOf('SPLASH'));
-          }
-
-        } catch (e) {
-          console.error('Error fetching data:', e);
-          setIsLockedOut(false); // Fail-safe
-          setStepIndex(FLOW_STEPS.indexOf('SPLASH'));
-        }
-      };
-
-      fetchAllData();
-    }, [session])
-  );
-
-
-  // --- Auto-advancing logic ---
-  useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-
-    // AD_VIDEO auto-advances to STREAK after 10 seconds
-    if (currentStep === 'AD_VIDEO') {
-      timeout = setTimeout(() => {
-        advanceStep();
-      }, 10000); // 10-second ad
-    }
-
-    return () => {
-      if (timeout) clearTimeout(timeout);
-    };
-  }, [currentStep]);
-
-  // --- Record Play Function ---
-  // Extracted for reuse by both winners (after ad) and losers (at STREAK)
-  const recordPlay = async () => {
-    if (!session?.user || isLockedOut) return;
+  const fetchPortfolio = useCallback(async () => {
+    if (!session) return;
 
     try {
-      // 1. INCREMENT STREAK
-      const { data: newStreak, error: streakError } = await supabase.rpc('increment_streak');
-      if (streakError) throw streakError;
-      setUserStreak(newStreak);
+      // Fetch portfolio summary with P&L
+      const { data: summaryData, error: summaryError } = await supabase.rpc('get_portfolio_summary');
+      if (!summaryError && summaryData && summaryData.length > 0) {
+        setSummary(summaryData[0]);
+      }
 
-      // 2. RECORD SUBMISSION (to prevent replays)
-      const { error: submissionError } = await supabase.from('poll_submissions').insert({
-        user_id: session.user.id,
-      });
-      if (submissionError) throw submissionError;
+      // Fetch assets with P&L
+      const { data: assets, error: assetsError } = await supabase.rpc('get_portfolio_with_pnl');
+      if (!assetsError && assets) {
+        setOwnedAssets(assets);
 
-      // 3. SET LOCKOUT
-      setIsLockedOut(true);
-    } catch (err) {
-      console.error('Error recording play:', err);
+        // Fetch price history for sparklines
+        const histories: Record<string, PriceHistory[]> = {};
+        for (const asset of assets) {
+          const { data: history } = await supabase.rpc('get_price_history', {
+            p_asset_id: asset.id,
+            p_days: 7,
+          });
+          if (history) {
+            histories[asset.id] = history;
+          }
+        }
+        setPriceHistories(histories);
+      }
+    } catch (e) {
+      console.error('Error fetching portfolio:', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [session]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      fetchPortfolio();
+    }, [fetchPortfolio])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchPortfolio();
+  }, [fetchPortfolio]);
+
+  const handleRefreshPrices = async () => {
+    if (updatingPrices) return;
+
+    try {
+      setUpdatingPrices(true);
+
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/update-prices/all`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        Alert.alert('Prices Updated', `Updated ${result.successful} of ${result.total} assets`);
+        fetchPortfolio();
+      } else {
+        Alert.alert('Update Failed', result.error || 'Could not update prices');
+      }
+    } catch (e) {
+      console.error('Error updating prices:', e);
+      Alert.alert('Error', 'Failed to update prices');
+    } finally {
+      setUpdatingPrices(false);
     }
   };
 
-  // --- Streak Increment & Submission Logic ---
-  // When losers reach STREAK screen, record their play
-  useEffect(() => {
-    const recordPlayOnStreak = async () => {
-      if (currentStep !== 'STREAK') return;
-      await recordPlay();
-    };
-
-    recordPlayOnStreak();
-  }, [currentStep]);
-
-  // --- Navigation Logic ---
-  const advanceStep = useCallback(() => {
-    setStepIndex((prevIndex) => Math.min(prevIndex + 1, FLOW_STEPS.length - 1));
-  }, []);
-
-  const handlePress = () => {
-    if (isLockedOut) return;
-    const now = Date.now();
-    const isDoubleTap = now - lastTap.current < DOUBLE_PRESS_DELAY;
-    lastTap.current = now;
-
-    if (!isDoubleTap) return;
-
-    // SPLASH advances on double-tap
-    // AD_VIDEO auto-advances (no tap)
-    // STREAK is final (no tap)
-    if (currentStep === 'SPLASH') {
-      advanceStep();
-    }
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(price);
   };
 
-  // --- The UI ---
-  const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 'SPLASH':
-        return (
-          <View style={[styles.stepContainer, styles.brandBackground]}>
-            <Text style={styles.headerText}>BLOOM</Text>
-            <View style={styles.warningContainer}>
-              <Text style={styles.warningText}>Double tap to start</Text>
-            </View>
-          </View>
-        );
-      case 'AD_VIDEO':
-        return (
-          <View style={[styles.stepContainer, styles.adBackground]}>
-            <Text style={styles.headerText}>15-Second Ad</Text>
-            <Text style={styles.subText}>(Auto-advances)</Text>
-          </View>
-        );
-      case 'STREAK':
-        return (
-          <View
-            ref={streakScreenRef}
-            style={[styles.stepContainer, styles.brandBackground]}
-            collapsable={false}
-          >
-            {/* Top spacer - pushes streak to center */}
-            <View style={{ flex: 1 }} />
-
-            {/* User's streak info - CENTERED */}
-            <View style={styles.streakTopSection}>
-              <Text style={styles.streakLabel}>BLOOM STREAK</Text>
-              <Text style={styles.streakNumber}>{userStreak}</Text>
-              <Text style={styles.lifetimeText}>Lifetime: {lifetimeDays}</Text>
-              <Text style={styles.returnText}>Return tomorrow at 7 am</Text>
-            </View>
-
-            {/* Bottom spacer - pushes buttons to bottom */}
-            <View style={{ flex: 1 }} />
-
-            {/* Bottom section - Actions */}
-            <View style={styles.streakBottomSection}>
-              {/* Store button */}
-              <Pressable
-                onPress={() => router.push('/redeem-streak')}
-                style={({ pressed }) => [
-                  styles.redeemButton,
-                  pressed && { opacity: 0.6 }
-                ]}
-              >
-                <Text style={styles.redeemButtonText}>
-                  Store
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => supabase.auth.signOut()}
-                style={({ pressed }) => [
-                  styles.logoutButton,
-                  pressed && { opacity: 0.6 }
-                ]}
-              >
-                <Text style={styles.logoutButtonText}>Log Out</Text>
-              </Pressable>
-            </View>
-          </View>
-        );
-      default:
-        return (
-          <View style={[styles.stepContainer, styles.brandBackground]}>
-            <Text style={styles.headerText}>BLOOM</Text>
-          </View>
-        );
-    }
+  const formatPnL = (value: number | null) => {
+    if (value === null) return '--';
+    const sign = value >= 0 ? '+' : '';
+    return `${sign}${formatPrice(value)}`;
   };
+
+  const formatPnLPercent = (value: number | null) => {
+    if (value === null) return '';
+    const sign = value >= 0 ? '+' : '';
+    return `${sign}${value.toFixed(1)}%`;
+  };
+
+  // Simple text-based sparkline using unicode block characters
+  const renderSparkline = (assetId: string) => {
+    const history = priceHistories[assetId];
+    if (!history || history.length < 2) return null;
+
+    const prices = history.map(h => h.price);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const range = max - min || 1;
+
+    const blocks = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+    const sparkline = prices.map(price => {
+      const normalized = (price - min) / range;
+      const index = Math.min(Math.floor(normalized * blocks.length), blocks.length - 1);
+      return blocks[index];
+    }).join('');
+
+    const isUp = prices[prices.length - 1] >= prices[0];
+
+    return (
+      <Text style={[styles.sparkline, isUp ? styles.sparklineUp : styles.sparklineDown]}>
+        {sparkline}
+      </Text>
+    );
+  };
+
+  const renderAssetCard = ({ item }: { item: Asset }) => {
+    const isPositive = item.pnl_dollars !== null && item.pnl_dollars >= 0;
+    const pnlColor = item.pnl_dollars === null ? theme.textSecondary : isPositive ? theme.success : theme.error;
+    const showImage = item.image_url && !failedImages.has(item.id);
+
+    return (
+      <Pressable style={styles.assetCard} onPress={() => router.push(`/asset/${item.id}`)}>
+        <View style={styles.cardImageContainer}>
+          {showImage ? (
+            <Image
+              source={{ uri: item.image_url! }}
+              style={styles.cardImage}
+              resizeMode="contain"
+              onError={() => handleImageError(item.id)}
+            />
+          ) : (
+            <View style={[styles.cardImage, styles.placeholderImage]}>
+              <Text style={styles.placeholderText}>{item.name.charAt(0)}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
+          {item.size && <Text style={styles.cardSize}>Size {item.size}</Text>}
+
+          <View style={styles.priceRow}>
+            <View>
+              <Text style={styles.cardPrice}>{formatPrice(item.current_price)}</Text>
+              <Text style={[styles.cardPnl, { color: pnlColor }]}>
+                {formatPnL(item.pnl_dollars)} {formatPnLPercent(item.pnl_percent)}
+              </Text>
+            </View>
+
+            <View style={styles.sparklineContainer}>
+              {renderSparkline(item.id)}
+            </View>
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyTitle}>No assets yet</Text>
+      <Text style={styles.emptySubtitle}>
+        Start building your collection
+      </Text>
+      <Pressable style={styles.emptyButton} onPress={() => router.push('/(tabs)/bloom')}>
+        <Text style={styles.emptyButtonText}>Browse assets</Text>
+      </Pressable>
+    </View>
+  );
+
+  const totalPnlColor = summary?.total_pnl_dollars === null || summary?.total_pnl_dollars === undefined
+    ? theme.textSecondary
+    : summary.total_pnl_dollars >= 0 ? theme.success : theme.error;
 
   return (
-    <Pressable
-      onPress={handlePress}
-      style={styles.container}
-    >
-      {renderCurrentStep()}
-    </Pressable>
-  );
-};
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Portfolio</Text>
+        <View style={styles.headerRight}>
+          <Pressable
+            style={styles.refreshButton}
+            onPress={handleRefreshPrices}
+            disabled={updatingPrices}
+          >
+            {updatingPrices ? (
+              <ActivityIndicator size="small" color={theme.accent} />
+            ) : (
+              <Text style={styles.refreshIcon}>↻</Text>
+            )}
+          </Pressable>
+          <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
+            <View style={styles.profileIcon}>
+              <Text style={styles.profileIconText}>
+                {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+      </View>
 
-// --- Add/Keep these styles ---
+      {/* Portfolio Value */}
+      <View style={styles.valueSection}>
+        <Text style={styles.valueLabel}>Total balance</Text>
+        <Text style={styles.valueAmount}>{formatPrice(summary?.total_value || 0)}</Text>
+
+        {summary?.total_pnl_dollars !== null && summary?.total_pnl_dollars !== undefined && (
+          <View style={styles.totalPnlRow}>
+            <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
+              {formatPnL(summary.total_pnl_dollars)}
+            </Text>
+            <Text style={[styles.totalPnlPercent, { color: totalPnlColor }]}>
+              {formatPnLPercent(summary.total_pnl_percent)}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Assets Section */}
+      <View style={styles.assetsSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Your assets</Text>
+          <Text style={styles.assetCount}>{summary?.asset_count || 0}</Text>
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.accent} />
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
+        ) : ownedAssets.length === 0 ? (
+          renderEmptyState()
+        ) : (
+          <FlatList
+            data={ownedAssets}
+            renderItem={renderAssetCard}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            columnWrapperStyle={styles.gridRow}
+            contentContainerStyle={styles.gridContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={theme.accent}
+              />
+            }
+          />
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.background,
   },
-  stepContainer: {
-    flex: 1,
-    width: '100%',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 20,
+    color: theme.textPrimary,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  refreshButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  refreshIcon: {
+    fontSize: 22,
+    color: theme.accent,
+  },
+  profileButton: {
+    padding: 4,
+  },
+  profileIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.accent,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  brandBackground: {
-    backgroundColor: '#FFD7B5', // Your brand orange
-  },
-  adBackground: {
-    backgroundColor: '#A0A0A0', // Grey for the ad
-  },
-  headerText: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  subText: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 24,
-    color: 'white',
-    opacity: 0.8,
-    marginTop: 10,
-  },
-  // --- STREAK SCREEN LAYOUT ---
-  streakTopSection: {
-    gap: 24,
-    alignItems: 'center',
-  },
-  streakLabel: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 18,
-    letterSpacing: 2,
-    color: '#fff',
-    textAlign: 'center',
-  },
-  streakNumber: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 100,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-  },
-  streakBottomSection: {
-    gap: 40,
-    alignItems: 'center',
-    paddingBottom: 40,
-  },
-  lifetimeText: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  returnText: {
-    fontFamily: 'ZenDots_400Regular',
+  profileIconText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
+    fontWeight: '600',
+    color: theme.textInverse,
   },
-  warningContainer: {
-    position: 'absolute',
-    bottom: 100,
+  valueSection: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 32,
+  },
+  valueLabel: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    marginBottom: 4,
+  },
+  valueAmount: {
+    fontFamily: fonts.heading,
+    fontSize: 36,
+    color: theme.textPrimary,
+    letterSpacing: -1,
+  },
+  totalPnlRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
   },
-  warningText: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  redeemButton: {
-    paddingVertical: 8,
-  },
-  redeemButtonText: {
-    fontFamily: 'ZenDots_400Regular',
+  totalPnl: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#A84296', // Magenta
-    textAlign: 'center',
   },
-  logoutButton: {
-    paddingVertical: 8,
+  totalPnlPercent: {
+    fontSize: 14,
+    fontWeight: '500',
   },
-  logoutButtonText: {
-    fontFamily: 'ZenDots_400Regular',
+  assetsSection: {
+    flex: 1,
+    backgroundColor: theme.backgroundSecondary,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 14,
+    color: theme.textPrimary,
+  },
+  assetCount: {
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
+  gridContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 100,
+  },
+  gridRow: {
+    justifyContent: 'space-between',
+  },
+  assetCard: {
+    width: '47%',
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  cardImageContainer: {
+    backgroundColor: '#FFF',
+    padding: 8,
+  },
+  cardImage: {
+    width: '100%',
+    aspectRatio: 1.3,
+  },
+  placeholderImage: {
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    fontFamily: fonts.heading,
+    fontSize: 24,
+    color: theme.accent,
+  },
+  cardInfo: {
+    padding: 12,
+  },
+  cardName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 2,
+    lineHeight: 16,
+  },
+  cardSize: {
+    fontSize: 11,
+    color: theme.textSecondary,
+    marginBottom: 6,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  cardPrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.accent,
+  },
+  cardPnl: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  sparklineContainer: {
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  sparkline: {
+    fontSize: 10,
+    letterSpacing: -1,
+  },
+  sparklineUp: {
+    color: theme.success,
+  },
+  sparklineDown: {
+    color: theme.error,
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: theme.textSecondary,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 18,
+    color: theme.textPrimary,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: theme.textSecondary,
     textAlign: 'center',
+    marginBottom: 24,
+  },
+  emptyButton: {
+    backgroundColor: theme.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 24,
+  },
+  emptyButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textInverse,
   },
 });
-
-export default MainFlowScreen;

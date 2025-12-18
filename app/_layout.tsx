@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useFonts, ZenDots_400Regular } from '@expo-google-fonts/zen-dots';
+import { useFonts } from 'expo-font';
+import { ZenDots_400Regular } from '@expo-google-fonts/zen-dots';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
@@ -118,7 +120,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    ZenDots_400Regular,
+    ZenDots: ZenDots_400Regular,
     ...FontAwesome.font,
   });
 
@@ -138,21 +140,22 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <Stack>
-        {/* The main app flow, protected */}
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        {/* Additional screens */}
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        {/* Winner flow */}
-        <Stack.Screen name="winner-payout" options={{ headerShown: false }} />
-        <Stack.Screen name="winner-lockout" options={{ headerShown: false }} />
-        {/* The authentication flow */}
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="signup" options={{ headerShown: false }} />
-        <Stack.Screen name="please-confirm-email" options={{ headerShown: false }} />
-        <Stack.Screen name="create-username" options={{ headerShown: false }} />
-      </Stack>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <Stack>
+          {/* Main app tabs */}
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          {/* Asset detail screen */}
+          <Stack.Screen name="asset/[id]" options={{ headerShown: false }} />
+          {/* Profile */}
+          <Stack.Screen name="profile" options={{ headerShown: false }} />
+          {/* Authentication flow */}
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="signup" options={{ headerShown: false }} />
+          <Stack.Screen name="please-confirm-email" options={{ headerShown: false }} />
+          <Stack.Screen name="create-username" options={{ headerShown: false }} />
+        </Stack>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

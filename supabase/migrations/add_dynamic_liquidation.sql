@@ -261,3 +261,4 @@ GRANT EXECUTE ON FUNCTION process_liquidation(INTEGER, TEXT, TEXT) TO authentica
 
 -- Migration complete!
 -- Liquidation now uses dynamic calculation based on proportional streak value
+
