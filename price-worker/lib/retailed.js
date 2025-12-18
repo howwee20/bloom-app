@@ -1,6 +1,8 @@
 const fetch = require('node-fetch');
 
-const RETAILED_API_URL = 'https://api.retailed.io/products';
+// Retailed API - Sneaker Lowest Ask endpoint
+// Docs: https://www.retailed.io/datasources/api/sneaker-lowest-ask
+const RETAILED_API_URL = 'https://app.retailed.io/api/v1/db/products/asks';
 
 /**
  * Fetch the lowest ask for a specific SKU and size from Retailed API
