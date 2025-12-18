@@ -1,13 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cron = require('node-cron');
-const SneaksAPI = require('sneaks-api');
 const { createClient } = require('@supabase/supabase-js');
+const { fetchLowestAsk } = require('./lib/retailed');
 
 const app = express();
 app.use(express.json());
 
-const sneaks = new SneaksAPI();
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
@@ -21,7 +20,7 @@ const MI_TAX_RATE = 0.06;               // 6% Michigan Sales Tax
 const STOCKX_SHIPPING = 14.95;          // Flat Rate
 const VOLATILITY_BUFFER = 1.015;        // 1.5% safety margin
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-const API_DELAY_MS = 3000;              // 3 seconds between API calls
+const API_DELAY_MS = 1000;              // 1 second between API calls
 
 // ============================================
 // PRICING FORMULA
@@ -45,45 +44,11 @@ function calculateBloomPrice(lowestAsk) {
 }
 
 // ============================================
-// FETCH LIVE PRICE FROM STOCKX VIA SNEAKS-API
-// ============================================
-function fetchLivePrice(sku, size) {
-  return new Promise((resolve, reject) => {
-    sneaks.getProductPrices(sku, (err, product) => {
-      if (err) {
-        return reject(new Error(`API Error: ${err.message || 'Unknown'}`));
-      }
-      if (!product || !product.resellPrices?.stockX) {
-        return reject(new Error('No StockX data returned'));
-      }
-
-      // Try multiple size formats
-      const sizeFormats = [size, `${size}`, `US ${size}`, `${size} US`, String(size)];
-      let livePrice = null;
-
-      for (const fmt of sizeFormats) {
-        livePrice = product.resellPrices.stockX[fmt];
-        if (livePrice) break;
-      }
-
-      if (!livePrice) {
-        const availableSizes = Object.keys(product.resellPrices.stockX);
-        return reject(new Error(`Size ${size} not found. Available: ${availableSizes.join(', ')}`));
-      }
-
-      resolve({
-        lowestAsk: livePrice,
-        productName: product.shoeName,
-        availableSizes: Object.keys(product.resellPrices.stockX)
-      });
-    });
-  });
-}
-
-// ============================================
 // CORE: REFRESH ALL ASSETS
 // ============================================
 let isRefreshing = false;
+let lastRefreshTime = null;
+let lastRefreshResults = null;
 
 async function refreshAllAssets() {
   if (isRefreshing) {
@@ -95,6 +60,7 @@ async function refreshAllAssets() {
   const startTime = Date.now();
   console.log('\n' + '='.repeat(60));
   console.log(`[REFRESH] Starting price refresh at ${new Date().toISOString()}`);
+  console.log('[SOURCE] Retailed API');
   console.log('='.repeat(60));
 
   try {
@@ -127,76 +93,65 @@ async function refreshAllAssets() {
     for (const asset of assets) {
       const size = asset.size || '10';
       const oldBasePrice = asset.base_price || 0;
-      const oldBloomPrice = asset.price || 0;
 
       try {
-        // FETCH LIVE PRICE
-        const liveData = await fetchLivePrice(asset.stockx_sku, size);
+        // FETCH LIVE PRICE FROM RETAILED API
+        const liveData = await fetchLowestAsk(asset.stockx_sku, size);
         const newLowestAsk = liveData.lowestAsk;
 
         // CALCULATE NEW BLOOM PRICE
         const pricing = calculateBloomPrice(newLowestAsk);
         const newBloomPrice = pricing.bloomPrice;
 
-        // CHECK IF PRICE CHANGED
+        // CHECK IF PRICE CHANGED (threshold of $1)
         const priceChanged = Math.abs(newLowestAsk - oldBasePrice) >= 1;
 
-        if (priceChanged) {
-          // UPDATE DATABASE
-          const { error: updateError } = await supabase
-            .from('assets')
-            .update({
-              base_price: newLowestAsk,
-              price: newBloomPrice,
-              price_updated_at: new Date().toISOString(),
-              last_price_update: new Date().toISOString()
-            })
-            .eq('id', asset.id);
-
-          if (updateError) {
-            throw new Error(`DB Update failed: ${updateError.message}`);
-          }
-
-          // INSERT PRICE HISTORY
-          await supabase.from('price_history').insert({
-            asset_id: asset.id,
+        // UPDATE DATABASE
+        const { error: updateError } = await supabase
+          .from('assets')
+          .update({
+            base_price: newLowestAsk,
             price: newBloomPrice,
-            source: 'live_api',
-            created_at: new Date().toISOString()
-          });
+            price_updated_at: new Date().toISOString(),
+            last_price_update: new Date().toISOString()
+          })
+          .eq('id', asset.id);
 
+        if (updateError) {
+          throw new Error(`DB Update failed: ${updateError.message}`);
+        }
+
+        // INSERT PRICE HISTORY
+        await supabase.from('price_history').insert({
+          asset_id: asset.id,
+          price: newBloomPrice,
+          source: 'retailed_api',
+          created_at: new Date().toISOString()
+        });
+
+        if (priceChanged) {
           const direction = newLowestAsk > oldBasePrice ? '↑' : '↓';
-          const diff = newLowestAsk - oldBasePrice;
-          console.log(`[UPDATE] ${asset.name}: Base $${oldBasePrice} -> $${newLowestAsk} (${direction}$${Math.abs(diff).toFixed(0)}). Bloom Price: $${newBloomPrice}`);
-
+          const diff = Math.abs(newLowestAsk - oldBasePrice);
+          console.log(`[API SUCCESS] ${asset.name}: Ask $${oldBasePrice} -> $${newLowestAsk} (${direction}$${diff.toFixed(0)}) -> Bloom $${newBloomPrice}`);
           results.updated++;
-          results.details.push({
-            name: asset.name,
-            oldBase: oldBasePrice,
-            newBase: newLowestAsk,
-            oldBloom: oldBloomPrice,
-            newBloom: newBloomPrice,
-            change: diff
-          });
         } else {
-          // Just update timestamp, price unchanged
-          await supabase
-            .from('assets')
-            .update({
-              price_updated_at: new Date().toISOString(),
-              last_price_update: new Date().toISOString()
-            })
-            .eq('id', asset.id);
-
-          console.log(`[OK] ${asset.name}: $${newLowestAsk} (unchanged)`);
+          console.log(`[API SUCCESS] ${asset.name}: Ask $${newLowestAsk} (unchanged) -> Bloom $${newBloomPrice}`);
           results.unchanged++;
         }
+
+        results.details.push({
+          name: asset.name,
+          oldBase: oldBasePrice,
+          newBase: newLowestAsk,
+          bloomPrice: newBloomPrice,
+          changed: priceChanged
+        });
 
         // Rate limit: wait between API calls
         await new Promise(r => setTimeout(r, API_DELAY_MS));
 
       } catch (err) {
-        console.error(`[FAIL] ${asset.name}: ${err.message}`);
+        console.error(`[API FAIL] ${asset.name}: ${err.message}`);
         results.failed++;
         results.details.push({
           name: asset.name,
@@ -211,6 +166,9 @@ async function refreshAllAssets() {
     console.log(`       Updated: ${results.updated} | Unchanged: ${results.unchanged} | Failed: ${results.failed}`);
     console.log('-'.repeat(60) + '\n');
 
+    lastRefreshTime = new Date().toISOString();
+    lastRefreshResults = results;
+
     return results;
 
   } finally {
@@ -222,11 +180,12 @@ async function refreshAllAssets() {
 // EXPRESS ENDPOINTS
 // ============================================
 
-// Health check with live example
+// Health check
 app.get('/', (req, res) => {
   const example = calculateBloomPrice(300);
   res.json({
     status: 'Bloom Price Worker - LIVE',
+    source: 'Retailed API',
     mode: 'Automated refresh every 10 minutes',
     formula: '(Ask + 4.83% + 6% Tax + $14.95) × 1.015',
     example: {
@@ -234,32 +193,29 @@ app.get('/', (req, res) => {
       output: `$${example.bloomPrice} Bloom Price`,
       breakdown: example
     },
+    lastRefresh: lastRefreshTime,
     endpoints: {
-      '/refresh': 'POST - Trigger manual refresh (for app pull-to-refresh)',
-      '/status': 'GET - Check last refresh status',
-      '/asset/:id': 'GET - Get single asset price'
+      'GET /refresh': 'Trigger manual refresh',
+      'GET /status': 'Check refresh status',
+      'GET /asset/:id': 'Get single asset'
     }
   });
 });
 
 // Manual refresh trigger (for app pull-to-refresh)
-app.post('/refresh', async (req, res) => {
+app.get('/refresh', async (req, res) => {
   console.log('[MANUAL] Refresh triggered via API');
   const results = await refreshAllAssets();
   res.json(results);
 });
 
-// Also support GET for easy testing
-app.get('/refresh', async (req, res) => {
-  console.log('[MANUAL] Refresh triggered via GET');
+app.post('/refresh', async (req, res) => {
+  console.log('[MANUAL] Refresh triggered via POST');
   const results = await refreshAllAssets();
   res.json(results);
 });
 
 // Status endpoint
-let lastRefreshTime = null;
-let lastRefreshResults = null;
-
 app.get('/status', (req, res) => {
   res.json({
     isRefreshing,
@@ -267,11 +223,12 @@ app.get('/status', (req, res) => {
     lastResults: lastRefreshResults,
     nextRefresh: lastRefreshTime
       ? new Date(new Date(lastRefreshTime).getTime() + REFRESH_INTERVAL_MS).toISOString()
-      : 'Pending first run'
+      : 'Pending first run',
+    source: 'Retailed API'
   });
 });
 
-// Get single asset (for debugging)
+// Get single asset
 app.get('/asset/:id', async (req, res) => {
   const { id } = req.params;
 
@@ -311,7 +268,7 @@ app.post('/asset/:id/refresh', async (req, res) => {
 
   try {
     const size = asset.size || '10';
-    const liveData = await fetchLivePrice(asset.stockx_sku, size);
+    const liveData = await fetchLowestAsk(asset.stockx_sku, size);
     const pricing = calculateBloomPrice(liveData.lowestAsk);
 
     await supabase
@@ -327,7 +284,7 @@ app.post('/asset/:id/refresh', async (req, res) => {
     await supabase.from('price_history').insert({
       asset_id: asset.id,
       price: pricing.bloomPrice,
-      source: 'manual_refresh',
+      source: 'retailed_api',
       created_at: new Date().toISOString()
     });
 
@@ -346,17 +303,7 @@ app.post('/asset/:id/refresh', async (req, res) => {
 });
 
 // ============================================
-// AUTOMATED REFRESH LOOP
-// ============================================
-async function runScheduledRefresh() {
-  console.log('\n[CRON] Scheduled refresh starting...');
-  const results = await refreshAllAssets();
-  lastRefreshTime = new Date().toISOString();
-  lastRefreshResults = results;
-}
-
-// ============================================
-// START SERVER
+// START SERVER & CRON
 // ============================================
 const PORT = process.env.PORT || 3001;
 
@@ -364,10 +311,11 @@ app.listen(PORT, () => {
   const example = calculateBloomPrice(300);
   console.log('');
   console.log('='.repeat(60));
-  console.log('  BLOOM PRICE WORKER - LIVE AUTOMATED ENGINE');
+  console.log('  BLOOM PRICE WORKER - RETAILED API');
   console.log('='.repeat(60));
   console.log(`  Port: ${PORT}`);
-  console.log(`  Refresh Interval: Every 10 minutes`);
+  console.log(`  Source: Retailed API`);
+  console.log(`  Refresh: Every 10 minutes`);
   console.log(`  Formula: (Ask + 4.83% + 6% Tax + $14.95) × 1.015`);
   console.log(`  Example: $300 Ask -> $${example.bloomPrice} Bloom Price`);
   console.log('='.repeat(60));
@@ -375,12 +323,12 @@ app.listen(PORT, () => {
 
   // Run initial refresh on startup
   console.log('[STARTUP] Running initial price refresh...');
-  runScheduledRefresh();
+  refreshAllAssets();
 
-  // Schedule refresh every 10 minutes using cron
-  // "*/10 * * * *" = every 10 minutes
+  // Schedule refresh every 10 minutes
   cron.schedule('*/10 * * * *', () => {
-    runScheduledRefresh();
+    console.log('\n[CRON] Scheduled refresh starting...');
+    refreshAllAssets();
   });
 
   console.log('[CRON] Scheduled: Refresh every 10 minutes');
