@@ -10,13 +10,18 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "keywords": ["bloom", "stockx", "pricing"],
+  "keywords": [
+    "bloom",
+    "stockx",
+    "pricing"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.88.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "node-cron": "^4.2.1",
     "sneaks-api": "^1.2.3"
   }
 }
