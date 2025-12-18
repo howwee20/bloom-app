@@ -5,8 +5,10 @@ const fetch = require('node-fetch');
 const RETAILED_API_URL = 'https://app.retailed.io/api/v1/db/products/asks';
 
 /**
- * Fetch the lowest ask for a specific SKU and size from Retailed API
- * @param {string} sku - The StockX SKU (e.g., 'FQ8232-100')
+ * Fetch the lowest ask for a specific SKU from Retailed API
+ * Uses FUZZY matching - trusts first result from API search
+ *
+ * @param {string} sku - The StockX SKU (e.g., 'FQ8232-010')
  * @param {string} size - The shoe size (e.g., '10')
  * @returns {Promise<{lowestAsk: number, productName: string}>}
  */
@@ -34,81 +36,119 @@ async function fetchLowestAsk(sku, size = '10') {
 
   const data = await response.json();
 
-  // Handle different response formats
-  // The API may return an array of products or a single product
+  // FUZZY MATCH: Trust the first result from the API
+  // If we searched for a unique SKU, the first result should be correct
   let product = null;
 
-  if (Array.isArray(data)) {
-    // Find exact SKU match
-    product = data.find(p => p.sku === sku || p.styleId === sku);
-    if (!product && data.length > 0) {
-      product = data[0]; // Fall back to first result
-    }
-  } else if (data.products && Array.isArray(data.products)) {
-    product = data.products.find(p => p.sku === sku || p.styleId === sku);
-    if (!product && data.products.length > 0) {
-      product = data.products[0];
-    }
-  } else if (data.sku || data.styleId) {
+  if (data.docs && Array.isArray(data.docs) && data.docs.length > 0) {
+    product = data.docs[0];
+  } else if (Array.isArray(data) && data.length > 0) {
+    product = data[0];
+  } else if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+    product = data.products[0];
+  } else if (data.id || data.sku || data.lowestAsk || data.price) {
+    // Single product response
     product = data;
   }
 
   if (!product) {
-    throw new Error(`No product found for SKU: ${sku}`);
+    throw new Error(`No results returned for SKU: ${sku}`);
   }
 
-  // Extract lowest ask for the specific size
-  // The API may have different structures for pricing
+  // Extract product name (try multiple fields)
+  const productName = product.title
+    || product.name
+    || product.shoeName
+    || product.productName
+    || product.urlSlug
+    || sku;
+
+  // Log what we found for verification
+  console.log(`[RETAILED] Found: "${productName}" for SKU ${sku}`);
+
+  // PRICE EXTRACTION: Try multiple strategies
   let lowestAsk = null;
-  const productName = product.name || product.title || product.shoeName || sku;
 
-  // Try different price structures
-  if (product.variants && Array.isArray(product.variants)) {
-    // Format: variants array with size and price
-    const variant = product.variants.find(v =>
-      v.size === size ||
-      v.size === `${size}` ||
-      v.size === `US ${size}` ||
-      String(v.size) === String(size)
-    );
-    if (variant) {
-      lowestAsk = variant.lowestAsk || variant.price || variant.lastSale;
-    }
+  // Strategy 1: Direct lowestAsk field
+  if (product.lowestAsk && typeof product.lowestAsk === 'number') {
+    lowestAsk = product.lowestAsk;
   }
 
-  if (!lowestAsk && product.market && product.market.lowestAsk) {
-    // Format: market object with overall lowestAsk
+  // Strategy 2: Price field
+  if (!lowestAsk && product.price && typeof product.price === 'number') {
+    lowestAsk = product.price;
+  }
+
+  // Strategy 3: Market object
+  if (!lowestAsk && product.market?.lowestAsk) {
     lowestAsk = product.market.lowestAsk;
   }
 
-  if (!lowestAsk && product.resellPrices?.stockX) {
-    // Format: resellPrices.stockX object keyed by size
-    const sizeFormats = [size, `${size}`, `US ${size}`, `${size} US`];
-    for (const fmt of sizeFormats) {
-      if (product.resellPrices.stockX[fmt]) {
-        lowestAsk = product.resellPrices.stockX[fmt];
-        break;
+  // Strategy 4: Variants array - find matching size
+  if (!lowestAsk && product.variants && Array.isArray(product.variants)) {
+    // First try to find exact size match
+    const sizeVariant = product.variants.find(v => {
+      const variantSize = String(v.size || '').replace(/[^0-9.]/g, '');
+      const targetSize = String(size).replace(/[^0-9.]/g, '');
+      return variantSize === targetSize;
+    });
+
+    if (sizeVariant) {
+      lowestAsk = sizeVariant.lowestAsk || sizeVariant.price || sizeVariant.lastSale;
+      console.log(`[RETAILED] Using size ${size} variant price: $${lowestAsk}`);
+    } else if (product.variants.length > 0) {
+      // Fallback: use first variant with a price
+      const anyVariant = product.variants.find(v => v.lowestAsk || v.price);
+      if (anyVariant) {
+        lowestAsk = anyVariant.lowestAsk || anyVariant.price;
+        console.log(`[RETAILED] Size ${size} not found, using variant size ${anyVariant.size}: $${lowestAsk}`);
       }
     }
   }
 
-  if (!lowestAsk && product.lowestAsk) {
-    // Format: direct lowestAsk property
-    lowestAsk = product.lowestAsk;
-  }
+  // Strategy 5: Prices object keyed by size
+  if (!lowestAsk && product.prices && typeof product.prices === 'object') {
+    // Try exact size match first
+    const sizeKeys = Object.keys(product.prices);
+    const matchingKey = sizeKeys.find(k => {
+      const keySize = String(k).replace(/[^0-9.]/g, '');
+      const targetSize = String(size).replace(/[^0-9.]/g, '');
+      return keySize === targetSize;
+    });
 
-  if (!lowestAsk && product.prices) {
-    // Format: prices object
-    const sizeKey = Object.keys(product.prices).find(k =>
-      k === size || k === `US ${size}` || k.includes(size)
-    );
-    if (sizeKey) {
-      lowestAsk = product.prices[sizeKey]?.lowestAsk || product.prices[sizeKey];
+    if (matchingKey) {
+      const priceData = product.prices[matchingKey];
+      lowestAsk = typeof priceData === 'number' ? priceData : priceData?.lowestAsk || priceData?.price;
+    } else if (sizeKeys.length > 0) {
+      // Fallback to first available price
+      const firstKey = sizeKeys[0];
+      const priceData = product.prices[firstKey];
+      lowestAsk = typeof priceData === 'number' ? priceData : priceData?.lowestAsk || priceData?.price;
     }
   }
 
+  // Strategy 6: resellPrices.stockX (legacy format)
+  if (!lowestAsk && product.resellPrices?.stockX) {
+    const stockxPrices = product.resellPrices.stockX;
+    const sizeKeys = Object.keys(stockxPrices);
+    const matchingKey = sizeKeys.find(k => String(k).includes(size));
+
+    if (matchingKey) {
+      lowestAsk = stockxPrices[matchingKey];
+    } else if (sizeKeys.length > 0) {
+      lowestAsk = stockxPrices[sizeKeys[0]];
+    }
+  }
+
+  // Strategy 7: salePrice or lastSale as fallback
   if (!lowestAsk) {
-    throw new Error(`Size ${size} not found for ${sku}. Product: ${productName}`);
+    lowestAsk = product.salePrice || product.lastSale || product.retailPrice;
+  }
+
+  if (!lowestAsk) {
+    // Log the product structure to help debug
+    console.log(`[RETAILED] Product structure:`, JSON.stringify(product, null, 2).substring(0, 500));
+    throw new Error(`No price found for "${productName}" (SKU: ${sku})`);
   }
 
   return {
