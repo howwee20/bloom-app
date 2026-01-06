@@ -47,7 +47,7 @@ interface TokenDetail {
   product_image_url: string | null;
   purchase_price: number;
   purchase_date: string;
-  custody_type: 'bloom'; // All tokens are Bloom custody
+  custody_type: 'bloom' | 'home'; // Bloom vault or user's home
   vault_location: string | null;
   verification_photos: string[] | null;
   verified_at: string | null;
@@ -234,6 +234,42 @@ export default function TokenDetailScreen() {
     );
   };
 
+  const handleRemove = () => {
+    showAlert(
+      'Remove from Portfolio?',
+      'This will permanently remove this item from your portfolio. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // First delete any related token_transfers
+              await supabase
+                .from('token_transfers')
+                .delete()
+                .eq('token_id', token?.id);
+
+              // Then delete the token
+              const { error } = await supabase
+                .from('tokens')
+                .delete()
+                .eq('id', token?.id);
+
+              if (error) throw error;
+
+              showAlert('Removed', 'Item removed from portfolio.');
+              router.back();
+            } catch (e: any) {
+              showAlert('Error', e.message || 'Failed to remove item.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Status helpers
   const isAcquiring = token?.status === 'acquiring';
   const isInCustody = token?.status === 'in_custody';
@@ -241,6 +277,8 @@ export default function TokenDetailScreen() {
   const isInCustodyOrListed = isInCustody || isListed;
   const isRedeeming = token?.status === 'redeeming' || token?.status === 'shipped';
   const isRedeemed = token?.status === 'redeemed';
+  const isBloomCustody = token?.custody_type === 'bloom';
+  const isHomeCustody = token?.custody_type === 'home';
 
   if (loading) {
     return (
@@ -316,6 +354,12 @@ export default function TokenDetailScreen() {
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{token.product_name}</Text>
           <Text style={styles.productMeta}>Size {token.size}</Text>
+          {/* Custody Badge */}
+          <View style={[styles.custodyBadge, isHomeCustody && styles.custodyBadgeHome]}>
+            <Text style={styles.custodyBadgeText}>
+              {isBloomCustody ? '● Bloom Vault' : '🏠 At Home'}
+            </Text>
+          </View>
         </View>
 
         {/* Value Section - Shows bid/ask spread for active tokens */}
@@ -368,19 +412,31 @@ export default function TokenDetailScreen() {
 
       {/* Action Buttons */}
       <View style={styles.actionContainer}>
+        {/* In Custody - Show Sell button (routing is invisible to user) */}
         {isInCustody && (
           <>
             <Pressable
-              style={[styles.actionButton, !token.is_exchange_eligible && styles.actionButtonDisabled]}
-              onPress={handleListForSale}
+              style={[styles.actionButton, isHomeCustody && styles.actionButtonDisabled]}
+              onPress={isBloomCustody ? handleListForSale : () => {
+                showAlert('Coming Soon', 'Marketplace selling is coming soon. Your item will be listed and shipped directly to the buyer.');
+              }}
             >
-              <Text style={[styles.actionButtonText, !token.is_exchange_eligible && styles.actionButtonTextDisabled]}>
+              <Text style={[styles.actionButtonText, isHomeCustody && styles.actionButtonTextDisabled]}>
                 Sell
               </Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={handleRedeem}>
-              <Text style={styles.secondaryButtonText}>Ship to Me</Text>
-            </Pressable>
+            {isBloomCustody && (
+              <Pressable style={styles.secondaryButton} onPress={handleRedeem}>
+                <Text style={styles.secondaryButtonText}>Ship to Me</Text>
+              </Pressable>
+            )}
+            {isHomeCustody && (
+              <Pressable style={styles.secondaryButton} onPress={() => {
+                showAlert('Upgrade to Instant', 'Send this item to Bloom Vault to enable instant selling. Ships in 2-3 days.');
+              }}>
+                <Text style={styles.secondaryButtonText}>Upgrade to Instant</Text>
+              </Pressable>
+            )}
           </>
         )}
         {isListed && (
@@ -392,10 +448,14 @@ export default function TokenDetailScreen() {
               <Text style={styles.actionButtonText}>Update Price</Text>
             </Pressable>
             <Pressable style={styles.secondaryButton} onPress={handleUnlist}>
-              <Text style={styles.secondaryButtonText}>Remove</Text>
+              <Text style={styles.secondaryButtonText}>Remove Listing</Text>
             </Pressable>
           </>
         )}
+        {/* Remove from Portfolio - always available */}
+        <Pressable style={styles.dangerButton} onPress={handleRemove}>
+          <Text style={styles.dangerButtonText}>Remove from Portfolio</Text>
+        </Pressable>
       </View>
 
       {/* Listing Modal */}
@@ -545,6 +605,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: theme.textSecondary,
   },
+  custodyBadge: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+  },
+  custodyBadgeHome: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  custodyBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
   valueSection: {
     alignItems: 'center',
     paddingVertical: 24,
@@ -656,6 +731,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: theme.success,
     fontWeight: '500',
+  },
+  dangerButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  dangerButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme.error,
   },
   // Modal styles
   modalOverlay: {

@@ -8,6 +8,7 @@ import {
   Pressable,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,6 +16,9 @@ import {
 import { fonts, theme } from '../../constants/Colors';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
+
+// Filter types for custody
+type CustodyFilter = 'all' | 'bloom' | 'home';
 
 // Token interface for ownership-first model
 interface Token {
@@ -26,7 +30,7 @@ interface Token {
   product_image_url: string | null;
   purchase_price: number;
   purchase_date: string;
-  custody_type: 'bloom'; // All tokens are Bloom custody
+  custody_type: 'bloom' | 'home'; // Bloom vault or user's home
   is_exchange_eligible: boolean;
   current_value: number;
   pnl_dollars: number | null;
@@ -44,6 +48,8 @@ interface TokenPortfolioSummary {
   acquiring_count: number;
   redeeming_count: number;
   redeemed_count: number;
+  bloom_count?: number;
+  home_count?: number;
 }
 
 // Legacy asset interface (for backwards compatibility)
@@ -79,6 +85,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>('all');
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -165,11 +172,29 @@ export default function HomeScreen() {
     }
   };
 
-  // Render token card - minimal design with status badge
+  // Get P&L color based on value
+  const getPnlColor = (value: number | null) => {
+    if (value === null || value === 0) return theme.textSecondary;
+    return value > 0 ? theme.success : theme.error;
+  };
+
+  // Format P&L with sign and percentage
+  const formatPnLWithPercent = (dollars: number | null, percent: number | null) => {
+    if (dollars === null || dollars === 0) return null;
+    const sign = dollars > 0 ? '+' : '';
+    const dollarStr = `${sign}$${Math.abs(dollars).toFixed(2)}`;
+    const percentStr = percent !== null ? ` (${sign}${percent.toFixed(1)}%)` : '';
+    return `${dollarStr}${percentStr}`;
+  };
+
+  // Render token card - brokerage style with P&L
   const renderTokenCard = ({ item }: { item: Token }) => {
     const showImage = item.product_image_url && !failedImages.has(item.id);
     const statusConfig = getStatusConfig(item.status);
     const showStatusBadge = item.status !== 'in_custody'; // Only show badge for non-ready states
+    const pnlStr = formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
+    const pnlColor = getPnlColor(item.pnl_dollars);
+    const isBloomCustody = item.custody_type === 'bloom';
 
     return (
       <Pressable style={styles.assetCard} onPress={() => router.push(`/token/${item.id}`)}>
@@ -196,12 +221,18 @@ export default function HomeScreen() {
 
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={2}>{item.product_name}</Text>
-          <View style={styles.cardMetaRow}>
-            <Text style={styles.cardMeta}>
-              Size {item.size} · {formatPrice(item.current_value)}
-            </Text>
+          <Text style={styles.cardPrice}>{formatPrice(item.current_value)}</Text>
+          <View style={styles.cardPnlRow}>
+            {pnlStr ? (
+              <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
+            ) : (
+              <Text style={styles.cardMeta}>Size {item.size}</Text>
+            )}
+            {/* Custody indicator */}
             {item.status === 'in_custody' && (
-              <Text style={[styles.statusDot, { color: theme.success }]}>●</Text>
+              <Text style={[styles.statusDot, { color: isBloomCustody ? theme.success : theme.textSecondary }]}>
+                {isBloomCustody ? '●' : '🏠'}
+              </Text>
             )}
           </View>
         </View>
@@ -209,9 +240,11 @@ export default function HomeScreen() {
     );
   };
 
-  // Legacy: Render asset card - minimal design
+  // Legacy: Render asset card - brokerage style with P&L
   const renderAssetCard = ({ item }: { item: Asset }) => {
     const showImage = item.image_url && !failedImages.has(item.id);
+    const pnlStr = formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
+    const pnlColor = getPnlColor(item.pnl_dollars);
 
     return (
       <Pressable style={styles.assetCard} onPress={() => router.push(`/asset/${item.id}`)}>
@@ -232,9 +265,14 @@ export default function HomeScreen() {
 
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.cardMeta}>
-            Size {item.size} · {formatPrice(item.current_price)}
-          </Text>
+          <Text style={styles.cardPrice}>{formatPrice(item.current_price)}</Text>
+          <View style={styles.cardPnlRow}>
+            {pnlStr ? (
+              <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
+            ) : (
+              <Text style={styles.cardMeta}>Size {item.size}</Text>
+            )}
+          </View>
         </View>
       </Pressable>
     );
@@ -261,6 +299,17 @@ export default function HomeScreen() {
     ? theme.textSecondary
     : combinedTotalPnl >= 0 ? theme.success : theme.error;
 
+  // Filter tokens by custody type
+  const filteredTokens = tokens.filter(token => {
+    if (custodyFilter === 'all') return true;
+    return token.custody_type === custodyFilter;
+  });
+
+  // Count by custody type
+  const bloomCount = tokens.filter(t => t.custody_type === 'bloom').length;
+  const homeCount = tokens.filter(t => t.custody_type === 'home').length;
+  const allCount = tokens.length + ownedAssets.length;
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -280,12 +329,44 @@ export default function HomeScreen() {
       {/* Portfolio Value */}
       <View style={styles.valueSection}>
         <Text style={styles.valueAmount}>{formatPrice(combinedTotalValue)}</Text>
-        {hasItems && (
+        {hasItems && combinedTotalPnl !== 0 && (
           <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
-            {formatPnL(combinedTotalPnl)} today
+            {formatPnL(combinedTotalPnl)} all time
           </Text>
         )}
       </View>
+
+      {/* Filter Pills */}
+      {hasItems && (
+        <View style={styles.filterContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+            <Pressable
+              style={[styles.filterPill, custodyFilter === 'all' && styles.filterPillActive]}
+              onPress={() => setCustodyFilter('all')}
+            >
+              <Text style={[styles.filterPillText, custodyFilter === 'all' && styles.filterPillTextActive]}>
+                All ({allCount})
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.filterPill, custodyFilter === 'bloom' && styles.filterPillActive]}
+              onPress={() => setCustodyFilter('bloom')}
+            >
+              <Text style={[styles.filterPillText, custodyFilter === 'bloom' && styles.filterPillTextActive]}>
+                <Text style={{ color: theme.success }}>●</Text> Bloom ({bloomCount})
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.filterPill, custodyFilter === 'home' && styles.filterPillActive]}
+              onPress={() => setCustodyFilter('home')}
+            >
+              <Text style={[styles.filterPillText, custodyFilter === 'home' && styles.filterPillTextActive]}>
+                🏠 Home ({homeCount})
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      )}
 
       {/* Assets */}
       <View style={styles.assetsSection}>
@@ -298,7 +379,7 @@ export default function HomeScreen() {
           renderEmptyState()
         ) : (
           <FlatList
-            data={[...tokens, ...ownedAssets] as any[]}
+            data={custodyFilter === 'all' ? [...filteredTokens, ...ownedAssets] : filteredTokens as any[]}
             renderItem={({ item }) => {
               // Check if it's a token (has custody_type) or legacy asset
               if ('custody_type' in item) {
@@ -318,6 +399,11 @@ export default function HomeScreen() {
                 onRefresh={onRefresh}
                 tintColor={theme.accent}
               />
+            }
+            ListFooterComponent={
+              <Pressable style={styles.addButton} onPress={() => router.push('/add-from-home')}>
+                <Text style={styles.addButtonText}>+ Add Item</Text>
+              </Pressable>
             }
           />
         )}
@@ -431,11 +517,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: theme.textPrimary,
-    marginBottom: 4,
+    marginBottom: 2,
     lineHeight: 17,
   },
+  cardPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    marginBottom: 2,
+  },
   cardMeta: {
-    fontSize: 12,
+    fontSize: 11,
     color: theme.textSecondary,
     flex: 1,
   },
@@ -443,6 +535,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  cardPnlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardPnl: {
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
   },
   statusDot: {
     fontSize: 10,
@@ -498,5 +600,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: theme.textInverse,
+  },
+  filterContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  filterScroll: {
+    gap: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  filterPillActive: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.textSecondary,
+  },
+  filterPillTextActive: {
+    color: theme.textInverse,
+  },
+  addButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  addButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.accent,
   },
 });

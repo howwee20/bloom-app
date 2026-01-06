@@ -98,6 +98,15 @@ async function refreshAllAssets() {
           created_at: new Date().toISOString()
         });
 
+        // Update token current_values for this SKU
+        await supabase
+          .from('tokens')
+          .update({
+            current_value: newPrice,
+            value_updated_at: new Date().toISOString()
+          })
+          .eq('sku', asset.stockx_sku);
+
         const diff = newPrice - oldPrice;
         const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
         console.log(`✓ ${asset.stockx_sku}: $${oldPrice.toFixed(2)} → $${newPrice.toFixed(2)} ${arrow}`);
