@@ -3,23 +3,44 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   AppStateStatus,
   FlatList,
   Image,
   Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { fonts, theme } from '../../constants/Colors';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
+
+// Web-compatible alert/confirm
+const showAlert = (title: string, message: string, buttons?: Array<{text: string, onPress?: () => void, style?: string}>) => {
+  if (Platform.OS === 'web') {
+    if (buttons && buttons.length > 1) {
+      const confirmed = window.confirm(`${title}\n\n${message}`);
+      if (confirmed) {
+        const confirmButton = buttons.find(b => b.style === 'destructive' || b.text !== 'Cancel');
+        confirmButton?.onPress?.();
+      }
+    } else {
+      window.alert(`${title}\n\n${message}`);
+      buttons?.[0]?.onPress?.();
+    }
+  } else {
+    Alert.alert(title, message, buttons);
+  }
+};
 
 // Filter types for custody
 type CustodyFilter = 'all' | 'bloom' | 'home';
@@ -118,6 +139,7 @@ interface SellItem {
   sku?: string | null;
   subtitle: string;
   custodyLabel: string;
+  custodyType: 'home' | 'bloom';
   value: number;
   imageUrl: string | null;
 }
@@ -137,6 +159,11 @@ export default function HomeScreen() {
   const [showSellModal, setShowSellModal] = useState(false);
   const [showSellOptions, setShowSellOptions] = useState(false);
   const [selectedSellItem, setSelectedSellItem] = useState<SellItem | null>(null);
+  const [showBloomMarketOptions, setShowBloomMarketOptions] = useState(false);
+  const [showExchangeListing, setShowExchangeListing] = useState(false);
+  const [exchangeListingPrice, setExchangeListingPrice] = useState('');
+  const [exchangeListingLoading, setExchangeListingLoading] = useState(false);
+  const [exchangeListingSuccess, setExchangeListingSuccess] = useState(false);
   const [topMovers, setTopMovers] = useState<TopMover[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [weeklyDigest, setWeeklyDigest] = useState<WeeklyDigest | null>(null);
@@ -253,6 +280,20 @@ export default function HomeScreen() {
   }, [session, appState]);
 
   const isForeground = appState === 'active';
+
+  useEffect(() => {
+    if (!selectedSellItem) {
+      setShowBloomMarketOptions(false);
+      setExchangeListingPrice('');
+      setExchangeListingSuccess(false);
+      return;
+    }
+    setShowBloomMarketOptions(false);
+    setExchangeListingPrice(
+      Number.isFinite(selectedSellItem.value) ? selectedSellItem.value.toFixed(2) : ''
+    );
+    setExchangeListingSuccess(false);
+  }, [selectedSellItem]);
 
   useEffect(() => {
     if (!session || !isForeground || !isFocused) return;
@@ -375,6 +416,79 @@ export default function HomeScreen() {
     if (!best || option.net > best.net) return option;
     return best;
   }, null as null | (typeof marketplaceOptions)[number])?.id;
+
+  const isBloomCustody = selectedSellItem?.custodyType === 'bloom';
+  const canListOnExchange = selectedSellItem?.type === 'token' && selectedSellItem?.custodyType === 'bloom';
+  const showMarketplaceCards = !isBloomCustody || showBloomMarketOptions;
+
+  const handleOpenExchangeListing = () => {
+    if (!selectedSellItem) return;
+    if (selectedSellItem.type !== 'token' || selectedSellItem.custodyType !== 'bloom') {
+      showAlert('Exchange requires Bloom custody', 'Only Bloom custody items can be listed on the exchange.');
+      return;
+    }
+    setShowSellOptions(false);
+    setShowExchangeListing(true);
+  };
+
+  const closeExchangeListing = () => {
+    setShowExchangeListing(false);
+    setExchangeListingLoading(false);
+    setExchangeListingSuccess(false);
+    setSelectedSellItem(null);
+  };
+
+  const handleConfirmExchangeListing = async () => {
+    if (!selectedSellItem) return;
+    if (!session?.user?.id) {
+      showAlert('Not signed in', 'Please sign in to list on the exchange.');
+      return;
+    }
+    if (selectedSellItem.type !== 'token' || selectedSellItem.custodyType !== 'bloom') {
+      showAlert('Exchange requires Bloom custody', 'Only Bloom custody items can be listed on the exchange.');
+      return;
+    }
+
+    const price = Number.parseFloat(exchangeListingPrice);
+    if (Number.isNaN(price) || price < 50 || price > 50000) {
+      showAlert('Invalid price', 'Price must be between $50 and $50,000.');
+      return;
+    }
+
+    try {
+      setExchangeListingLoading(true);
+      const { data, error } = await supabase.rpc('list_token_for_sale', {
+        p_token_id: selectedSellItem.id,
+        p_listing_price: price,
+      });
+
+      if (error || !data?.success) {
+        throw new Error(error?.message || data?.error || 'Failed to list token');
+      }
+
+      const { error: insertError } = await supabase
+        .from('exchange_listings')
+        .insert({
+          user_id: session.user.id,
+          token_id: selectedSellItem.id,
+          ask_price: price,
+          status: 'active',
+        });
+
+      if (insertError) {
+        await supabase.rpc('unlist_token', { p_token_id: selectedSellItem.id });
+        throw new Error(insertError.message || 'Failed to create exchange listing');
+      }
+
+      setExchangeListingSuccess(true);
+      fetchPortfolio({ silent: true });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Please try again.';
+      showAlert('Listing failed', message);
+    } finally {
+      setExchangeListingLoading(false);
+    }
+  };
 
   // Render token card - brokerage style with P&L
   const renderTokenCard = ({ item }: { item: Token }) => {
@@ -524,6 +638,7 @@ export default function HomeScreen() {
         sku: token.sku,
         subtitle: token.size ? `Size ${token.size}` : 'Size —',
         custodyLabel: token.custody_type === 'bloom' ? 'Bloom' : 'Home',
+        custodyType: token.custody_type,
         value: token.current_value || 0,
         imageUrl: token.product_image_url,
       })),
@@ -535,10 +650,12 @@ export default function HomeScreen() {
       sku: asset.stockx_sku,
       subtitle: asset.size ? `Size ${asset.size}` : asset.category || 'Asset',
       custodyLabel: 'Home',
+      custodyType: 'home' as const,
       value: asset.current_price || 0,
       imageUrl: asset.image_url,
     })),
   ];
+  const sortedSellItems = [...sellItems].sort((a, b) => b.value - a.value);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -627,11 +744,11 @@ export default function HomeScreen() {
             <Text style={styles.actionPrimaryText}>Buy</Text>
           </Pressable>
           <Pressable
-            style={[styles.actionSecondary, sellItems.length === 0 && styles.actionSecondaryDisabled]}
+            style={[styles.actionSecondary, sortedSellItems.length === 0 && styles.actionSecondaryDisabled]}
             onPress={() => setShowSellModal(true)}
-            disabled={sellItems.length === 0}
+            disabled={sortedSellItems.length === 0}
           >
-            <Text style={[styles.actionSecondaryText, sellItems.length === 0 && styles.actionSecondaryTextDisabled]}>
+            <Text style={[styles.actionSecondaryText, sortedSellItems.length === 0 && styles.actionSecondaryTextDisabled]}>
               Sell
             </Text>
           </Pressable>
@@ -792,49 +909,67 @@ export default function HomeScreen() {
             <Text style={styles.modalTitle}>Sell</Text>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {sellItems.length === 0 ? (
+              {sortedSellItems.length === 0 ? (
                 <View style={styles.emptySellState}>
                   <Text style={styles.emptySellTitle}>No items to sell</Text>
                   <Text style={styles.emptySellSubtitle}>Add an item to get started</Text>
                 </View>
               ) : (
-                sellItems.map(item => (
+                sortedSellItems.map(item => {
+                  const isBloom = item.custodyType === 'bloom';
+                  return (
                   <Pressable
                     key={`${item.type}-${item.id}`}
-                    style={styles.modalOption}
+                    style={[
+                      styles.sellPickRow,
+                      isBloom ? styles.sellPickRowBloom : styles.sellPickRowHome,
+                    ]}
                     onPress={() => {
                       setShowSellModal(false);
                       setSelectedSellItem(item);
                       setShowSellOptions(true);
                     }}
                   >
-                    <View style={styles.sellOptionRow}>
-                      <View style={styles.sellOptionLeft}>
-                        {item.imageUrl ? (
-                          <Image source={{ uri: item.imageUrl }} style={styles.sellOptionImage} />
-                        ) : (
-                          <View style={[styles.sellOptionImage, styles.sellOptionPlaceholder]}>
-                            <Text style={styles.sellOptionPlaceholderText}>
-                              {item.name.charAt(0)}
-                            </Text>
-                          </View>
-                        )}
-                        <View style={styles.sellOptionText}>
-                          <Text style={styles.modalOptionTitle} numberOfLines={1}>
-                            {item.name}
+                    <View style={styles.sellPickLeft}>
+                      {item.imageUrl ? (
+                        <Image source={{ uri: item.imageUrl }} style={styles.sellPickThumb} />
+                      ) : (
+                        <View style={[styles.sellPickThumb, styles.sellOptionPlaceholder]}>
+                          <Text style={styles.sellOptionPlaceholderText}>
+                            {item.name.charAt(0)}
                           </Text>
-                          <View style={styles.sellOptionMetaRow}>
-                            <Text style={styles.modalOptionDesc}>{item.subtitle}</Text>
-                            <View style={styles.custodyTag}>
-                              <Text style={styles.custodyTagText}>{item.custodyLabel}</Text>
-                            </View>
+                        </View>
+                      )}
+                      <View style={styles.sellPickText}>
+                        <Text style={styles.sellPickName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <View style={styles.sellPickMetaRow}>
+                          <Text style={styles.sellPickMeta}>
+                            {item.size ? `Size ${item.size}` : 'Size —'} · {item.custodyLabel}
+                          </Text>
+                          <View
+                            style={[
+                              styles.sellPickBadge,
+                              isBloom ? styles.sellPickBadgeBloom : styles.sellPickBadgeHome,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.sellPickBadgeText,
+                                isBloom ? styles.sellPickBadgeTextBloom : styles.sellPickBadgeTextHome,
+                              ]}
+                            >
+                              {item.custodyLabel}
+                            </Text>
                           </View>
                         </View>
                       </View>
-                      <Text style={styles.sellOptionValue}>{formatPrice(item.value)}</Text>
                     </View>
+                    <Text style={styles.sellPickValue}>{formatPrice(item.value)}</Text>
                   </Pressable>
-                ))
+                  );
+                })
               )}
             </ScrollView>
 
@@ -852,6 +987,7 @@ export default function HomeScreen() {
         animationType="slide"
         onRequestClose={() => {
           setShowSellOptions(false);
+          setShowBloomMarketOptions(false);
           setSelectedSellItem(null);
         }}
       >
@@ -859,11 +995,12 @@ export default function HomeScreen() {
           style={styles.modalOverlay}
           onPress={() => {
             setShowSellOptions(false);
+            setShowBloomMarketOptions(false);
             setSelectedSellItem(null);
           }}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Best Sell Options</Text>
+            <Text style={styles.modalTitle}>{isBloomCustody ? 'Sell Options' : 'Best Sell Options'}</Text>
 
             {selectedSellItem && (
               <View style={styles.sellHeaderRow}>
@@ -887,49 +1024,73 @@ export default function HomeScreen() {
               </View>
             )}
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {marketplaceOptions.map(option => (
-                <View key={option.id} style={styles.sellOptionCard}>
-                  <View style={styles.sellOptionHeader}>
-                    <Text style={styles.sellOptionName}>{option.name}</Text>
-                    {option.id === bestOptionId && (
-                      <View style={styles.bestBadge}>
-                        <Text style={styles.bestBadgeText}>Best</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.sellOptionRow}>
-                    <Text style={styles.sellOptionLabel}>Market</Text>
-                    <Text style={styles.sellOptionValue}>{formatPrice(option.gross)}</Text>
-                  </View>
-                  <View style={styles.sellOptionRow}>
-                    <Text style={styles.sellOptionLabel}>Fees</Text>
-                    <Text style={styles.sellOptionValue}>-{formatPrice(option.feeEstimate)}</Text>
-                  </View>
-                  <View style={styles.sellOptionRow}>
-                    <Text style={styles.sellOptionLabel}>Shipping</Text>
-                    <Text style={styles.sellOptionValue}>-{formatPrice(option.shipping)}</Text>
-                  </View>
-                  <View style={styles.sellOptionRow}>
-                    <Text style={styles.sellOptionLabelStrong}>Net payout</Text>
-                    <Text style={styles.sellOptionValueStrong}>{formatPrice(option.net)}</Text>
-                  </View>
-                  <Pressable
-                    style={styles.sellOptionButton}
-                    onPress={() => {
-                      if (!selectedSellItem) return;
-                      Linking.openURL(buildMarketplaceUrl(option.id, selectedSellItem));
-                    }}
-                  >
-                    <Text style={styles.sellOptionButtonText}>Continue</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </ScrollView>
+            {isBloomCustody && (
+              <View style={styles.sellDecisionBlock}>
+                <Pressable
+                  style={styles.sellDecisionPrimary}
+                  onPress={handleOpenExchangeListing}
+                  disabled={!canListOnExchange}
+                >
+                  <Text style={styles.sellDecisionPrimaryText}>List on Bloom Exchange</Text>
+                  <Text style={styles.sellDecisionSubtext}>Verified. Instant transfer eligible.</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.sellDecisionSecondary}
+                  onPress={() => setShowBloomMarketOptions(true)}
+                >
+                  <Text style={styles.sellDecisionSecondaryText}>List on Market</Text>
+                  <Text style={styles.sellDecisionSubtext}>Route to StockX / GOAT / eBay</Text>
+                </Pressable>
+              </View>
+            )}
 
-            <Text style={styles.sellDisclaimer}>
-              Estimates only. Final payout set by the marketplace.
-            </Text>
+            {showMarketplaceCards && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {marketplaceOptions.map(option => (
+                  <View key={option.id} style={styles.sellOptionCard}>
+                    <View style={styles.sellOptionHeader}>
+                      <Text style={styles.sellOptionName}>{option.name}</Text>
+                      {option.id === bestOptionId && (
+                        <View style={styles.bestBadge}>
+                          <Text style={styles.bestBadgeText}>Best</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.sellOptionRow}>
+                      <Text style={styles.sellOptionLabel}>Market</Text>
+                      <Text style={styles.sellOptionValue}>{formatPrice(option.gross)}</Text>
+                    </View>
+                    <View style={styles.sellOptionRow}>
+                      <Text style={styles.sellOptionLabel}>Fees</Text>
+                      <Text style={styles.sellOptionValue}>-{formatPrice(option.feeEstimate)}</Text>
+                    </View>
+                    <View style={styles.sellOptionRow}>
+                      <Text style={styles.sellOptionLabel}>Shipping</Text>
+                      <Text style={styles.sellOptionValue}>-{formatPrice(option.shipping)}</Text>
+                    </View>
+                    <View style={styles.sellOptionRow}>
+                      <Text style={styles.sellOptionLabelStrong}>Net payout</Text>
+                      <Text style={styles.sellOptionValueStrong}>{formatPrice(option.net)}</Text>
+                    </View>
+                    <Pressable
+                      style={styles.sellOptionButton}
+                      onPress={() => {
+                        if (!selectedSellItem) return;
+                        Linking.openURL(buildMarketplaceUrl(option.id, selectedSellItem));
+                      }}
+                    >
+                      <Text style={styles.sellOptionButtonText}>Continue</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {showMarketplaceCards && (
+              <Text style={styles.sellDisclaimer}>
+                Estimates only. Final payout set by the marketplace.
+              </Text>
+            )}
 
             <Pressable
               style={styles.modalCancel}
@@ -940,6 +1101,93 @@ export default function HomeScreen() {
             >
               <Text style={styles.modalCancelText}>Close</Text>
             </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Bloom Exchange Listing Modal */}
+      <Modal
+        visible={showExchangeListing}
+        transparent
+        animationType="slide"
+        onRequestClose={closeExchangeListing}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeExchangeListing}>
+          <View style={styles.modalContent}>
+            {exchangeListingSuccess ? (
+              <View style={styles.exchangeSuccess}>
+                <Text style={styles.exchangeSuccessTitle}>Listed on Bloom Exchange</Text>
+                <Text style={styles.exchangeSuccessSubtitle}>Your listing is now live.</Text>
+                <Pressable style={styles.sellOptionButton} onPress={closeExchangeListing}>
+                  <Text style={styles.sellOptionButtonText}>Done</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.modalTitle}>List on Bloom Exchange</Text>
+
+                {selectedSellItem && (
+                  <View style={styles.sellHeaderRow}>
+                    {selectedSellItem.imageUrl ? (
+                      <Image source={{ uri: selectedSellItem.imageUrl }} style={styles.sellHeaderImage} />
+                    ) : (
+                      <View style={[styles.sellHeaderImage, styles.sellOptionPlaceholder]}>
+                        <Text style={styles.sellOptionPlaceholderText}>
+                          {selectedSellItem.name.charAt(0)}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.sellHeaderText}>
+                      <Text style={styles.sellHeaderTitle} numberOfLines={1}>
+                        {selectedSellItem.name}
+                      </Text>
+                      <Text style={styles.sellHeaderMeta}>
+                        {selectedSellItem.size ? `Size ${selectedSellItem.size}` : 'Size —'} · Bloom custody
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                <View style={styles.exchangeInputCard}>
+                  <Text style={styles.exchangeInputLabel}>Ask price</Text>
+                  <View style={styles.exchangeInputRow}>
+                    <Text style={styles.exchangeCurrency}>$</Text>
+                    <TextInput
+                      style={styles.exchangeInput}
+                      value={exchangeListingPrice}
+                      onChangeText={setExchangeListingPrice}
+                      placeholder="0.00"
+                      placeholderTextColor={theme.textTertiary}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                  {selectedSellItem && (
+                    <Text style={styles.exchangeHint}>
+                      Market value: {formatPrice(selectedSellItem.value)}
+                    </Text>
+                  )}
+                </View>
+
+                <Pressable
+                  style={[
+                    styles.sellOptionButton,
+                    exchangeListingLoading && styles.sellOptionButtonDisabled,
+                  ]}
+                  onPress={handleConfirmExchangeListing}
+                  disabled={exchangeListingLoading}
+                >
+                  {exchangeListingLoading ? (
+                    <ActivityIndicator size="small" color={theme.textInverse} />
+                  ) : (
+                    <Text style={styles.sellOptionButtonText}>List on Exchange</Text>
+                  )}
+                </Pressable>
+
+                <Pressable style={styles.modalCancel} onPress={closeExchangeListing}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </Pressable>
       </Modal>
@@ -1421,6 +1669,84 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  sellPickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  sellPickRowHome: {
+    backgroundColor: theme.card,
+    borderColor: theme.border,
+  },
+  sellPickRowBloom: {
+    backgroundColor: theme.accentLight,
+    borderColor: theme.accentDark,
+  },
+  sellPickLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 14,
+  },
+  sellPickThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+  },
+  sellPickText: {
+    flex: 1,
+  },
+  sellPickName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    marginBottom: 4,
+  },
+  sellPickMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sellPickMeta: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    flexShrink: 1,
+  },
+  sellPickBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  sellPickBadgeHome: {
+    backgroundColor: theme.backgroundTertiary,
+  },
+  sellPickBadgeBloom: {
+    backgroundColor: theme.accent,
+  },
+  sellPickBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  sellPickBadgeTextHome: {
+    color: theme.textSecondary,
+  },
+  sellPickBadgeTextBloom: {
+    color: theme.textPrimary,
+  },
+  sellPickValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    marginLeft: 12,
+    textAlign: 'right',
+  },
   modalOptionDisabled: {
     opacity: 0.5,
   },
@@ -1445,6 +1771,40 @@ const styles = StyleSheet.create({
   modalCancelText: {
     fontSize: 17,
     fontWeight: '600',
+    color: theme.textSecondary,
+  },
+  sellDecisionBlock: {
+    gap: 12,
+    marginBottom: 12,
+  },
+  sellDecisionPrimary: {
+    backgroundColor: theme.accent,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  sellDecisionPrimaryText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    marginBottom: 4,
+  },
+  sellDecisionSecondary: {
+    backgroundColor: theme.card,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  sellDecisionSecondaryText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 4,
+  },
+  sellDecisionSubtext: {
+    fontSize: 12,
     color: theme.textSecondary,
   },
   sellOptionRow: {
@@ -1575,10 +1935,66 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
+  sellOptionButtonDisabled: {
+    opacity: 0.7,
+  },
   sellOptionButtonText: {
     fontSize: 15,
     fontWeight: '600',
     color: theme.textInverse,
+  },
+  exchangeInputCard: {
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: theme.borderLight,
+    marginBottom: 14,
+  },
+  exchangeInputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.textSecondary,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  exchangeInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exchangeCurrency: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  exchangeInput: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    paddingVertical: 6,
+  },
+  exchangeHint: {
+    marginTop: 6,
+    fontSize: 12,
+    color: theme.textSecondary,
+  },
+  exchangeSuccess: {
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  exchangeSuccessTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  exchangeSuccessSubtitle: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    textAlign: 'center',
   },
   sellDisclaimer: {
     fontSize: 12,
