@@ -1,42 +1,42 @@
-// Bloom Theme - Coinbase-inspired with Orange Accent
+// Bloom Theme - Warm cream with Orange Accent
 // Using Zen Dots font for headers
 
 export const theme = {
-  // Accent color (replacing Coinbase blue #0052FF)
+  // Accent color - Bloom orange
   accent: '#FFD7B5',
-  accentDark: '#E5B896',
+  accentDark: '#E8A875',
   accentLight: '#FFF0E5',
 
-  // Backgrounds (Coinbase dark mode style)
-  background: '#0A0B0D',
-  backgroundSecondary: '#111214',
-  backgroundTertiary: '#16171A',
-  card: '#1E2026',
-  cardHover: '#252830',
+  // Backgrounds - Warm cream palette
+  background: '#FDF8F3',
+  backgroundSecondary: '#F7F2ED',
+  backgroundTertiary: '#F0EBE6',
+  card: '#FFFFFF',
+  cardHover: '#FDF8F3',
 
-  // Text
-  textPrimary: '#FFFFFF',
-  textSecondary: '#8A919E',
-  textTertiary: '#5F6673',
-  textInverse: '#0A0B0D',
+  // Text - Dark for readability on cream
+  textPrimary: '#1A1A1A',
+  textSecondary: '#6B6B6B',
+  textTertiary: '#9A9A9A',
+  textInverse: '#1A1A1A',
 
-  // Borders
-  border: '#2C2F36',
-  borderLight: '#3C3F46',
+  // Borders - Soft warm tones
+  border: 'rgba(0, 0, 0, 0.08)',
+  borderLight: 'rgba(0, 0, 0, 0.05)',
 
   // Status colors
-  success: '#00D395',
-  successBg: '#0D2E26',
-  error: '#F6465D',
-  errorBg: '#2E1519',
-  warning: '#F0B90B',
-  warningBg: '#2E2B15',
+  success: '#00A878',
+  successBg: '#E6F7F2',
+  error: '#E53935',
+  errorBg: '#FFEBEE',
+  warning: '#F9A825',
+  warningBg: '#FFF8E1',
 
   // Tab bar
-  tabBar: '#0A0B0D',
-  tabBarBorder: '#1E2026',
-  tabIconDefault: '#5F6673',
-  tabIconSelected: '#FFD7B5',
+  tabBar: '#FDF8F3',
+  tabBarBorder: 'rgba(0, 0, 0, 0.08)',
+  tabIconDefault: '#9A9A9A',
+  tabIconSelected: '#E8A875',
 };
 
 // Font family constant

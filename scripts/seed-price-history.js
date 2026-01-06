@@ -1,5 +1,5 @@
-// Seed price history with ALIVE Protocol simulation
-// This creates baseline price data for all assets
+// Seed price history with baseline values (no synthetic fluctuations)
+// This creates stable price history data for all assets
 
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
@@ -12,11 +12,6 @@ function calculateAllInPrice(lowestAsk) {
   return Math.round((lowestAsk * ALL_IN_MULTIPLIER + FLAT_SHIPPING) * 100) / 100;
 }
 
-// ALIVE Protocol: Synthetic fluctuation +/- 1.5%
-function applySyntheticFluctuation(currentPrice) {
-  const fluctuation = (Math.random() * 0.03) - 0.015; // -1.5% to +1.5%
-  return Math.round(currentPrice * (1 + fluctuation) * 100) / 100;
-}
 
 async function main() {
   const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -51,8 +46,7 @@ async function main() {
     const basePrice = asset.price;
 
     for (let daysAgo = 7; daysAgo >= 0; daysAgo--) {
-      // Fluctuate price randomly to simulate market movement
-      const priceForDay = applySyntheticFluctuation(basePrice);
+      const priceForDay = basePrice;
       const date = new Date();
       date.setDate(date.getDate() - daysAgo);
       date.setHours(12, 0, 0, 0); // Noon each day
@@ -62,16 +56,14 @@ async function main() {
         .insert({
           asset_id: asset.id,
           price: priceForDay,
-          source: daysAgo === 0 ? 'baseline' : 'alive_protocol',
+          source: 'baseline',
           created_at: date.toISOString()
         });
 
       if (error) {
         console.log(`  Error for day -${daysAgo}:`, error.message);
       } else {
-        const sign = priceForDay >= basePrice ? '+' : '';
-        const diff = priceForDay - basePrice;
-        console.log(`  Day -${daysAgo}: $${priceForDay} (${sign}${diff.toFixed(2)})`);
+        console.log(`  Day -${daysAgo}: $${priceForDay}`);
       }
     }
 

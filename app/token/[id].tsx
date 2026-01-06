@@ -52,7 +52,7 @@ interface TokenDetail {
   verification_photos: string[] | null;
   verified_at: string | null;
   is_exchange_eligible: boolean;
-  current_value: number;
+  current_value: number | null;
   pnl_dollars: number | null;
   pnl_percent: number | null;
   is_listed_for_sale: boolean;
@@ -483,6 +483,9 @@ export default function TokenDetailScreen() {
           )}
           {isRedeemed && (
             <Text style={styles.statusNote}>In your possession</Text>
+          )}
+          {token.match_status === 'pending' && (
+            <Text style={styles.statusNote}>Needs match to enable pricing</Text>
           )}
         </View>
 

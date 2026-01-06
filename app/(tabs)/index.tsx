@@ -36,7 +36,7 @@ interface Token {
   purchase_date: string;
   custody_type: 'bloom' | 'home'; // Bloom vault or user's home
   is_exchange_eligible: boolean;
-  current_value: number;
+  current_value: number | null;
   pnl_dollars: number | null;
   pnl_percent: number | null;
   match_status?: 'matched' | 'pending';
@@ -101,6 +101,15 @@ interface NotificationRow {
   is_read: boolean;
 }
 
+interface WeeklyDigest {
+  id: string;
+  week_start: string;
+  total_value: number | null;
+  total_pnl_dollars: number | null;
+  total_pnl_percent: number | null;
+  created_at: string;
+}
+
 interface SellItem {
   id: string;
   type: 'token' | 'asset';
@@ -130,6 +139,7 @@ export default function HomeScreen() {
   const [selectedSellItem, setSelectedSellItem] = useState<SellItem | null>(null);
   const [topMovers, setTopMovers] = useState<TopMover[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [weeklyDigest, setWeeklyDigest] = useState<WeeklyDigest | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(2 * 60 * 1000);
   const [updateDelayed, setUpdateDelayed] = useState(false);
@@ -178,6 +188,14 @@ export default function HomeScreen() {
         .order('created_at', { ascending: false })
         .limit(3);
       setNotifications((notificationsData as NotificationRow[]) || []);
+
+      const { data: digestData } = await supabase
+        .from('weekly_digests')
+        .select('id, week_start, total_value, total_pnl_dollars, total_pnl_percent, created_at')
+        .order('week_start', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setWeeklyDigest((digestData as WeeklyDigest) || null);
 
       const latestTokenCheck = (tokenData || [])
         .map((item: Token) => item.last_price_checked_at)
@@ -629,6 +647,28 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {weeklyDigest && (
+          <View style={styles.digestSection}>
+            <Text style={styles.sectionTitle}>Weekly digest</Text>
+            <View style={styles.digestCard}>
+              <Text style={styles.digestLabel}>Portfolio value</Text>
+              <Text style={styles.digestValue}>
+                {weeklyDigest.total_value !== null ? formatPrice(weeklyDigest.total_value) : '—'}
+              </Text>
+              {weeklyDigest.total_pnl_dollars !== null && (
+                <Text
+                  style={[
+                    styles.digestChange,
+                    { color: (weeklyDigest.total_pnl_dollars || 0) >= 0 ? theme.success : theme.error },
+                  ]}
+                >
+                  {formatPnL(weeklyDigest.total_pnl_dollars)} ({weeklyDigest.total_pnl_percent?.toFixed(1)}%)
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
         {topMovers.length > 0 && (
           <View style={styles.moversSection}>
             <Text style={styles.sectionTitle}>Top movers (24h)</Text>
@@ -715,6 +755,17 @@ export default function HomeScreen() {
             >
               <Text style={styles.modalOptionTitle}>Add from Home</Text>
               <Text style={styles.modalOptionDesc}>Track something you already own</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.modalOption}
+              onPress={() => {
+                setShowAddModal(false);
+                router.push('/add-from-photo');
+              }}
+            >
+              <Text style={styles.modalOptionTitle}>Add from Photo</Text>
+              <Text style={styles.modalOptionDesc}>Snap a photo and match later</Text>
             </Pressable>
 
             <Pressable style={styles.modalCancel} onPress={() => setShowAddModal(false)}>
@@ -978,7 +1029,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 215, 181, 0.25)',
+    borderColor: theme.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   assetCardBloom: {
     borderColor: theme.accent,
@@ -1082,7 +1138,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   custodyLabelHome: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
   custodyLabelText: {
     fontSize: 9,
@@ -1094,7 +1150,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   custodyLabelTextHome: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: theme.textSecondary,
   },
   loadingContainer: {
     paddingVertical: 40,
@@ -1256,6 +1312,33 @@ const styles = StyleSheet.create({
   alertBody: {
     fontSize: 12,
     color: theme.textSecondary,
+    marginTop: 4,
+  },
+  digestSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  digestCard: {
+    backgroundColor: theme.card,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  digestLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginBottom: 4,
+  },
+  digestValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  digestChange: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.success,
     marginTop: 4,
   },
   moversSection: {
