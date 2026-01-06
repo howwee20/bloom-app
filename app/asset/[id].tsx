@@ -12,6 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
@@ -63,6 +64,9 @@ export default function AssetDetailScreen() {
   const [imageError, setImageError] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [sellTriggered, setSellTriggered] = useState(false);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertType, setAlertType] = useState<'above' | 'below'>('above');
+  const [alertThreshold, setAlertThreshold] = useState('');
 
   useEffect(() => {
     const fetchAsset = async () => {
@@ -310,6 +314,34 @@ export default function AssetDetailScreen() {
     );
   };
 
+  const handleSaveAlert = async () => {
+    if (!asset || !session) return;
+
+    const threshold = parseFloat(alertThreshold);
+    if (Number.isNaN(threshold) || threshold <= 0) {
+      Alert.alert('Invalid threshold', 'Enter a valid dollar amount.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('price_alerts')
+        .insert({
+          user_id: session.user.id,
+          asset_id: asset.id,
+          type: alertType,
+          threshold,
+        });
+
+      if (error) throw error;
+      setShowAlertModal(false);
+      setAlertThreshold('');
+      Alert.alert('Alert set', 'We’ll notify you when the price hits your target.');
+    } catch (e: any) {
+      Alert.alert('Failed to set alert', e.message || 'Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -490,8 +522,68 @@ export default function AssetDetailScreen() {
                 <Text style={styles.menuItemText}>{selling ? 'Listing...' : 'Sell'}</Text>
               </Pressable>
             )}
+            {isOwned && (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMoreMenu(false);
+                  setShowAlertModal(true);
+                }}
+              >
+                <Text style={styles.menuItemText}>Set price alert</Text>
+              </Pressable>
+            )}
             <Pressable style={styles.menuItem} onPress={() => setShowMoreMenu(false)}>
               <Text style={styles.menuItemText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Alert Modal */}
+      <Modal
+        visible={showAlertModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAlertModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowAlertModal(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Set price alert</Text>
+            <View style={styles.alertToggleRow}>
+              <Pressable
+                style={[styles.alertToggle, alertType === 'above' && styles.alertToggleActive]}
+                onPress={() => setAlertType('above')}
+              >
+                <Text style={[styles.alertToggleText, alertType === 'above' && styles.alertToggleTextActive]}>
+                  Above
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.alertToggle, alertType === 'below' && styles.alertToggleActive]}
+                onPress={() => setAlertType('below')}
+              >
+                <Text style={[styles.alertToggleText, alertType === 'below' && styles.alertToggleTextActive]}>
+                  Below
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.alertInputRow}>
+              <Text style={styles.alertCurrency}>$</Text>
+              <TextInput
+                style={styles.alertInput}
+                value={alertThreshold}
+                onChangeText={setAlertThreshold}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={theme.textTertiary}
+              />
+            </View>
+            <Pressable style={styles.modalButton} onPress={handleSaveAlert}>
+              <Text style={styles.modalButtonText}>Save alert</Text>
+            </Pressable>
+            <Pressable style={styles.modalCancel} onPress={() => setShowAlertModal(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -740,6 +832,91 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: theme.textPrimary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: theme.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    paddingBottom: 32,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  alertToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  alertToggle: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: theme.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  alertToggleActive: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  alertToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  alertToggleTextActive: {
+    color: theme.textInverse,
+  },
+  alertInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  alertCurrency: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginRight: 4,
+  },
+  alertInput: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    minWidth: 120,
+    textAlign: 'center',
+  },
+  modalButton: {
+    backgroundColor: theme.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.textInverse,
+  },
+  modalCancel: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.textSecondary,
   },
   loadingContainer: {
     flex: 1,

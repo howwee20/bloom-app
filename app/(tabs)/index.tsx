@@ -82,6 +82,25 @@ interface PortfolioSummary {
   asset_count: number;
 }
 
+interface TopMover {
+  item_type: 'token' | 'asset';
+  item_id: string;
+  name: string;
+  image_url: string | null;
+  size: string | null;
+  current_value: number;
+  price_change: number;
+  price_change_percent: number;
+}
+
+interface NotificationRow {
+  id: string;
+  title: string;
+  body: string | null;
+  created_at: string;
+  is_read: boolean;
+}
+
 interface SellItem {
   id: string;
   type: 'token' | 'asset';
@@ -109,6 +128,8 @@ export default function HomeScreen() {
   const [showSellModal, setShowSellModal] = useState(false);
   const [showSellOptions, setShowSellOptions] = useState(false);
   const [selectedSellItem, setSelectedSellItem] = useState<SellItem | null>(null);
+  const [topMovers, setTopMovers] = useState<TopMover[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(2 * 60 * 1000);
   const [updateDelayed, setUpdateDelayed] = useState(false);
@@ -147,6 +168,16 @@ export default function HomeScreen() {
       if (!assetsError && assets) {
         setOwnedAssets(assets);
       }
+
+      const { data: moversData } = await supabase.rpc('get_user_top_movers', { p_limit: 3 });
+      setTopMovers(moversData || []);
+
+      const { data: notificationsData } = await supabase
+        .from('notifications')
+        .select('id, title, body, created_at, is_read')
+        .order('created_at', { ascending: false })
+        .limit(3);
+      setNotifications((notificationsData as NotificationRow[]) || []);
 
       const latestTokenCheck = (tokenData || [])
         .map((item: Token) => item.last_price_checked_at)
@@ -372,7 +403,7 @@ export default function HomeScreen() {
           </Text>
           <View style={styles.cardPnlRow}>
             {pnlStr ? (
-              <Text style={[styles.cardPnl, isBloom && styles.cardPnlBloom]}>{pnlStr}</Text>
+              <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
             ) : (
               <Text style={[styles.cardMeta, isBloom && styles.cardMetaBloom]}>
                 {isPendingMatch ? 'Add details to match' : `Size ${item.size}`}
@@ -585,6 +616,50 @@ export default function HomeScreen() {
             <Text style={styles.actionIconText}>+</Text>
           </Pressable>
         </View>
+
+        {notifications.length > 0 && (
+          <View style={styles.alertsSection}>
+            <Text style={styles.sectionTitle}>Alerts</Text>
+            {notifications.map((note) => (
+              <View key={note.id} style={styles.alertItem}>
+                <Text style={styles.alertTitle} numberOfLines={1}>{note.title}</Text>
+                {note.body && <Text style={styles.alertBody} numberOfLines={2}>{note.body}</Text>}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {topMovers.length > 0 && (
+          <View style={styles.moversSection}>
+            <Text style={styles.sectionTitle}>Top movers (24h)</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.moversRow}
+            >
+              {topMovers.map((mover) => {
+                const isUp = mover.price_change >= 0;
+                const changeColor = isUp ? theme.success : theme.error;
+                return (
+                  <View key={`${mover.item_type}-${mover.item_id}`} style={styles.moverCard}>
+                    {mover.image_url ? (
+                      <Image source={{ uri: mover.image_url }} style={styles.moverImage} />
+                    ) : (
+                      <View style={[styles.moverImage, styles.sellOptionPlaceholder]}>
+                        <Text style={styles.sellOptionPlaceholderText}>{mover.name.charAt(0)}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.moverName} numberOfLines={1}>{mover.name}</Text>
+                    <Text style={styles.moverValue}>{formatPrice(mover.current_value)}</Text>
+                    <Text style={[styles.moverChange, { color: changeColor }]}>
+                      {isUp ? '▲' : '▼'} {formatPrice(Math.abs(mover.price_change))} ({mover.price_change_percent.toFixed(1)}%)
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.accent} />
@@ -1152,6 +1227,74 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.textPrimary,
     marginTop: -2,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.textSecondary,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  alertsSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  alertItem: {
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  alertTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  alertBody: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 4,
+  },
+  moversSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  moversRow: {
+    gap: 12,
+  },
+  moverCard: {
+    width: 140,
+    backgroundColor: theme.card,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  moverImage: {
+    width: '100%',
+    height: 80,
+    borderRadius: 10,
+    backgroundColor: '#FFF',
+    marginBottom: 8,
+  },
+  moverName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  moverValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    marginTop: 4,
+  },
+  moverChange: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   // Modal styles
   modalOverlay: {

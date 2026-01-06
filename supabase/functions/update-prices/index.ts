@@ -392,6 +392,79 @@ const updateAssetPrice = async (
   };
 };
 
+const processPriceAlerts = async (
+  supabaseAdmin: any,
+  results: UpdateOutcome[]
+) => {
+  const changedResults = results.filter(result => result.changed);
+  if (changedResults.length === 0) {
+    return 0;
+  }
+
+  const assetIds = changedResults.map(result => result.asset_id);
+  const { data: alerts, error } = await supabaseAdmin
+    .from('price_alerts')
+    .select('id, user_id, asset_id, type, threshold')
+    .in('asset_id', assetIds)
+    .eq('is_active', true);
+
+  if (error || !alerts || alerts.length === 0) {
+    return 0;
+  }
+
+  const resultMap = new Map(changedResults.map(result => [result.asset_id, result]));
+  const notifications: any[] = [];
+  const triggeredAlertIds: string[] = [];
+
+  for (const alert of alerts) {
+    const result = resultMap.get(alert.asset_id);
+    if (!result) continue;
+
+    const previous = result.previous_price;
+    const current = result.new_price;
+    let triggered = false;
+
+    if (alert.type === 'above' && previous < alert.threshold && current >= alert.threshold) {
+      triggered = true;
+    }
+
+    if (alert.type === 'below' && previous > alert.threshold && current <= alert.threshold) {
+      triggered = true;
+    }
+
+    if (!triggered) continue;
+
+    triggeredAlertIds.push(alert.id);
+    notifications.push({
+      user_id: alert.user_id,
+      title: `${result.name || 'Asset'} alert`,
+      body: `Price is now ${formatCurrency(current)} (${alert.type} ${formatCurrency(alert.threshold)})`,
+      data: {
+        asset_id: alert.asset_id,
+        alert_id: alert.id,
+        price: current,
+        threshold: alert.threshold,
+        type: alert.type,
+      },
+    });
+  }
+
+  if (triggeredAlertIds.length > 0) {
+    await supabaseAdmin
+      .from('price_alerts')
+      .update({ last_triggered_at: new Date().toISOString() })
+      .in('id', triggeredAlertIds);
+  }
+
+  if (notifications.length > 0) {
+    await supabaseAdmin
+      .from('notifications')
+      .insert(notifications);
+  }
+
+  return notifications.length;
+};
+
 // Update prices for active portfolio assets
 app.post('/all', async (c) => {
   const start = Date.now();
@@ -538,12 +611,15 @@ app.post('/all', async (c) => {
       console.error('Token sync error:', tokenSyncError);
     }
 
+    const alertsTriggered = await processPriceAlerts(supabaseAdmin, results);
+
     return c.json({
       ok: true,
       processed: processedCount,
       updated: updatedCount,
       failed: failedCount,
       tokens_synced: tokensSynced,
+      alerts_triggered: alertsTriggered,
       stockx_fetched: stockxSuccesses,
       durationMs: Date.now() - start,
       nextCursor,

@@ -86,6 +86,9 @@ export default function TokenDetailScreen() {
   const [listingLoading, setListingLoading] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [sellTriggered, setSellTriggered] = useState(false);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertType, setAlertType] = useState<'above' | 'below'>('above');
+  const [alertThreshold, setAlertThreshold] = useState('');
 
   const fetchToken = useCallback(async () => {
     if (!id || !session) return;
@@ -262,6 +265,10 @@ export default function TokenDetailScreen() {
 
   const handleSellEntry = () => {
     if (!token) return;
+    if (token.match_status === 'pending' || !hasValue) {
+      showAlert('Needs match', 'Match this item to enable pricing and selling.');
+      return;
+    }
     if (token.custody_type === 'bloom') {
       handleListForSale();
       return;
@@ -270,6 +277,38 @@ export default function TokenDetailScreen() {
       'Coming Soon',
       `Marketplace selling is coming soon. You’ll receive ~${formatPrice(cashOutEstimate)} after fees.`
     );
+  };
+
+  const handleSaveAlert = async () => {
+    if (!token || !session) return;
+    if (!token.matched_asset_id) {
+      showAlert('Match required', 'Match this item to enable price alerts.');
+      return;
+    }
+
+    const threshold = parseFloat(alertThreshold);
+    if (Number.isNaN(threshold) || threshold <= 0) {
+      showAlert('Invalid threshold', 'Enter a valid dollar amount.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('price_alerts')
+        .insert({
+          user_id: session.user.id,
+          asset_id: token.matched_asset_id,
+          type: alertType,
+          threshold,
+        });
+
+      if (error) throw error;
+      setShowAlertModal(false);
+      setAlertThreshold('');
+      showAlert('Alert set', 'We’ll notify you when the price hits your target.');
+    } catch (e: any) {
+      showAlert('Failed to set alert', e.message || 'Please try again.');
+    }
   };
 
   const handleRemove = () => {
@@ -571,12 +610,67 @@ export default function TokenDetailScreen() {
             )}
             <Pressable style={styles.menuItem} onPress={() => {
               setShowMoreMenu(false);
+              setShowAlertModal(true);
+            }}>
+              <Text style={styles.menuItemText}>Set price alert</Text>
+            </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => {
+              setShowMoreMenu(false);
               handleRemove();
             }}>
               <Text style={styles.menuItemDanger}>Remove from Portfolio</Text>
             </Pressable>
             <Pressable style={styles.menuItem} onPress={() => setShowMoreMenu(false)}>
               <Text style={styles.menuItemText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Alert Modal */}
+      <Modal
+        visible={showAlertModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAlertModal(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setShowAlertModal(false)}>
+          <View style={styles.alertModalContent}>
+            <Text style={styles.modalTitle}>Set price alert</Text>
+            <View style={styles.alertToggleRow}>
+              <Pressable
+                style={[styles.alertToggle, alertType === 'above' && styles.alertToggleActive]}
+                onPress={() => setAlertType('above')}
+              >
+                <Text style={[styles.alertToggleText, alertType === 'above' && styles.alertToggleTextActive]}>
+                  Above
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.alertToggle, alertType === 'below' && styles.alertToggleActive]}
+                onPress={() => setAlertType('below')}
+              >
+                <Text style={[styles.alertToggleText, alertType === 'below' && styles.alertToggleTextActive]}>
+                  Below
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.alertInputRow}>
+              <Text style={styles.alertCurrency}>$</Text>
+              <TextInput
+                style={styles.alertInput}
+                value={alertThreshold}
+                onChangeText={setAlertThreshold}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={theme.textTertiary}
+              />
+            </View>
+            <Pressable style={styles.modalButton} onPress={handleSaveAlert}>
+              <Text style={styles.modalButtonText}>Save alert</Text>
+            </Pressable>
+            <Pressable style={styles.modalCancel} onPress={() => setShowAlertModal(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -801,6 +895,13 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
+  alertModalContent: {
+    backgroundColor: theme.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    paddingBottom: 32,
+  },
   menuItem: {
     paddingVertical: 14,
     alignItems: 'center',
@@ -814,6 +915,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: theme.error,
+  },
+  alertToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  alertToggle: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: theme.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  alertToggleActive: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  alertToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  alertToggleTextActive: {
+    color: theme.textInverse,
+  },
+  alertInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  alertCurrency: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginRight: 4,
+  },
+  alertInput: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    minWidth: 120,
+    textAlign: 'center',
   },
   shippingInfo: {
     alignItems: 'center',
