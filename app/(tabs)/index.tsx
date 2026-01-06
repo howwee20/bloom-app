@@ -194,7 +194,6 @@ export default function HomeScreen() {
     const showStatusBadge = item.status !== 'in_custody'; // Only show badge for non-ready states
     const pnlStr = formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
     const pnlColor = getPnlColor(item.pnl_dollars);
-    const isBloomCustody = item.custody_type === 'bloom';
 
     return (
       <Pressable style={styles.assetCard} onPress={() => router.push(`/token/${item.id}`)}>
@@ -227,12 +226,6 @@ export default function HomeScreen() {
               <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
             ) : (
               <Text style={styles.cardMeta}>Size {item.size}</Text>
-            )}
-            {/* Custody indicator */}
-            {item.status === 'in_custody' && (
-              <Text style={[styles.statusDot, { color: isBloomCustody ? theme.success : theme.textSecondary }]}>
-                {isBloomCustody ? '●' : '🏠'}
-              </Text>
             )}
           </View>
         </View>
@@ -353,7 +346,7 @@ export default function HomeScreen() {
               onPress={() => setCustodyFilter('bloom')}
             >
               <Text style={[styles.filterPillText, custodyFilter === 'bloom' && styles.filterPillTextActive]}>
-                <Text style={{ color: theme.success }}>●</Text> Bloom ({bloomCount})
+                Bloom ({bloomCount})
               </Text>
             </Pressable>
             <Pressable
@@ -361,7 +354,7 @@ export default function HomeScreen() {
               onPress={() => setCustodyFilter('home')}
             >
               <Text style={[styles.filterPillText, custodyFilter === 'home' && styles.filterPillTextActive]}>
-                🏠 Home ({homeCount})
+                Home ({homeCount})
               </Text>
             </Pressable>
           </ScrollView>
@@ -380,6 +373,7 @@ export default function HomeScreen() {
         ) : (
           <FlatList
             data={custodyFilter === 'all' ? [...filteredTokens, ...ownedAssets] : filteredTokens as any[]}
+            extraData={custodyFilter}
             renderItem={({ item }) => {
               // Check if it's a token (has custody_type) or legacy asset
               if ('custody_type' in item) {
@@ -545,10 +539,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     flex: 1,
-  },
-  statusDot: {
-    fontSize: 10,
-    marginLeft: 4,
   },
   statusBadge: {
     position: 'absolute',

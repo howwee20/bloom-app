@@ -357,7 +357,7 @@ export default function TokenDetailScreen() {
           {/* Custody Badge */}
           <View style={[styles.custodyBadge, isHomeCustody && styles.custodyBadgeHome]}>
             <Text style={styles.custodyBadgeText}>
-              {isBloomCustody ? '● Bloom Vault' : '🏠 At Home'}
+              {isBloomCustody ? 'Bloom Vault' : 'At Home'}
             </Text>
           </View>
         </View>

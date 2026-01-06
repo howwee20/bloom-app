@@ -40,8 +40,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="exchange"
         options={{
-          title: 'EXCHANGE',
-          tabBarIcon: ({ color }) => <TabBarIcon name="exchange" color={color} />,
+          title: 'MARKET',
+          tabBarIcon: ({ color }) => <TabBarIcon name="shopping-cart" color={color} />,
         }}
       />
       {/* Hide bloom tab - content merged into exchange */}
