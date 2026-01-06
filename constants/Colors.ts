@@ -2,9 +2,9 @@
 // Using Zen Dots font for headers
 
 export const theme = {
-  // Accent color - Bloom orange
-  accent: '#FFD7B5',
-  accentDark: '#E8A875',
+  // Accent color - Bloom orange (warm peach)
+  accent: '#F5C49A',
+  accentDark: '#E0A570',
   accentLight: '#FFF0E5',
 
   // Backgrounds - Warm cream palette

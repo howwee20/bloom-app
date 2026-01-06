@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS public.pricing_config (
   -- Staleness thresholds
   stale_minutes INTEGER DEFAULT 240,               -- 4 hours before price is stale
   quote_expiration_minutes INTEGER DEFAULT 10,     -- 10 minutes to complete checkout
-  -- ALIVE Protocol
-  alive_fluctuation NUMERIC(6, 5) DEFAULT 0.015,   -- +/- 1.5% synthetic fluctuation
   -- Metadata
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

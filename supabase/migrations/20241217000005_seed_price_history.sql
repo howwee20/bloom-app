@@ -13,7 +13,6 @@ SET search_path = public
 AS $$
 DECLARE
   v_days_ago INTEGER;
-  v_fluctuation NUMERIC;
   v_price NUMERIC(10, 2);
   v_date TIMESTAMPTZ;
 BEGIN
@@ -22,9 +21,7 @@ BEGIN
 
   -- Create 7 days of price history
   FOR v_days_ago IN REVERSE 7..0 LOOP
-    -- ALIVE Protocol: Synthetic fluctuation +/- 1.5%
-    v_fluctuation := (random() * 0.03) - 0.015;
-    v_price := ROUND((p_base_price * (1 + v_fluctuation))::NUMERIC, 2);
+    v_price := p_base_price;
 
     -- Set date to noon of each day
     v_date := (NOW() - (v_days_ago || ' days')::INTERVAL)::DATE + INTERVAL '12 hours';
@@ -33,7 +30,7 @@ BEGIN
     VALUES (
       p_asset_id,
       v_price,
-      CASE WHEN v_days_ago = 0 THEN 'baseline' ELSE 'alive_protocol' END,
+      'baseline',
       v_date
     );
   END LOOP;

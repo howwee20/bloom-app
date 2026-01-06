@@ -379,9 +379,11 @@ export default function HomeScreen() {
   // Render token card - brokerage style with P&L
   const renderTokenCard = ({ item }: { item: Token }) => {
     const showImage = item.product_image_url && !failedImages.has(item.id);
-    const statusConfig = getStatusConfig(item.status);
-    const showStatusBadge = item.status !== 'in_custody' && item.status !== undefined;
     const isPendingMatch = item.match_status === 'pending' || item.current_value === null;
+    const statusConfig = isPendingMatch
+      ? { label: 'Needs match', color: theme.warning, icon: '●' }
+      : getStatusConfig(item.status);
+    const showStatusBadge = isPendingMatch || (item.status !== 'in_custody' && item.status !== undefined);
     const pnlStr = isPendingMatch ? null : formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
     const pnlColor = getPnlColor(item.pnl_dollars);
     const isBloom = item.custody_type === 'bloom';
@@ -540,23 +542,25 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, styles.headerTitleAccent]}>Bloom</Text>
-        <View style={styles.headerRight}>
-          <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
-            <View style={styles.profileIcon}>
-              <Text style={styles.profileIconText}>
-                {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
-              </Text>
-            </View>
-          </Pressable>
+      {/* White header area */}
+      <View style={styles.headerArea}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, styles.headerTitleAccent]}>Bloom</Text>
+          <View style={styles.headerRight}>
+            <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
+              <View style={styles.profileIcon}>
+                <Text style={styles.profileIconText}>
+                  {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
         </View>
-      </View>
 
-      {/* Portfolio Value */}
-      <View style={styles.valueSection}>
-        <Text style={styles.valueAmount}>{formatPrice(filteredTotalValue)}</Text>
+        {/* Portfolio Value */}
+        <View style={styles.valueSection}>
+          <Text style={styles.valueAmount}>{formatPrice(filteredTotalValue)}</Text>
         {hasItems && filteredTotalPnl !== 0 && (
           <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
             {formatPnL(filteredTotalPnl)} all time
@@ -614,6 +618,7 @@ export default function HomeScreen() {
           )}
         </View>
       )}
+      </View>
 
       {/* Assets */}
       <View style={styles.assetsSection}>
@@ -946,6 +951,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.background,
+  },
+  headerArea: {
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    paddingBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   header: {
     flexDirection: 'row',

@@ -12,7 +12,7 @@ DELETE FROM price_history;
 INSERT INTO price_history (asset_id, price, source, created_at)
 SELECT
   id,
-  ROUND((price * (1 + (random() * 0.03 - 0.015)))::NUMERIC, 2),
+  ROUND(price::NUMERIC, 2),
   'baseline',
   NOW()::DATE + INTERVAL '12 hours'
 FROM assets;
@@ -21,8 +21,8 @@ FROM assets;
 INSERT INTO price_history (asset_id, price, source, created_at)
 SELECT
   id,
-  ROUND((price * (1 + (random() * 0.03 - 0.015)))::NUMERIC, 2),
-  'alive_protocol',
+  ROUND(price::NUMERIC, 2),
+  'baseline',
   (NOW() - INTERVAL '1 day')::DATE + INTERVAL '12 hours'
 FROM assets;
 
@@ -30,8 +30,8 @@ FROM assets;
 INSERT INTO price_history (asset_id, price, source, created_at)
 SELECT
   id,
-  ROUND((price * (1 + (random() * 0.03 - 0.015)))::NUMERIC, 2),
-  'alive_protocol',
+  ROUND(price::NUMERIC, 2),
+  'baseline',
   (NOW() - INTERVAL '2 days')::DATE + INTERVAL '12 hours'
 FROM assets;
 
@@ -39,8 +39,8 @@ FROM assets;
 INSERT INTO price_history (asset_id, price, source, created_at)
 SELECT
   id,
-  ROUND((price * (1 + (random() * 0.03 - 0.015)))::NUMERIC, 2),
-  'alive_protocol',
+  ROUND(price::NUMERIC, 2),
+  'baseline',
   (NOW() - INTERVAL '3 days')::DATE + INTERVAL '12 hours'
 FROM assets;
 
@@ -48,8 +48,8 @@ FROM assets;
 INSERT INTO price_history (asset_id, price, source, created_at)
 SELECT
   id,
-  ROUND((price * (1 + (random() * 0.03 - 0.015)))::NUMERIC, 2),
-  'alive_protocol',
+  ROUND(price::NUMERIC, 2),
+  'baseline',
   (NOW() - INTERVAL '4 days')::DATE + INTERVAL '12 hours'
 FROM assets;
 
@@ -57,8 +57,8 @@ FROM assets;
 INSERT INTO price_history (asset_id, price, source, created_at)
 SELECT
   id,
-  ROUND((price * (1 + (random() * 0.03 - 0.015)))::NUMERIC, 2),
-  'alive_protocol',
+  ROUND(price::NUMERIC, 2),
+  'baseline',
   (NOW() - INTERVAL '5 days')::DATE + INTERVAL '12 hours'
 FROM assets;
 
@@ -66,8 +66,8 @@ FROM assets;
 INSERT INTO price_history (asset_id, price, source, created_at)
 SELECT
   id,
-  ROUND((price * (1 + (random() * 0.03 - 0.015)))::NUMERIC, 2),
-  'alive_protocol',
+  ROUND(price::NUMERIC, 2),
+  'baseline',
   (NOW() - INTERVAL '6 days')::DATE + INTERVAL '12 hours'
 FROM assets;
 
@@ -75,8 +75,8 @@ FROM assets;
 INSERT INTO price_history (asset_id, price, source, created_at)
 SELECT
   id,
-  ROUND((price * (1 + (random() * 0.03 - 0.015)))::NUMERIC, 2),
-  'alive_protocol',
+  ROUND(price::NUMERIC, 2),
+  'baseline',
   (NOW() - INTERVAL '7 days')::DATE + INTERVAL '12 hours'
 FROM assets;
 

@@ -611,7 +611,12 @@ app.post('/all', async (c) => {
       console.error('Token sync error:', tokenSyncError);
     }
 
-    const alertsTriggered = await processPriceAlerts(supabaseAdmin, results);
+    let alertsTriggered = 0;
+    try {
+      alertsTriggered = await processPriceAlerts(supabaseAdmin, results);
+    } catch (error) {
+      console.error('Alert processing failed:', error);
+    }
 
     return c.json({
       ok: true,
