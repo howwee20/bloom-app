@@ -53,6 +53,14 @@ function calculateAllInPrice(base: number, config: PricingConfig): PriceBreakdow
   };
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+  }).format(value);
+}
+
 // Fetch pricing config from database
 async function getPricingConfig(supabase: any): Promise<PricingConfig> {
   try {

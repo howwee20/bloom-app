@@ -7,6 +7,7 @@ import {
   AppStateStatus,
   FlatList,
   Image,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -81,6 +82,17 @@ interface PortfolioSummary {
   asset_count: number;
 }
 
+interface SellItem {
+  id: string;
+  type: 'token' | 'asset';
+  name: string;
+  size?: string | null;
+  sku?: string | null;
+  subtitle: string;
+  custodyLabel: string;
+  value: number;
+  imageUrl: string | null;
+}
 
 export default function HomeScreen() {
   const { session } = useAuth();
@@ -95,6 +107,8 @@ export default function HomeScreen() {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSellModal, setShowSellModal] = useState(false);
+  const [showSellOptions, setShowSellOptions] = useState(false);
+  const [selectedSellItem, setSelectedSellItem] = useState<SellItem | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(2 * 60 * 1000);
   const [updateDelayed, setUpdateDelayed] = useState(false);
@@ -268,6 +282,51 @@ export default function HomeScreen() {
     return `Updated ${diffHours}h ago`;
   };
 
+  const buildSearchQuery = (item: SellItem) => {
+    if (item.sku) return item.sku;
+    if (item.size) return `${item.name} ${item.size}`;
+    return item.name;
+  };
+
+  const buildMarketplaceUrl = (marketplace: string, item: SellItem) => {
+    const query = encodeURIComponent(buildSearchQuery(item));
+    switch (marketplace) {
+      case 'stockx':
+        return `https://stockx.com/search?s=${query}`;
+      case 'goat':
+        return `https://www.goat.com/search?query=${query}`;
+      case 'ebay':
+        return `https://www.ebay.com/sch/i.html?_nkw=${query}`;
+      default:
+        return `https://www.google.com/search?q=${query}`;
+    }
+  };
+
+  const marketplaceOptions = selectedSellItem
+    ? [
+        { id: 'stockx', name: 'StockX', feeRate: 0.12, shippingFee: 14 },
+        { id: 'goat', name: 'GOAT', feeRate: 0.12, shippingFee: 14 },
+        { id: 'ebay', name: 'eBay', feeRate: 0.1, shippingFee: 10 },
+      ].map(option => {
+        const gross = selectedSellItem.value || 0;
+        const feeEstimate = Math.round(gross * option.feeRate * 100) / 100;
+        const shipping = option.shippingFee;
+        const net = Math.max(gross - feeEstimate - shipping, 0);
+        return {
+          ...option,
+          gross,
+          feeEstimate,
+          shipping,
+          net,
+        };
+      })
+    : [];
+
+  const bestOptionId = marketplaceOptions.reduce((best, option) => {
+    if (!best || option.net > best.net) return option;
+    return best;
+  }, null as null | (typeof marketplaceOptions)[number])?.id;
+
   // Render token card - brokerage style with P&L
   const renderTokenCard = ({ item }: { item: Token }) => {
     const showImage = item.product_image_url && !failedImages.has(item.id);
@@ -304,7 +363,7 @@ export default function HomeScreen() {
           )}
         </View>
 
-        <View style={styles.cardInfo}>
+        <View style={[styles.cardInfo, isBloom && styles.cardInfoBloom]}>
           <Text style={[styles.cardName, isBloom && styles.cardNameBloom]} numberOfLines={2}>
             {item.product_name}
           </Text>
@@ -313,7 +372,7 @@ export default function HomeScreen() {
           </Text>
           <View style={styles.cardPnlRow}>
             {pnlStr ? (
-              <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
+              <Text style={[styles.cardPnl, isBloom && styles.cardPnlBloom]}>{pnlStr}</Text>
             ) : (
               <Text style={[styles.cardMeta, isBloom && styles.cardMetaBloom]}>
                 {isPendingMatch ? 'Add details to match' : `Size ${item.size}`}
@@ -403,23 +462,29 @@ export default function HomeScreen() {
     ? theme.textSecondary
     : filteredTotalPnl >= 0 ? theme.success : theme.error;
 
-  const sellItems = [
-    ...tokens.map(token => ({
-      id: token.id,
-      type: 'token' as const,
-      name: token.product_name,
-      subtitle: token.custody_type === 'bloom' ? 'Bloom custody' : 'Home custody',
-      custodyLabel: token.custody_type === 'bloom' ? 'Bloom' : 'Home',
-      value: token.current_value,
-      imageUrl: token.product_image_url,
-    })),
+  const sellItems: SellItem[] = [
+    ...tokens
+      .filter(token => token.match_status !== 'pending' && token.current_value !== null)
+      .map(token => ({
+        id: token.id,
+        type: 'token' as const,
+        name: token.product_name,
+        size: token.size,
+        sku: token.sku,
+        subtitle: token.size ? `Size ${token.size}` : 'Size —',
+        custodyLabel: token.custody_type === 'bloom' ? 'Bloom' : 'Home',
+        value: token.current_value || 0,
+        imageUrl: token.product_image_url,
+      })),
     ...ownedAssets.map(asset => ({
       id: asset.id,
       type: 'asset' as const,
       name: asset.name,
-      subtitle: asset.category || 'Asset',
+      size: asset.size,
+      sku: asset.stockx_sku,
+      subtitle: asset.size ? `Size ${asset.size}` : asset.category || 'Asset',
       custodyLabel: 'Home',
-      value: asset.current_price,
+      value: asset.current_price || 0,
       imageUrl: asset.image_url,
     })),
   ];
@@ -508,11 +573,11 @@ export default function HomeScreen() {
             <Text style={styles.actionPrimaryText}>Buy</Text>
           </Pressable>
           <Pressable
-            style={[styles.actionSecondary, !hasItems && styles.actionSecondaryDisabled]}
+            style={[styles.actionSecondary, sellItems.length === 0 && styles.actionSecondaryDisabled]}
             onPress={() => setShowSellModal(true)}
-            disabled={!hasItems}
+            disabled={sellItems.length === 0}
           >
-            <Text style={[styles.actionSecondaryText, !hasItems && styles.actionSecondaryTextDisabled]}>
+            <Text style={[styles.actionSecondaryText, sellItems.length === 0 && styles.actionSecondaryTextDisabled]}>
               Sell
             </Text>
           </Pressable>
@@ -608,10 +673,8 @@ export default function HomeScreen() {
                     style={styles.modalOption}
                     onPress={() => {
                       setShowSellModal(false);
-                      router.push({
-                        pathname: item.type === 'token' ? '/token/[id]' : '/asset/[id]',
-                        params: { id: item.id, sell: '1' },
-                      });
+                      setSelectedSellItem(item);
+                      setShowSellOptions(true);
                     }}
                   >
                     <View style={styles.sellOptionRow}>
@@ -646,6 +709,105 @@ export default function HomeScreen() {
 
             <Pressable style={styles.modalCancel} onPress={() => setShowSellModal(false)}>
               <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Sell Options Modal */}
+      <Modal
+        visible={showSellOptions}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setShowSellOptions(false);
+          setSelectedSellItem(null);
+        }}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => {
+            setShowSellOptions(false);
+            setSelectedSellItem(null);
+          }}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Best Sell Options</Text>
+
+            {selectedSellItem && (
+              <View style={styles.sellHeaderRow}>
+                {selectedSellItem.imageUrl ? (
+                  <Image source={{ uri: selectedSellItem.imageUrl }} style={styles.sellHeaderImage} />
+                ) : (
+                  <View style={[styles.sellHeaderImage, styles.sellOptionPlaceholder]}>
+                    <Text style={styles.sellOptionPlaceholderText}>
+                      {selectedSellItem.name.charAt(0)}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.sellHeaderText}>
+                  <Text style={styles.sellHeaderTitle} numberOfLines={1}>
+                    {selectedSellItem.name}
+                  </Text>
+                  <Text style={styles.sellHeaderMeta}>
+                    {selectedSellItem.size ? `Size ${selectedSellItem.size}` : 'Size —'} · {selectedSellItem.custodyLabel}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {marketplaceOptions.map(option => (
+                <View key={option.id} style={styles.sellOptionCard}>
+                  <View style={styles.sellOptionHeader}>
+                    <Text style={styles.sellOptionName}>{option.name}</Text>
+                    {option.id === bestOptionId && (
+                      <View style={styles.bestBadge}>
+                        <Text style={styles.bestBadgeText}>Best</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.sellOptionRow}>
+                    <Text style={styles.sellOptionLabel}>Market</Text>
+                    <Text style={styles.sellOptionValue}>{formatPrice(option.gross)}</Text>
+                  </View>
+                  <View style={styles.sellOptionRow}>
+                    <Text style={styles.sellOptionLabel}>Fees</Text>
+                    <Text style={styles.sellOptionValue}>-{formatPrice(option.feeEstimate)}</Text>
+                  </View>
+                  <View style={styles.sellOptionRow}>
+                    <Text style={styles.sellOptionLabel}>Shipping</Text>
+                    <Text style={styles.sellOptionValue}>-{formatPrice(option.shipping)}</Text>
+                  </View>
+                  <View style={styles.sellOptionRow}>
+                    <Text style={styles.sellOptionLabelStrong}>Net payout</Text>
+                    <Text style={styles.sellOptionValueStrong}>{formatPrice(option.net)}</Text>
+                  </View>
+                  <Pressable
+                    style={styles.sellOptionButton}
+                    onPress={() => {
+                      if (!selectedSellItem) return;
+                      Linking.openURL(buildMarketplaceUrl(option.id, selectedSellItem));
+                    }}
+                  >
+                    <Text style={styles.sellOptionButtonText}>Continue</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.sellDisclaimer}>
+              Estimates only. Final payout set by the marketplace.
+            </Text>
+
+            <Pressable
+              style={styles.modalCancel}
+              onPress={() => {
+                setShowSellOptions(false);
+                setSelectedSellItem(null);
+              }}
+            >
+              <Text style={styles.modalCancelText}>Close</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -744,7 +906,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 215, 181, 0.25)',
   },
   assetCardBloom: {
-    backgroundColor: '#FFFFFF',
     borderColor: theme.accent,
     borderWidth: 2,
   },
@@ -753,7 +914,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   cardImageContainerBloom: {
-    backgroundColor: '#FFF8F3',
+    backgroundColor: '#FFF',
   },
   cardImage: {
     width: '100%',
@@ -772,6 +933,9 @@ const styles = StyleSheet.create({
   cardInfo: {
     padding: 12,
   },
+  cardInfoBloom: {
+    backgroundColor: theme.accent,
+  },
   cardName: {
     fontSize: 13,
     fontWeight: '600',
@@ -789,7 +953,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   cardPriceBloom: {
-    color: theme.accent,
+    color: '#1A1A1A',
   },
   cardMeta: {
     fontSize: 11,
@@ -797,7 +961,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardMetaBloom: {
-    color: '#666666',
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   cardMetaRow: {
     flexDirection: 'row',
@@ -813,6 +977,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     flex: 1,
+  },
+  cardPnlBloom: {
+    color: '#1A1A1A',
   },
   statusBadge: {
     position: 'absolute',
@@ -837,7 +1004,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   custodyLabelBloom: {
-    backgroundColor: theme.accent,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   custodyLabelHome: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -1044,6 +1211,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  sellHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  sellHeaderImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+  },
+  sellHeaderText: {
+    flex: 1,
+  },
+  sellHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  sellHeaderMeta: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    marginTop: 4,
+  },
   sellOptionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1089,6 +1281,68 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: theme.textPrimary,
+  },
+  sellOptionCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  sellOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sellOptionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  bestBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: theme.accent,
+  },
+  bestBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.textInverse,
+  },
+  sellOptionLabel: {
+    fontSize: 13,
+    color: theme.textSecondary,
+  },
+  sellOptionLabelStrong: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  sellOptionValueStrong: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  sellOptionButton: {
+    marginTop: 12,
+    backgroundColor: theme.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  sellOptionButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.textInverse,
+  },
+  sellDisclaimer: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
   },
   emptySellState: {
     alignItems: 'center',

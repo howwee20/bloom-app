@@ -39,6 +39,13 @@ export default function ProfileScreen() {
           <Text style={styles.menuItemArrow}>→</Text>
         </Pressable>
 
+        {__DEV__ && (
+          <Pressable style={styles.menuItem} onPress={() => router.push('/cron-debug')}>
+            <Text style={styles.menuItemText}>Cron Debug</Text>
+            <Text style={styles.menuItemArrow}>→</Text>
+          </Pressable>
+        )}
+
         {/* Logout */}
         <Pressable style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Log out</Text>

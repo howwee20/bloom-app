@@ -124,7 +124,23 @@ export default function TokenDetailScreen() {
     return `${sign}${formatPrice(value)}`;
   };
 
-  const cashOutEstimate = token
+  const formatTimeAgo = (dateString?: string | null) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
+
+  const hasValue = token?.current_value !== null && token?.current_value !== undefined;
+  const cashOutEstimate = token && hasValue
     ? Math.round(token.current_value * 0.88 * 100) / 100
     : 0;
 
@@ -401,10 +417,17 @@ export default function TokenDetailScreen() {
         {/* Value Section - Shows bid/ask spread for active tokens */}
         <View style={styles.valueSection}>
           <Text style={styles.valueLabel}>Market Value</Text>
-          <Text style={styles.valueAmount}>{formatPrice(token.current_value)}</Text>
-          {isInCustodyOrListed && (
+          <Text style={styles.valueAmount}>
+            {hasValue ? formatPrice(token.current_value) : 'Needs match'}
+          </Text>
+          {isInCustodyOrListed && hasValue && (
             <Text style={[styles.pnlText, { color: pnlColor }]}>
               {formatPnL(token.pnl_dollars)} since purchase
+            </Text>
+          )}
+          {token.last_price_checked_at && (
+            <Text style={styles.updatedText}>
+              Updated {formatTimeAgo(token.last_price_checked_at)}
             </Text>
           )}
 
@@ -704,6 +727,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     marginTop: 4,
+  },
+  updatedText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 6,
   },
   statusNote: {
     fontSize: 15,
