@@ -1,8 +1,7 @@
 require('dotenv').config();
 const express = require('express');
-const cron = require('node-cron');
 const { createClient } = require('@supabase/supabase-js');
-const { fetchPrice } = require('./lib/rapidapi');
+const { fetchPrice } = require('./lib/stockx'); // Official StockX API
 
 const app = express();
 app.use(express.json());
@@ -20,11 +19,11 @@ const MI_TAX_RATE = 0.06;               // 6% Michigan Sales Tax
 const STOCKX_SHIPPING = 14.95;          // Flat Rate
 const VOLATILITY_BUFFER = 1.015;        // 1.5% safety margin
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-const API_DELAY_MS = 1500;              // 1.5 seconds between API calls
+const API_DELAY_MS = 1200;              // 1.2 seconds between API calls (StockX rate limit: 1/sec)
 
-// TESTING: Limit to first N assets to conserve API credits
-const TEST_MODE = true;
-const TEST_LIMIT = 3;
+// PRODUCTION: Process all assets
+const TEST_MODE = false;
+const TEST_LIMIT = 50; // Not used when TEST_MODE is false
 
 // ============================================
 // PRICING FORMULA
@@ -107,6 +106,7 @@ async function refreshAllAssets() {
         // FETCH LIVE PRICE FROM RAPIDAPI
         const liveData = await fetchPrice(asset.stockx_sku, size);
         const newLowestAsk = liveData.lowestAsk;
+        const newHighestBid = liveData.highestBid; // Estimated or real bid
 
         // CALCULATE NEW BLOOM PRICE
         const pricing = calculateBloomPrice(newLowestAsk);
@@ -115,12 +115,14 @@ async function refreshAllAssets() {
         // CHECK IF PRICE CHANGED
         const priceChanged = Math.abs(newLowestAsk - oldBasePrice) >= 1;
 
-        // UPDATE DATABASE
+        // UPDATE DATABASE (including bid for spread display)
         const { error: updateError } = await supabase
           .from('assets')
           .update({
             base_price: newLowestAsk,
             price: newBloomPrice,
+            highest_bid: newHighestBid,
+            bid_updated_at: new Date().toISOString(),
             price_updated_at: new Date().toISOString(),
             last_price_update: new Date().toISOString()
           })
@@ -193,13 +195,16 @@ async function refreshAllAssets() {
 app.get('/', (req, res) => {
   const example = calculateBloomPrice(300);
   res.json({
-    status: 'Bloom Price Worker - LIVE',
-    source: 'RapidAPI Sneaker Database',
-    testMode: TEST_MODE ? `Limited to ${TEST_LIMIT} assets` : 'OFF',
+    status: 'Bloom Price Worker - Manual Pricing Mode',
+    mode: 'Manual pricing only (automated RapidAPI refresh disabled)',
     formula: '(Ask + 4.83% + 6% Tax + $14.95) × 1.015',
     example: {
       input: '$300 StockX Ask',
       output: `$${example.bloomPrice} Bloom Price`
+    },
+    endpoints: {
+      'POST /manual-price': 'Set size-specific prices',
+      'GET /refresh': 'Manual RapidAPI refresh (optional)'
     },
     lastRefresh: lastRefreshTime
   });
@@ -251,6 +256,90 @@ app.get('/asset/:id', async (req, res) => {
 });
 
 // ============================================
+// MANUAL PRICE OVERRIDE
+// Bypass RapidAPI and set exact StockX prices
+// ============================================
+app.post('/manual-price', async (req, res) => {
+  const { asset_id, base_price, size } = req.body;
+
+  if (!asset_id || !base_price) {
+    return res.status(400).json({ error: 'asset_id and base_price required' });
+  }
+
+  if (typeof base_price !== 'number' || base_price <= 0) {
+    return res.status(400).json({ error: 'base_price must be a positive number' });
+  }
+
+  // Calculate Bloom price using the same formula
+  const pricing = calculateBloomPrice(base_price);
+
+  // Estimate bid (12% spread) for manual pricing too
+  const ESTIMATED_SPREAD = 0.12;
+  const estimatedBid = Math.round(base_price * (1 - ESTIMATED_SPREAD) * 100) / 100;
+
+  // Update the asset in database
+  const updateData = {
+    base_price: base_price,
+    price: pricing.bloomPrice,
+    highest_bid: estimatedBid,
+    bid_updated_at: new Date().toISOString(),
+    price_updated_at: new Date().toISOString(),
+    last_price_update: new Date().toISOString()
+  };
+
+  if (size) {
+    updateData.size = size;
+  }
+
+  const { data: asset, error } = await supabase
+    .from('assets')
+    .update(updateData)
+    .eq('id', asset_id)
+    .select('id, name, stockx_sku, size')
+    .single();
+
+  if (error) {
+    console.error('[MANUAL] Database error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  if (!asset) {
+    return res.status(404).json({ error: 'Asset not found' });
+  }
+
+  // Insert price history
+  await supabase.from('price_history').insert({
+    asset_id: asset_id,
+    price: pricing.bloomPrice,
+    source: 'manual',
+    created_at: new Date().toISOString()
+  });
+
+  console.log(`[MANUAL] ${asset.name}: Ask $${base_price} | Bid $${estimatedBid} | Bloom $${pricing.bloomPrice}`);
+
+  res.json({
+    success: true,
+    asset: {
+      id: asset.id,
+      name: asset.name,
+      sku: asset.stockx_sku,
+      size: asset.size
+    },
+    pricing: {
+      base_price: base_price,
+      highest_bid: estimatedBid,
+      spread: Math.round((base_price - estimatedBid) / base_price * 100),
+      bloomPrice: pricing.bloomPrice,
+      processingFee: pricing.processingFee,
+      estimatedTax: pricing.estimatedTax,
+      shipping: pricing.shipping,
+      landedCost: pricing.landedCost,
+      buffer: pricing.buffer
+    }
+  });
+});
+
+// ============================================
 // START SERVER & CRON
 // ============================================
 const PORT = process.env.PORT || 3001;
@@ -259,26 +348,16 @@ app.listen(PORT, () => {
   const example = calculateBloomPrice(300);
   console.log('');
   console.log('='.repeat(60));
-  console.log('  BLOOM PRICE WORKER - RAPIDAPI');
+  console.log('  BLOOM PRICE WORKER - MANUAL PRICING MODE');
   console.log('='.repeat(60));
   console.log(`  Port: ${PORT}`);
-  console.log(`  Source: RapidAPI Sneaker Database`);
-  console.log(`  Test Mode: ${TEST_MODE ? `ON (${TEST_LIMIT} assets)` : 'OFF'}`);
-  console.log(`  Refresh: Every 10 minutes`);
+  console.log(`  Mode: Manual pricing only (RapidAPI disabled)`);
   console.log(`  Formula: (Ask + 4.83% + 6% + $14.95) × 1.015`);
   console.log(`  Example: $300 Ask -> $${example.bloomPrice} Bloom`);
+  console.log('');
+  console.log('  Endpoints:');
+  console.log('    POST /manual-price  - Set size-specific prices');
+  console.log('    GET  /refresh       - Manual RapidAPI refresh (optional)');
   console.log('='.repeat(60));
   console.log('');
-
-  // Run initial refresh on startup
-  console.log('[STARTUP] Running initial price refresh...');
-  refreshAllAssets();
-
-  // Schedule refresh every 10 minutes
-  cron.schedule('*/10 * * * *', () => {
-    console.log('\n[CRON] Scheduled refresh...');
-    refreshAllAssets();
-  });
-
-  console.log('[CRON] Scheduled: Every 10 minutes');
 });

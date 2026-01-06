@@ -40,6 +40,7 @@ interface Asset {
   price_24h_ago: number | null;
   price_change: number | null;
   price_change_percent: number | null;
+  custody_status: 'in_vault' | 'available_to_acquire' | null;
 }
 
 interface PricePoint {
@@ -230,7 +231,7 @@ export default function AssetDetailScreen() {
   const isStale = !asset?.last_price_update ||
     ((Date.now() - new Date(asset.last_price_update).getTime()) / 60000) > STALE_MINUTES;
 
-  const handlePurchase = async () => {
+  const handlePurchase = () => {
     if (!asset || !session) return;
 
     if (!hasFixedSize && !selectedSize) {
@@ -240,60 +241,18 @@ export default function AssetDetailScreen() {
 
     const size = hasFixedSize ? asset.size! : selectedSize!;
 
-    Alert.alert(
-      'Confirm purchase',
-      `Buy ${asset.name} (Size ${size}) for ${formatPrice(asset.price)}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Continue to Payment',
-          style: 'default',
-          onPress: async () => {
-            try {
-              setPurchasing(true);
-
-              const response = await fetch(
-                `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout`,
-                {
-                  method: 'POST',
-                  headers: {
-                    Authorization: `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    asset_id: asset.id,
-                    size: size,
-                    success_url: 'https://bloom.app/checkout/success',
-                    cancel_url: 'https://bloom.app/checkout/cancel',
-                  }),
-                }
-              );
-
-              const result = await response.json();
-
-              if (!response.ok) {
-                throw new Error(result.error || 'Failed to create checkout');
-              }
-
-              if (result.url) {
-                await Linking.openURL(result.url);
-
-                Alert.alert(
-                  'Complete Payment',
-                  'A payment page has opened in your browser. Complete the payment to finalize your purchase.',
-                  [{ text: 'OK', onPress: () => router.back() }]
-                );
-              }
-            } catch (e: any) {
-              console.error('Purchase failed:', e);
-              Alert.alert('Purchase failed', e.message || 'Please try again.');
-            } finally {
-              setPurchasing(false);
-            }
-          },
-        },
-      ]
-    );
+    // Navigate directly to confirm-order (ownership-first model)
+    router.push({
+      pathname: '/checkout/confirm-order',
+      params: {
+        asset_id: asset.id,
+        asset_name: asset.name,
+        asset_image: asset.image_url || '',
+        size: size,
+        price: asset.price.toString(),
+        custody_status: asset.custody_status || 'available_to_acquire',
+      },
+    });
   };
 
   const handleSell = async () => {
@@ -325,7 +284,7 @@ export default function AssetDetailScreen() {
               Alert.alert(
                 'Listed successfully',
                 `${asset.name} is now available on the marketplace.`,
-                [{ text: 'Browse marketplace', onPress: () => router.replace('/(tabs)/bloom') }]
+                [{ text: 'Browse marketplace', onPress: () => router.replace('/(tabs)/exchange') }]
               );
             } catch (e: any) {
               console.error('Listing failed:', e);
@@ -394,36 +353,12 @@ export default function AssetDetailScreen() {
           </View>
         )}
 
-        {/* Price Section with Change */}
+        {/* Price Section - Hero */}
         <View style={styles.priceSection}>
-          <Text style={styles.priceLabel}>All-in Price</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceValue}>{formatPrice(asset.price)}</Text>
-            {hasChange && (
-              <View style={[styles.changeBadge, { backgroundColor: isPositive ? theme.successBg : theme.errorBg }]}>
-                <Text style={[styles.changeArrow, { color: changeColor }]}>
-                  {isPositive ? '▲' : '▼'}
-                </Text>
-                <Text style={[styles.changeBadgeText, { color: changeColor }]}>
-                  {formatPercentChange(asset.price_change_percent)}
-                </Text>
-              </View>
-            )}
-          </View>
-
+          <Text style={styles.priceValue}>{formatPrice(asset.price)}</Text>
           {hasChange && (
             <Text style={[styles.changeDetail, { color: changeColor }]}>
-              {formatPriceChange(asset.price_change)} (24h)
-            </Text>
-          )}
-
-          <Text style={styles.priceSubtext}>
-            Includes 6.3% MI tax, 4.8% processing & $14.95 shipping
-          </Text>
-
-          {asset.last_price_update && (
-            <Text style={styles.updateTime}>
-              Updated {formatTimeAgo(asset.last_price_update)}
+              {isPositive ? '▲' : '▼'} {formatPriceChange(asset.price_change)} ({formatPercentChange(asset.price_change_percent)}) today
             </Text>
           )}
         </View>
@@ -431,15 +366,20 @@ export default function AssetDetailScreen() {
         {/* Price Chart */}
         {priceHistory.length >= 2 && (
           <View style={styles.chartSection}>
-            <Text style={styles.sectionTitle}>7 Day Price History</Text>
             {renderPriceChart()}
           </View>
         )}
 
+        {/* Size & Delivery Info */}
+        <View style={styles.infoRow}>
+          <Text style={styles.infoText}>
+            Size {hasFixedSize ? asset.size : selectedSize || '—'} · {asset.custody_status === 'in_vault' ? 'Instant' : 'Ships to Vault'}
+          </Text>
+        </View>
+
         {/* Size Selector */}
         {!isOwned && isAvailable && !hasFixedSize && (
           <View style={styles.sizeSection}>
-            <Text style={styles.sectionTitle}>Select Size</Text>
             <View style={styles.sizeGrid}>
               {AVAILABLE_SIZES.map((size) => (
                 <Pressable
@@ -461,41 +401,6 @@ export default function AssetDetailScreen() {
                 </Pressable>
               ))}
             </View>
-          </View>
-        )}
-
-        {/* Details */}
-        <View style={styles.detailsSection}>
-          {(hasFixedSize || selectedSize) && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Size</Text>
-              <Text style={styles.detailValue}>{hasFixedSize ? asset.size : selectedSize}</Text>
-            </View>
-          )}
-          {asset.category && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Category</Text>
-              <Text style={styles.detailValue}>{asset.category}</Text>
-            </View>
-          )}
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Status</Text>
-            <Text style={styles.detailValue}>
-              {isOwned ? 'In Your Wallet' : 'Ships to Vault'}
-            </Text>
-          </View>
-        </View>
-
-        {/* How it works */}
-        {!isOwned && isAvailable && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>How It Works</Text>
-            <Text style={styles.sectionText}>
-              1. Complete payment at the all-in price{'\n'}
-              2. We purchase from StockX and ship to our vault{'\n'}
-              3. Your token appears in your wallet once delivered{'\n'}
-              4. Trade or redeem anytime
-            </Text>
           </View>
         )}
       </ScrollView>
@@ -523,7 +428,7 @@ export default function AssetDetailScreen() {
                   (purchasing || (!hasFixedSize && !selectedSize)) && styles.actionButtonTextDisabled
                 ]}
               >
-                {purchasing ? 'Processing...' : !hasFixedSize && !selectedSize ? 'Select Size to Buy' : 'Buy Now'}
+                {purchasing ? 'Processing...' : !hasFixedSize && !selectedSize ? 'Select Size' : `Buy`}
               </Text>
             </Pressable>
           )}
@@ -618,62 +523,32 @@ const styles = StyleSheet.create({
   },
   priceSection: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  priceLabel: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 4,
-  },
-  priceRow: {
-    flexDirection: 'row',
+    paddingVertical: 16,
     alignItems: 'center',
-    gap: 12,
   },
   priceValue: {
     fontFamily: fonts.heading,
-    fontSize: 32,
+    fontSize: 40,
     color: theme.textPrimary,
     letterSpacing: -0.5,
   },
-  changeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  changeArrow: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  changeBadgeText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
   changeDetail: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
     marginTop: 4,
   },
-  priceSubtext: {
-    fontSize: 12,
-    color: theme.textTertiary,
-    marginTop: 8,
+  infoRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    alignItems: 'center',
   },
-  updateTime: {
-    fontSize: 11,
-    color: theme.textTertiary,
-    marginTop: 4,
+  infoText: {
+    fontSize: 15,
+    color: theme.textSecondary,
   },
   chartSection: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
+    paddingVertical: 12,
   },
   chartContainer: {
     marginTop: 12,
@@ -703,15 +578,12 @@ const styles = StyleSheet.create({
   },
   sizeSection: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
+    paddingVertical: 16,
   },
   sizeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 12,
   },
   sizeButton: {
     width: '22%',
@@ -733,46 +605,6 @@ const styles = StyleSheet.create({
   },
   sizeButtonTextSelected: {
     color: theme.textInverse,
-  },
-  detailsSection: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  detailLabel: {
-    fontSize: 16,
-    color: theme.textSecondary,
-  },
-  detailValue: {
-    fontSize: 16,
-    color: theme.textPrimary,
-    fontWeight: '500',
-  },
-  section: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  sectionTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 12,
-    color: theme.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  sectionText: {
-    fontSize: 16,
-    color: theme.textPrimary,
-    lineHeight: 24,
   },
   actionContainer: {
     paddingHorizontal: 16,

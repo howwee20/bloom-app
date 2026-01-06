@@ -33,15 +33,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'HOME',
+          title: 'WALLET',
           tabBarIcon: ({ color }) => <TabBarIcon name="folder" color={color} />,
         }}
       />
       <Tabs.Screen
+        name="exchange"
+        options={{
+          title: 'EXCHANGE',
+          tabBarIcon: ({ color }) => <TabBarIcon name="exchange" color={color} />,
+        }}
+      />
+      {/* Hide bloom tab - content merged into exchange */}
+      <Tabs.Screen
         name="bloom"
         options={{
-          title: 'BLOOM',
-          tabBarIcon: ({ color }) => <TabBarIcon name="shopping-bag" color={color} />,
+          href: null, // This hides the tab from navigation
         }}
       />
     </Tabs>

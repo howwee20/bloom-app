@@ -3,7 +3,6 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   Pressable,
@@ -13,10 +12,41 @@ import {
   Text,
   View,
 } from 'react-native';
+import { fonts, theme } from '../../constants/Colors';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
-import { theme, fonts } from '../../constants/Colors';
 
+// Token interface for ownership-first model
+interface Token {
+  id: string;
+  order_id: string;
+  sku: string;
+  product_name: string;
+  size: string;
+  product_image_url: string | null;
+  purchase_price: number;
+  purchase_date: string;
+  custody_type: 'bloom'; // All tokens are Bloom custody
+  is_exchange_eligible: boolean;
+  current_value: number;
+  pnl_dollars: number | null;
+  pnl_percent: number | null;
+  status: 'acquiring' | 'in_custody' | 'listed' | 'redeeming' | 'shipped' | 'redeemed';
+}
+
+interface TokenPortfolioSummary {
+  total_value: number;
+  total_cost: number;
+  total_pnl_dollars: number | null;
+  total_pnl_percent: number | null;
+  token_count: number;
+  in_custody_count: number;
+  acquiring_count: number;
+  redeeming_count: number;
+  redeemed_count: number;
+}
+
+// Legacy asset interface (for backwards compatibility)
 interface Asset {
   id: string;
   name: string;
@@ -39,19 +69,15 @@ interface PortfolioSummary {
   asset_count: number;
 }
 
-interface PriceHistory {
-  price: number;
-  created_at: string;
-}
 
 export default function HomeScreen() {
   const { session } = useAuth();
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
+  const [tokenSummary, setTokenSummary] = useState<TokenPortfolioSummary | null>(null);
   const [ownedAssets, setOwnedAssets] = useState<Asset[]>([]);
-  const [priceHistories, setPriceHistories] = useState<Record<string, PriceHistory[]>>({});
+  const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [updatingPrices, setUpdatingPrices] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   const handleImageError = (assetId: string) => {
@@ -62,29 +88,28 @@ export default function HomeScreen() {
     if (!session) return;
 
     try {
-      // Fetch portfolio summary with P&L
+      // Fetch token portfolio summary (ownership-first model)
+      const { data: tokenSummaryData, error: tokenSummaryError } = await supabase.rpc('get_token_portfolio_summary');
+      if (!tokenSummaryError && tokenSummaryData && tokenSummaryData.length > 0) {
+        setTokenSummary(tokenSummaryData[0]);
+      }
+
+      // Fetch tokens (ownership-first model)
+      const { data: tokenData, error: tokenError } = await supabase.rpc('get_user_tokens');
+      if (!tokenError && tokenData) {
+        setTokens(tokenData);
+      }
+
+      // Legacy: Fetch old portfolio summary with P&L
       const { data: summaryData, error: summaryError } = await supabase.rpc('get_portfolio_summary');
       if (!summaryError && summaryData && summaryData.length > 0) {
         setSummary(summaryData[0]);
       }
 
-      // Fetch assets with P&L
+      // Legacy: Fetch assets with P&L
       const { data: assets, error: assetsError } = await supabase.rpc('get_portfolio_with_pnl');
       if (!assetsError && assets) {
         setOwnedAssets(assets);
-
-        // Fetch price history for sparklines
-        const histories: Record<string, PriceHistory[]> = {};
-        for (const asset of assets) {
-          const { data: history } = await supabase.rpc('get_price_history', {
-            p_asset_id: asset.id,
-            p_days: 7,
-          });
-          if (history) {
-            histories[asset.id] = history;
-          }
-        }
-        setPriceHistories(histories);
       }
     } catch (e) {
       console.error('Error fetching portfolio:', e);
@@ -106,39 +131,6 @@ export default function HomeScreen() {
     fetchPortfolio();
   }, [fetchPortfolio]);
 
-  const handleRefreshPrices = async () => {
-    if (updatingPrices) return;
-
-    try {
-      setUpdatingPrices(true);
-
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/update-prices/all`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session?.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (response.ok) {
-        Alert.alert('Prices Updated', `Updated ${result.successful} of ${result.total} assets`);
-        fetchPortfolio();
-      } else {
-        Alert.alert('Update Failed', result.error || 'Could not update prices');
-      }
-    } catch (e) {
-      console.error('Error updating prices:', e);
-      Alert.alert('Error', 'Failed to update prices');
-    } finally {
-      setUpdatingPrices(false);
-    }
-  };
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -153,42 +145,72 @@ export default function HomeScreen() {
     return `${sign}${formatPrice(value)}`;
   };
 
-  const formatPnLPercent = (value: number | null) => {
-    if (value === null) return '';
-    const sign = value >= 0 ? '+' : '';
-    return `${sign}${value.toFixed(1)}%`;
+  // Get status config for token
+  const getStatusConfig = (status: Token['status']) => {
+    switch (status) {
+      case 'in_custody':
+        return { label: 'Ready', color: theme.success, icon: '●' };
+      case 'acquiring':
+        return { label: 'Acquiring...', color: '#F5A623', icon: '◐' };
+      case 'listed':
+        return { label: 'Listed', color: theme.accent, icon: '●' };
+      case 'redeeming':
+        return { label: 'Redeeming...', color: '#F5A623', icon: '◐' };
+      case 'shipped':
+        return { label: 'Shipped', color: '#F5A623', icon: '→' };
+      case 'redeemed':
+        return { label: 'Redeemed', color: theme.textSecondary, icon: '✓' };
+      default:
+        return { label: '', color: theme.textSecondary, icon: '' };
+    }
   };
 
-  // Simple text-based sparkline using unicode block characters
-  const renderSparkline = (assetId: string) => {
-    const history = priceHistories[assetId];
-    if (!history || history.length < 2) return null;
-
-    const prices = history.map(h => h.price);
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const range = max - min || 1;
-
-    const blocks = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-
-    const sparkline = prices.map(price => {
-      const normalized = (price - min) / range;
-      const index = Math.min(Math.floor(normalized * blocks.length), blocks.length - 1);
-      return blocks[index];
-    }).join('');
-
-    const isUp = prices[prices.length - 1] >= prices[0];
+  // Render token card - minimal design with status badge
+  const renderTokenCard = ({ item }: { item: Token }) => {
+    const showImage = item.product_image_url && !failedImages.has(item.id);
+    const statusConfig = getStatusConfig(item.status);
+    const showStatusBadge = item.status !== 'in_custody'; // Only show badge for non-ready states
 
     return (
-      <Text style={[styles.sparkline, isUp ? styles.sparklineUp : styles.sparklineDown]}>
-        {sparkline}
-      </Text>
+      <Pressable style={styles.assetCard} onPress={() => router.push(`/token/${item.id}`)}>
+        <View style={styles.cardImageContainer}>
+          {showImage ? (
+            <Image
+              source={{ uri: item.product_image_url! }}
+              style={styles.cardImage}
+              resizeMode="contain"
+              onError={() => handleImageError(item.id)}
+            />
+          ) : (
+            <View style={[styles.cardImage, styles.placeholderImage]}>
+              <Text style={styles.placeholderText}>{item.product_name.charAt(0)}</Text>
+            </View>
+          )}
+          {/* Status badge overlay */}
+          {showStatusBadge && (
+            <View style={[styles.statusBadge, { backgroundColor: statusConfig.color }]}>
+              <Text style={styles.statusBadgeText}>{statusConfig.label}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName} numberOfLines={2}>{item.product_name}</Text>
+          <View style={styles.cardMetaRow}>
+            <Text style={styles.cardMeta}>
+              Size {item.size} · {formatPrice(item.current_value)}
+            </Text>
+            {item.status === 'in_custody' && (
+              <Text style={[styles.statusDot, { color: theme.success }]}>●</Text>
+            )}
+          </View>
+        </View>
+      </Pressable>
     );
   };
 
+  // Legacy: Render asset card - minimal design
   const renderAssetCard = ({ item }: { item: Asset }) => {
-    const isPositive = item.pnl_dollars !== null && item.pnl_dollars >= 0;
-    const pnlColor = item.pnl_dollars === null ? theme.textSecondary : isPositive ? theme.success : theme.error;
     const showImage = item.image_url && !failedImages.has(item.id);
 
     return (
@@ -210,20 +232,9 @@ export default function HomeScreen() {
 
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-          {item.size && <Text style={styles.cardSize}>Size {item.size}</Text>}
-
-          <View style={styles.priceRow}>
-            <View>
-              <Text style={styles.cardPrice}>{formatPrice(item.current_price)}</Text>
-              <Text style={[styles.cardPnl, { color: pnlColor }]}>
-                {formatPnL(item.pnl_dollars)} {formatPnLPercent(item.pnl_percent)}
-              </Text>
-            </View>
-
-            <View style={styles.sparklineContainer}>
-              {renderSparkline(item.id)}
-            </View>
-          </View>
+          <Text style={styles.cardMeta}>
+            Size {item.size} · {formatPrice(item.current_price)}
+          </Text>
         </View>
       </Pressable>
     );
@@ -235,33 +246,27 @@ export default function HomeScreen() {
       <Text style={styles.emptySubtitle}>
         Start building your collection
       </Text>
-      <Pressable style={styles.emptyButton} onPress={() => router.push('/(tabs)/bloom')}>
+      <Pressable style={styles.emptyButton} onPress={() => router.push('/(tabs)/exchange')}>
         <Text style={styles.emptyButtonText}>Browse assets</Text>
       </Pressable>
     </View>
   );
 
-  const totalPnlColor = summary?.total_pnl_dollars === null || summary?.total_pnl_dollars === undefined
+  // Calculate combined totals (tokens + legacy assets)
+  const combinedTotalValue = (tokenSummary?.total_value || 0) + (summary?.total_value || 0);
+  const combinedTotalPnl = (tokenSummary?.total_pnl_dollars || 0) + (summary?.total_pnl_dollars || 0);
+  const hasItems = tokens.length > 0 || ownedAssets.length > 0;
+
+  const totalPnlColor = combinedTotalPnl === 0
     ? theme.textSecondary
-    : summary.total_pnl_dollars >= 0 ? theme.success : theme.error;
+    : combinedTotalPnl >= 0 ? theme.success : theme.error;
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Portfolio</Text>
+        <Text style={[styles.headerTitle, styles.headerTitleAccent]}>Bloom</Text>
         <View style={styles.headerRight}>
-          <Pressable
-            style={styles.refreshButton}
-            onPress={handleRefreshPrices}
-            disabled={updatingPrices}
-          >
-            {updatingPrices ? (
-              <ActivityIndicator size="small" color={theme.accent} />
-            ) : (
-              <Text style={styles.refreshIcon}>↻</Text>
-            )}
-          </Pressable>
           <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
             <View style={styles.profileIcon}>
               <Text style={styles.profileIconText}>
@@ -274,39 +279,34 @@ export default function HomeScreen() {
 
       {/* Portfolio Value */}
       <View style={styles.valueSection}>
-        <Text style={styles.valueLabel}>Total balance</Text>
-        <Text style={styles.valueAmount}>{formatPrice(summary?.total_value || 0)}</Text>
-
-        {summary?.total_pnl_dollars !== null && summary?.total_pnl_dollars !== undefined && (
-          <View style={styles.totalPnlRow}>
-            <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
-              {formatPnL(summary.total_pnl_dollars)}
-            </Text>
-            <Text style={[styles.totalPnlPercent, { color: totalPnlColor }]}>
-              {formatPnLPercent(summary.total_pnl_percent)}
-            </Text>
-          </View>
+        <Text style={styles.valueAmount}>{formatPrice(combinedTotalValue)}</Text>
+        {hasItems && (
+          <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
+            {formatPnL(combinedTotalPnl)} today
+          </Text>
         )}
       </View>
 
-      {/* Assets Section */}
+      {/* Assets */}
       <View style={styles.assetsSection}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Your assets</Text>
-          <Text style={styles.assetCount}>{summary?.asset_count || 0}</Text>
-        </View>
-
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.accent} />
             <Text style={styles.loadingText}>Loading...</Text>
           </View>
-        ) : ownedAssets.length === 0 ? (
+        ) : !hasItems ? (
           renderEmptyState()
         ) : (
           <FlatList
-            data={ownedAssets}
-            renderItem={renderAssetCard}
+            data={[...tokens, ...ownedAssets] as any[]}
+            renderItem={({ item }) => {
+              // Check if it's a token (has custody_type) or legacy asset
+              if ('custody_type' in item) {
+                return renderTokenCard({ item: item as Token });
+              } else {
+                return renderAssetCard({ item: item as Asset });
+              }
+            }}
             keyExtractor={(item) => item.id}
             numColumns={2}
             columnWrapperStyle={styles.gridRow}
@@ -343,20 +343,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: theme.textPrimary,
   },
+  headerTitleAccent: {
+    color: theme.accent,
+  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  refreshButton: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refreshIcon: {
-    fontSize: 22,
-    color: theme.accent,
   },
   profileButton: {
     padding: 4,
@@ -379,53 +372,23 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 32,
   },
-  valueLabel: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 4,
-  },
   valueAmount: {
     fontFamily: fonts.heading,
-    fontSize: 36,
+    fontSize: 40,
     color: theme.textPrimary,
     letterSpacing: -1,
   },
-  totalPnlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 8,
-  },
   totalPnl: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  totalPnlPercent: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
+    marginTop: 4,
   },
   assetsSection: {
     flex: 1,
     backgroundColor: theme.backgroundSecondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingTop: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 14,
-    color: theme.textPrimary,
-  },
-  assetCount: {
-    fontSize: 14,
-    color: theme.textSecondary,
+    paddingTop: 16,
   },
   gridContent: {
     paddingHorizontal: 12,
@@ -441,7 +404,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: 'rgba(255, 215, 181, 0.25)',
   },
   cardImageContainer: {
     backgroundColor: '#FFF',
@@ -465,45 +428,39 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   cardName: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: theme.textPrimary,
-    marginBottom: 2,
-    lineHeight: 16,
+    marginBottom: 4,
+    lineHeight: 17,
   },
-  cardSize: {
-    fontSize: 11,
+  cardMeta: {
+    fontSize: 12,
     color: theme.textSecondary,
-    marginBottom: 6,
+    flex: 1,
   },
-  priceRow: {
+  cardMetaRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
   },
-  cardPrice: {
-    fontSize: 14,
+  statusDot: {
+    fontSize: 10,
+    marginLeft: 4,
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  statusBadgeText: {
+    fontSize: 9,
     fontWeight: '700',
-    color: theme.accent,
-  },
-  cardPnl: {
-    fontSize: 10,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  sparklineContainer: {
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-  },
-  sparkline: {
-    fontSize: 10,
-    letterSpacing: -1,
-  },
-  sparklineUp: {
-    color: theme.success,
-  },
-  sparklineDown: {
-    color: theme.error,
+    color: '#FFF',
+    textTransform: 'uppercase',
   },
   loadingContainer: {
     paddingVertical: 40,

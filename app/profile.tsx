@@ -33,6 +33,12 @@ export default function ProfileScreen() {
           <Text style={styles.emailText}>{session?.user?.email || 'Not signed in'}</Text>
         </View>
 
+        {/* My Orders */}
+        <Pressable style={styles.menuItem} onPress={() => router.push('/orders')}>
+          <Text style={styles.menuItemText}>My Orders</Text>
+          <Text style={styles.menuItemArrow}>→</Text>
+        </Pressable>
+
         {/* Logout */}
         <Pressable style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Log out</Text>
@@ -104,5 +110,25 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#FF3B30',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  menuItemText: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#FFF',
+  },
+  menuItemArrow: {
+    fontSize: 17,
+    color: '#666',
   },
 });

@@ -29,7 +29,10 @@ interface Asset {
   last_price_update: string | null;
   price_change: number | null;
   price_change_percent: number | null;
+  custody_status: 'in_vault' | 'available_to_acquire' | null;
 }
+
+type FilterTab = 'all' | 'instant' | 'acquire';
 
 export default function BloomScreen() {
   const { session } = useAuth();
@@ -38,6 +41,7 @@ export default function BloomScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<FilterTab>('all');
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -89,15 +93,37 @@ export default function BloomScreen() {
   }, [fetchMarketAssets]);
 
   const filteredAssets = useMemo(() => {
-    if (!searchQuery.trim()) return marketAssets;
-    const query = searchQuery.toLowerCase();
-    return marketAssets.filter(
-      (asset) =>
-        asset.name.toLowerCase().includes(query) ||
-        asset.category?.toLowerCase().includes(query) ||
-        asset.brand?.toLowerCase().includes(query)
-    );
-  }, [marketAssets, searchQuery]);
+    let assets = marketAssets;
+
+    // Filter by tab
+    if (activeTab === 'instant') {
+      assets = assets.filter(a => a.custody_status === 'in_vault');
+    } else if (activeTab === 'acquire') {
+      assets = assets.filter(a => a.custody_status === 'available_to_acquire' || !a.custody_status);
+    }
+
+    // Filter by search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      assets = assets.filter(
+        (asset) =>
+          asset.name.toLowerCase().includes(query) ||
+          asset.category?.toLowerCase().includes(query) ||
+          asset.brand?.toLowerCase().includes(query)
+      );
+    }
+
+    return assets;
+  }, [marketAssets, searchQuery, activeTab]);
+
+  // Count assets by custody type
+  const instantCount = useMemo(() =>
+    marketAssets.filter(a => a.custody_status === 'in_vault').length
+  , [marketAssets]);
+
+  const acquireCount = useMemo(() =>
+    marketAssets.filter(a => a.custody_status === 'available_to_acquire' || !a.custody_status).length
+  , [marketAssets]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -139,6 +165,7 @@ export default function BloomScreen() {
     const hasChange = item.price_change !== null && item.price_change !== 0;
     const isPositive = (item.price_change || 0) >= 0;
     const changeColor = hasChange ? (isPositive ? theme.success : theme.error) : theme.textSecondary;
+    const isInstant = item.custody_status === 'in_vault';
 
     return (
       <Pressable style={styles.assetCard} onPress={() => router.push(`/asset/${item.id}`)}>
@@ -155,6 +182,12 @@ export default function BloomScreen() {
               <Text style={styles.placeholderText}>{item.brand?.charAt(0) || item.name.charAt(0)}</Text>
             </View>
           )}
+          {/* Custody Badge */}
+          <View style={[styles.custodyBadge, isInstant ? styles.instantBadge : styles.acquireBadge]}>
+            <Text style={[styles.custodyBadgeText, isInstant ? styles.instantBadgeText : styles.acquireBadgeText]}>
+              {isInstant ? 'Instant' : '5-7d'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.cardInfo}>
@@ -227,6 +260,37 @@ export default function BloomScreen() {
             </Pressable>
           )}
         </View>
+      </View>
+
+      {/* Filter Tabs */}
+      <View style={styles.tabContainer}>
+        <Pressable
+          style={[styles.tab, activeTab === 'all' && styles.tabActive]}
+          onPress={() => setActiveTab('all')}
+        >
+          <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
+            All ({marketAssets.length})
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tab, activeTab === 'instant' && styles.tabActive]}
+          onPress={() => setActiveTab('instant')}
+        >
+          <View style={styles.tabContent}>
+            <View style={styles.instantDot} />
+            <Text style={[styles.tabText, activeTab === 'instant' && styles.tabTextActive]}>
+              Instant ({instantCount})
+            </Text>
+          </View>
+        </Pressable>
+        <Pressable
+          style={[styles.tab, activeTab === 'acquire' && styles.tabActive]}
+          onPress={() => setActiveTab('acquire')}
+        >
+          <Text style={[styles.tabText, activeTab === 'acquire' && styles.tabTextActive]}>
+            Acquire ({acquireCount})
+          </Text>
+        </Pressable>
       </View>
 
       {/* Assets Section */}
@@ -345,7 +409,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: 'rgba(255, 215, 181, 0.25)',
   },
   cardImageContainer: {
     backgroundColor: '#FFF',
@@ -433,5 +497,71 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.textSecondary,
     textAlign: 'center',
+  },
+  // Filter Tabs
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  tab: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  tabActive: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  tabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.textSecondary,
+  },
+  tabTextActive: {
+    color: theme.textInverse,
+  },
+  instantDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.success,
+  },
+  // Custody Badge on Cards
+  custodyBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  instantBadge: {
+    backgroundColor: theme.success,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  acquireBadge: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  custodyBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  instantBadgeText: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+  acquireBadgeText: {
+    color: 'rgba(255,255,255,0.7)',
   },
 });

@@ -147,6 +147,17 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           {/* Asset detail screen */}
           <Stack.Screen name="asset/[id]" options={{ headerShown: false }} />
+          {/* Checkout flow */}
+          <Stack.Screen name="checkout/confirm-order" options={{ headerShown: false }} />
+          {/* Redemption flow */}
+          <Stack.Screen name="redeem/[tokenId]" options={{ headerShown: false }} />
+          {/* Token detail screen */}
+          <Stack.Screen name="token/[id]" options={{ headerShown: false }} />
+          {/* Orders screens */}
+          <Stack.Screen name="orders" options={{ headerShown: false }} />
+          <Stack.Screen name="orders/[id]" options={{ headerShown: false }} />
+          {/* Post-payment success */}
+          <Stack.Screen name="checkout/success" options={{ headerShown: false }} />
           {/* Profile */}
           <Stack.Screen name="profile" options={{ headerShown: false }} />
           {/* Authentication flow */}

@@ -33,6 +33,8 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Ownership-first model: all purchases are custody tokens (no lane selection)
+
     // Get user from auth header
     const authHeader = req.headers.get('Authorization')!
     const supabaseClient = createClient(
@@ -113,7 +115,7 @@ Deno.serve(async (req) => {
     // Calculate quote expiration time
     const quoteExpiresAt = new Date(Date.now() + quoteExpirationMinutes * 60 * 1000);
 
-    // Create order record with quote expiration
+    // Create order record (ownership-first: all orders are custody)
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -123,6 +125,7 @@ Deno.serve(async (req) => {
         amount_cents: amountCents,
         quote_expires_at: quoteExpiresAt.toISOString(),
         status: 'pending_payment',
+        lane: 'b', // All purchases are ownership (custody) tokens
       })
       .select()
       .single()
@@ -135,7 +138,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Create Stripe checkout session
+    // Create Stripe checkout session (ownership-first messaging)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -144,7 +147,7 @@ Deno.serve(async (req) => {
             currency: 'usd',
             product_data: {
               name: asset.name,
-              description: `Size ${size} - Ships to Bloom Vault`,
+              description: `Size ${size} - Bloom Ownership Token`,
               images: asset.image_url ? [asset.image_url] : [],
             },
             unit_amount: amountCents,
