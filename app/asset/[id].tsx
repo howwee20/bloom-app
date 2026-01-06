@@ -6,6 +6,7 @@ import {
   Dimensions,
   Image,
   Linking,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -37,6 +38,8 @@ interface Asset {
   provenance: string | null;
   category: string | null;
   last_price_update: string | null;
+  last_price_checked_at: string | null;
+  last_price_updated_at: string | null;
   price_24h_ago: number | null;
   price_change: number | null;
   price_change_percent: number | null;
@@ -49,7 +52,7 @@ interface PricePoint {
 }
 
 export default function AssetDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, sell } = useLocalSearchParams<{ id: string; sell?: string }>();
   const { session } = useAuth();
   const [asset, setAsset] = useState<Asset | null>(null);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
@@ -58,6 +61,8 @@ export default function AssetDetailScreen() {
   const [selling, setSelling] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [sellTriggered, setSellTriggered] = useState(false);
 
   useEffect(() => {
     const fetchAsset = async () => {
@@ -231,6 +236,13 @@ export default function AssetDetailScreen() {
   const isStale = !asset?.last_price_update ||
     ((Date.now() - new Date(asset.last_price_update).getTime()) / 60000) > STALE_MINUTES;
 
+  useEffect(() => {
+    if (!asset || sell !== '1' || sellTriggered) return;
+    if (!isOwned) return;
+    setSellTriggered(true);
+    handleSell();
+  }, [asset, sell, sellTriggered, isOwned]);
+
   const handlePurchase = () => {
     if (!asset || !session) return;
 
@@ -331,7 +343,9 @@ export default function AssetDetailScreen() {
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>{asset.name}</Text>
-        <View style={styles.headerSpacer} />
+        <Pressable style={styles.moreButton} onPress={() => setShowMoreMenu(true)}>
+          <Text style={styles.moreButtonText}>•••</Text>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -361,6 +375,11 @@ export default function AssetDetailScreen() {
               {isPositive ? '▲' : '▼'} {formatPriceChange(asset.price_change)} ({formatPercentChange(asset.price_change_percent)}) today
             </Text>
           )}
+          {asset.last_price_checked_at && (
+            <Text style={styles.updatedText}>
+              Updated {formatTimeAgo(asset.last_price_checked_at)}
+            </Text>
+          )}
         </View>
 
         {/* Price Chart */}
@@ -373,7 +392,7 @@ export default function AssetDetailScreen() {
         {/* Size & Delivery Info */}
         <View style={styles.infoRow}>
           <Text style={styles.infoText}>
-            Size {hasFixedSize ? asset.size : selectedSize || '—'} · {asset.custody_status === 'in_vault' ? 'Instant' : 'Ships to Vault'}
+            Size {hasFixedSize ? asset.size : selectedSize || '—'} · {asset.custody_status === 'in_vault' ? 'Instant' : 'Ships 5-7d'}
           </Text>
         </View>
 
@@ -448,17 +467,35 @@ export default function AssetDetailScreen() {
           <View style={styles.ownedBadge}>
             <Text style={styles.ownedText}>You own this asset</Text>
           </View>
-          <Pressable
-            style={[styles.sellButton, selling && styles.sellButtonDisabled]}
-            onPress={handleSell}
-            disabled={selling}
-          >
-            <Text style={[styles.sellButtonText, selling && styles.sellButtonTextDisabled]}>
-              {selling ? 'Listing...' : 'Sell'}
-            </Text>
-          </Pressable>
         </View>
       )}
+
+      {/* Overflow Menu */}
+      <Modal
+        visible={showMoreMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMoreMenu(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setShowMoreMenu(false)}>
+          <View style={styles.menuContent}>
+            {isOwned && (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMoreMenu(false);
+                  handleSell();
+                }}
+              >
+                <Text style={styles.menuItemText}>{selling ? 'Listing...' : 'Sell'}</Text>
+              </Pressable>
+            )}
+            <Pressable style={styles.menuItem} onPress={() => setShowMoreMenu(false)}>
+              <Text style={styles.menuItemText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -498,8 +535,15 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  headerSpacer: {
+  moreButton: {
     width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreButtonText: {
+    fontSize: 18,
+    color: theme.textPrimary,
   },
   scrollView: {
     flex: 1,
@@ -536,6 +580,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     marginTop: 4,
+  },
+  updatedText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 6,
   },
   infoRow: {
     paddingHorizontal: 16,
@@ -671,22 +720,26 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginTop: 4,
   },
-  sellButton: {
-    backgroundColor: theme.error,
-    borderRadius: 14,
-    paddingVertical: 16,
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  menuContent: {
+    backgroundColor: theme.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    paddingBottom: 32,
+  },
+  menuItem: {
+    paddingVertical: 14,
     alignItems: 'center',
   },
-  sellButtonDisabled: {
-    backgroundColor: theme.card,
-  },
-  sellButtonText: {
-    fontSize: 17,
+  menuItemText: {
+    fontSize: 16,
     fontWeight: '600',
     color: theme.textPrimary,
-  },
-  sellButtonTextDisabled: {
-    color: theme.textSecondary,
   },
   loadingContainer: {
     flex: 1,

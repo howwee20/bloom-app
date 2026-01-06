@@ -205,7 +205,7 @@ export default function BuyTokenScreen() {
             <Text style={styles.instantText}>Instant Transfer</Text>
           </View>
           <Text style={styles.instantDescription}>
-            This token transfers to your wallet immediately upon purchase. The physical item remains securely in Bloom's vault.
+            This token transfers to your wallet immediately upon purchase. The physical item remains securely at Bloom.
           </Text>
         </View>
 
@@ -248,7 +248,7 @@ export default function BuyTokenScreen() {
               <Text style={styles.optionIcon}>🏦</Text>
               <View style={styles.optionInfo}>
                 <Text style={styles.optionTitle}>Verified Ownership</Text>
-                <Text style={styles.optionDesc}>Token representing authenticated item in vault</Text>
+                <Text style={styles.optionDesc}>Token representing authenticated item at Bloom</Text>
               </View>
             </View>
             <View style={styles.optionRow}>

@@ -1,10 +1,13 @@
 // HOME Screen - Portfolio View (Coinbase Style with Zen Dots)
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
   FlatList,
   Image,
+  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -35,7 +38,9 @@ interface Token {
   current_value: number;
   pnl_dollars: number | null;
   pnl_percent: number | null;
-  status: 'acquiring' | 'in_custody' | 'listed' | 'redeeming' | 'shipped' | 'redeemed';
+  match_status?: 'matched' | 'pending';
+  last_price_checked_at?: string | null;
+  status: 'acquiring' | 'in_custody' | 'listed' | 'redeeming' | 'shipped' | 'redeemed' | 'shipping_to_bloom';
 }
 
 interface TokenPortfolioSummary {
@@ -65,6 +70,7 @@ interface Asset {
   pnl_dollars: number | null;
   pnl_percent: number | null;
   last_price_update: string | null;
+  last_price_checked_at?: string | null;
 }
 
 interface PortfolioSummary {
@@ -86,12 +92,21 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>('all');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showSellModal, setShowSellModal] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [pollIntervalMs, setPollIntervalMs] = useState(2 * 60 * 1000);
+  const [updateDelayed, setUpdateDelayed] = useState(false);
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const [now, setNow] = useState(Date.now());
+  const [isFocused, setIsFocused] = useState(true);
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
   };
 
-  const fetchPortfolio = useCallback(async () => {
+  const fetchPortfolio = useCallback(async (options?: { silent?: boolean }) => {
     if (!session) return;
 
     try {
@@ -118,20 +133,74 @@ export default function HomeScreen() {
       if (!assetsError && assets) {
         setOwnedAssets(assets);
       }
+
+      const latestTokenCheck = (tokenData || [])
+        .map((item: Token) => item.last_price_checked_at)
+        .filter((value: string | null | undefined): value is string => Boolean(value))
+        .map(value => new Date(value).getTime());
+      const latestAssetCheck = (assets || [])
+        .map((item: Asset) => item.last_price_checked_at)
+        .filter((value: string | null | undefined): value is string => Boolean(value))
+        .map(value => new Date(value).getTime());
+      const allChecks = [...latestTokenCheck, ...latestAssetCheck];
+      const latestCheck = allChecks.length > 0 ? Math.max(...allChecks) : null;
+      setLastUpdatedAt(latestCheck ? new Date(latestCheck) : null);
+      setUpdateDelayed(false);
+      setPollIntervalMs(2 * 60 * 1000);
     } catch (e) {
       console.error('Error fetching portfolio:', e);
+      setUpdateDelayed(true);
+      setPollIntervalMs((prev) => {
+        if (prev <= 2 * 60 * 1000) return 5 * 60 * 1000;
+        return 5 * 60 * 1000;
+      });
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!options?.silent) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [session]);
 
   useFocusEffect(
     useCallback(() => {
+      setIsFocused(true);
       setLoading(true);
       fetchPortfolio();
+      return () => setIsFocused(false);
     }, [fetchPortfolio])
   );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      setAppState(nextState);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!session || appState !== 'active' || !isFocused) return;
+
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [session, appState]);
+
+  const isForeground = appState === 'active';
+
+  useEffect(() => {
+    if (!session || !isForeground || !isFocused) return;
+    if (loading) return;
+
+    const interval = setInterval(() => {
+      fetchPortfolio({ silent: true });
+    }, pollIntervalMs);
+
+    return () => clearInterval(interval);
+  }, [session, isForeground, isFocused, pollIntervalMs, fetchPortfolio, loading]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -167,6 +236,8 @@ export default function HomeScreen() {
         return { label: 'Shipped', color: '#F5A623', icon: '→' };
       case 'redeemed':
         return { label: 'Redeemed', color: theme.textSecondary, icon: '✓' };
+      case 'shipping_to_bloom':
+        return { label: 'SHIPPING TO BLOOM', color: '#F5A623', icon: '→' };
       default:
         return { label: '', color: theme.textSecondary, icon: '' };
     }
@@ -187,17 +258,32 @@ export default function HomeScreen() {
     return `${dollarStr}${percentStr}`;
   };
 
+  const formatTimeAgo = (date: Date | null) => {
+    if (!date) return 'Updated —';
+    const diffMs = now - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    if (diffMins < 1) return 'Updated just now';
+    if (diffMins < 60) return `Updated ${diffMins}m ago`;
+    return `Updated ${diffHours}h ago`;
+  };
+
   // Render token card - brokerage style with P&L
   const renderTokenCard = ({ item }: { item: Token }) => {
     const showImage = item.product_image_url && !failedImages.has(item.id);
     const statusConfig = getStatusConfig(item.status);
-    const showStatusBadge = item.status !== 'in_custody'; // Only show badge for non-ready states
-    const pnlStr = formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
+    const showStatusBadge = item.status !== 'in_custody' && item.status !== undefined;
+    const isPendingMatch = item.match_status === 'pending' || item.current_value === null;
+    const pnlStr = isPendingMatch ? null : formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
     const pnlColor = getPnlColor(item.pnl_dollars);
+    const isBloom = item.custody_type === 'bloom';
 
     return (
-      <Pressable style={styles.assetCard} onPress={() => router.push(`/token/${item.id}`)}>
-        <View style={styles.cardImageContainer}>
+      <Pressable
+        style={[styles.assetCard, isBloom && styles.assetCardBloom]}
+        onPress={() => router.push(`/token/${item.id}`)}
+      >
+        <View style={[styles.cardImageContainer, isBloom && styles.cardImageContainerBloom]}>
           {showImage ? (
             <Image
               source={{ uri: item.product_image_url! }}
@@ -219,15 +305,27 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.cardInfo}>
-          <Text style={styles.cardName} numberOfLines={2}>{item.product_name}</Text>
-          <Text style={styles.cardPrice}>{formatPrice(item.current_value)}</Text>
+          <Text style={[styles.cardName, isBloom && styles.cardNameBloom]} numberOfLines={2}>
+            {item.product_name}
+          </Text>
+          <Text style={[styles.cardPrice, isBloom && styles.cardPriceBloom]}>
+            {isPendingMatch ? 'Needs match' : formatPrice(item.current_value)}
+          </Text>
           <View style={styles.cardPnlRow}>
             {pnlStr ? (
               <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
             ) : (
-              <Text style={styles.cardMeta}>Size {item.size}</Text>
+              <Text style={[styles.cardMeta, isBloom && styles.cardMetaBloom]}>
+                {isPendingMatch ? 'Add details to match' : `Size ${item.size}`}
+              </Text>
             )}
           </View>
+        </View>
+        {/* Custody label */}
+        <View style={[styles.custodyLabel, isBloom ? styles.custodyLabelBloom : styles.custodyLabelHome]}>
+          <Text style={[styles.custodyLabelText, isBloom ? styles.custodyLabelTextBloom : styles.custodyLabelTextHome]}>
+            {isBloom ? 'Bloom' : 'Home'}
+          </Text>
         </View>
       </Pressable>
     );
@@ -283,15 +381,6 @@ export default function HomeScreen() {
     </View>
   );
 
-  // Calculate combined totals (tokens + legacy assets)
-  const combinedTotalValue = (tokenSummary?.total_value || 0) + (summary?.total_value || 0);
-  const combinedTotalPnl = (tokenSummary?.total_pnl_dollars || 0) + (summary?.total_pnl_dollars || 0);
-  const hasItems = tokens.length > 0 || ownedAssets.length > 0;
-
-  const totalPnlColor = combinedTotalPnl === 0
-    ? theme.textSecondary
-    : combinedTotalPnl >= 0 ? theme.success : theme.error;
-
   // Filter tokens by custody type
   const filteredTokens = tokens.filter(token => {
     if (custodyFilter === 'all') return true;
@@ -302,6 +391,38 @@ export default function HomeScreen() {
   const bloomCount = tokens.filter(t => t.custody_type === 'bloom').length;
   const homeCount = tokens.filter(t => t.custody_type === 'home').length;
   const allCount = tokens.length + ownedAssets.length;
+
+  // Calculate filtered totals (based on current filter)
+  const filteredTotalValue = filteredTokens.reduce((sum, t) => sum + (t.current_value || 0), 0)
+    + (custodyFilter === 'all' ? (summary?.total_value || 0) : 0);
+  const filteredTotalPnl = filteredTokens.reduce((sum, t) => sum + (t.pnl_dollars || 0), 0)
+    + (custodyFilter === 'all' ? (summary?.total_pnl_dollars || 0) : 0);
+  const hasItems = tokens.length > 0 || ownedAssets.length > 0;
+
+  const totalPnlColor = filteredTotalPnl === 0
+    ? theme.textSecondary
+    : filteredTotalPnl >= 0 ? theme.success : theme.error;
+
+  const sellItems = [
+    ...tokens.map(token => ({
+      id: token.id,
+      type: 'token' as const,
+      name: token.product_name,
+      subtitle: token.custody_type === 'bloom' ? 'Bloom custody' : 'Home custody',
+      custodyLabel: token.custody_type === 'bloom' ? 'Bloom' : 'Home',
+      value: token.current_value,
+      imageUrl: token.product_image_url,
+    })),
+    ...ownedAssets.map(asset => ({
+      id: asset.id,
+      type: 'asset' as const,
+      name: asset.name,
+      subtitle: asset.category || 'Asset',
+      custodyLabel: 'Home',
+      value: asset.current_price,
+      imageUrl: asset.image_url,
+    })),
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -321,48 +442,84 @@ export default function HomeScreen() {
 
       {/* Portfolio Value */}
       <View style={styles.valueSection}>
-        <Text style={styles.valueAmount}>{formatPrice(combinedTotalValue)}</Text>
-        {hasItems && combinedTotalPnl !== 0 && (
+        <Text style={styles.valueAmount}>{formatPrice(filteredTotalValue)}</Text>
+        {hasItems && filteredTotalPnl !== 0 && (
           <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
-            {formatPnL(combinedTotalPnl)} all time
+            {formatPnL(filteredTotalPnl)} all time
           </Text>
         )}
+        <View style={styles.updatedRow}>
+          <Text style={styles.updatedText}>{formatTimeAgo(lastUpdatedAt)}</Text>
+          {updateDelayed && <Text style={styles.updatedText}> · Update delayed</Text>}
+        </View>
       </View>
 
-      {/* Filter Pills */}
+      {/* Filter Dropdown */}
       {hasItems && (
         <View style={styles.filterContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-            <Pressable
-              style={[styles.filterPill, custodyFilter === 'all' && styles.filterPillActive]}
-              onPress={() => setCustodyFilter('all')}
-            >
-              <Text style={[styles.filterPillText, custodyFilter === 'all' && styles.filterPillTextActive]}>
-                All ({allCount})
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.filterPill, custodyFilter === 'bloom' && styles.filterPillActive]}
-              onPress={() => setCustodyFilter('bloom')}
-            >
-              <Text style={[styles.filterPillText, custodyFilter === 'bloom' && styles.filterPillTextActive]}>
-                Bloom ({bloomCount})
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.filterPill, custodyFilter === 'home' && styles.filterPillActive]}
-              onPress={() => setCustodyFilter('home')}
-            >
-              <Text style={[styles.filterPillText, custodyFilter === 'home' && styles.filterPillTextActive]}>
-                Home ({homeCount})
-              </Text>
-            </Pressable>
-          </ScrollView>
+          <Pressable
+            style={styles.filterDropdownTrigger}
+            onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+          >
+            <Text style={styles.filterDropdownText}>
+              {custodyFilter === 'all' ? `All (${allCount})` :
+               custodyFilter === 'bloom' ? `Bloom (${bloomCount})` :
+               `Home (${homeCount})`}
+            </Text>
+            <Text style={styles.filterDropdownArrow}>
+              {showFilterDropdown ? '▲' : '▼'}
+            </Text>
+          </Pressable>
+          {showFilterDropdown && (
+            <View style={styles.filterDropdownOptions}>
+              <Pressable
+                style={[styles.filterDropdownOption, custodyFilter === 'all' && styles.filterDropdownOptionActive]}
+                onPress={() => { setCustodyFilter('all'); setShowFilterDropdown(false); }}
+              >
+                <Text style={[styles.filterDropdownOptionText, custodyFilter === 'all' && styles.filterDropdownOptionTextActive]}>
+                  All ({allCount})
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.filterDropdownOption, custodyFilter === 'bloom' && styles.filterDropdownOptionActive]}
+                onPress={() => { setCustodyFilter('bloom'); setShowFilterDropdown(false); }}
+              >
+                <Text style={[styles.filterDropdownOptionText, custodyFilter === 'bloom' && styles.filterDropdownOptionTextActive]}>
+                  Bloom ({bloomCount})
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.filterDropdownOption, custodyFilter === 'home' && styles.filterDropdownOptionActive]}
+                onPress={() => { setCustodyFilter('home'); setShowFilterDropdown(false); }}
+              >
+                <Text style={[styles.filterDropdownOptionText, custodyFilter === 'home' && styles.filterDropdownOptionTextActive]}>
+                  Home ({homeCount})
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       )}
 
       {/* Assets */}
       <View style={styles.assetsSection}>
+        <View style={styles.actionRow}>
+          <Pressable style={styles.actionPrimary} onPress={() => router.push('/(tabs)/exchange')}>
+            <Text style={styles.actionPrimaryText}>Buy</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionSecondary, !hasItems && styles.actionSecondaryDisabled]}
+            onPress={() => setShowSellModal(true)}
+            disabled={!hasItems}
+          >
+            <Text style={[styles.actionSecondaryText, !hasItems && styles.actionSecondaryTextDisabled]}>
+              Sell
+            </Text>
+          </Pressable>
+          <Pressable style={styles.actionIconButton} onPress={() => setShowAddModal(true)}>
+            <Text style={styles.actionIconText}>+</Text>
+          </Pressable>
+        </View>
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.accent} />
@@ -394,14 +551,105 @@ export default function HomeScreen() {
                 tintColor={theme.accent}
               />
             }
-            ListFooterComponent={
-              <Pressable style={styles.addButton} onPress={() => router.push('/add-from-home')}>
-                <Text style={styles.addButtonText}>+ Add Item</Text>
-              </Pressable>
-            }
           />
         )}
       </View>
+
+      {/* Add Item Modal */}
+      <Modal
+        visible={showAddModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowAddModal(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add to Wallet</Text>
+
+            <Pressable
+              style={styles.modalOption}
+              onPress={() => {
+                setShowAddModal(false);
+                router.push('/add-from-home');
+              }}
+            >
+              <Text style={styles.modalOptionTitle}>Add from Home</Text>
+              <Text style={styles.modalOptionDesc}>Track something you already own</Text>
+            </Pressable>
+
+            <Pressable style={styles.modalCancel} onPress={() => setShowAddModal(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Sell Modal */}
+      <Modal
+        visible={showSellModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSellModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowSellModal(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Sell</Text>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {sellItems.length === 0 ? (
+                <View style={styles.emptySellState}>
+                  <Text style={styles.emptySellTitle}>No items to sell</Text>
+                  <Text style={styles.emptySellSubtitle}>Add an item to get started</Text>
+                </View>
+              ) : (
+                sellItems.map(item => (
+                  <Pressable
+                    key={`${item.type}-${item.id}`}
+                    style={styles.modalOption}
+                    onPress={() => {
+                      setShowSellModal(false);
+                      router.push({
+                        pathname: item.type === 'token' ? '/token/[id]' : '/asset/[id]',
+                        params: { id: item.id, sell: '1' },
+                      });
+                    }}
+                  >
+                    <View style={styles.sellOptionRow}>
+                      <View style={styles.sellOptionLeft}>
+                        {item.imageUrl ? (
+                          <Image source={{ uri: item.imageUrl }} style={styles.sellOptionImage} />
+                        ) : (
+                          <View style={[styles.sellOptionImage, styles.sellOptionPlaceholder]}>
+                            <Text style={styles.sellOptionPlaceholderText}>
+                              {item.name.charAt(0)}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.sellOptionText}>
+                          <Text style={styles.modalOptionTitle} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <View style={styles.sellOptionMetaRow}>
+                            <Text style={styles.modalOptionDesc}>{item.subtitle}</Text>
+                            <View style={styles.custodyTag}>
+                              <Text style={styles.custodyTagText}>{item.custodyLabel}</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                      <Text style={styles.sellOptionValue}>{formatPrice(item.value)}</Text>
+                    </View>
+                  </Pressable>
+                ))
+              )}
+            </ScrollView>
+
+            <Pressable style={styles.modalCancel} onPress={() => setShowSellModal(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -463,12 +711,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 4,
   },
+  updatedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  updatedText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+  },
   assetsSection: {
     flex: 1,
     backgroundColor: theme.backgroundSecondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingTop: 16,
+    paddingTop: 12,
   },
   gridContent: {
     paddingHorizontal: 12,
@@ -486,9 +743,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 215, 181, 0.25)',
   },
+  assetCardBloom: {
+    backgroundColor: '#FFFFFF',
+    borderColor: theme.accent,
+    borderWidth: 2,
+  },
   cardImageContainer: {
     backgroundColor: '#FFF',
     padding: 8,
+  },
+  cardImageContainerBloom: {
+    backgroundColor: '#FFF8F3',
   },
   cardImage: {
     width: '100%',
@@ -514,16 +779,25 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     lineHeight: 17,
   },
+  cardNameBloom: {
+    color: '#1A1A1A',
+  },
   cardPrice: {
     fontSize: 15,
     fontWeight: '700',
     color: theme.textPrimary,
     marginBottom: 2,
   },
+  cardPriceBloom: {
+    color: theme.accent,
+  },
   cardMeta: {
     fontSize: 11,
     color: theme.textSecondary,
     flex: 1,
+  },
+  cardMetaBloom: {
+    color: '#666666',
   },
   cardMetaRow: {
     flexDirection: 'row',
@@ -553,6 +827,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
     textTransform: 'uppercase',
+  },
+  custodyLabel: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  custodyLabelBloom: {
+    backgroundColor: theme.accent,
+  },
+  custodyLabelHome: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  custodyLabelText: {
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  custodyLabelTextBloom: {
+    color: '#FFF',
+  },
+  custodyLabelTextHome: {
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   loadingContainer: {
     paddingVertical: 40,
@@ -595,39 +895,213 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
-  filterScroll: {
-    gap: 8,
+  filterDropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  filterPillActive: {
-    backgroundColor: theme.accent,
-    borderColor: theme.accent,
-  },
-  filterPillText: {
+  filterDropdownText: {
     fontSize: 13,
     fontWeight: '600',
     color: theme.textSecondary,
   },
-  filterPillTextActive: {
+  filterDropdownArrow: {
+    fontSize: 10,
+    color: theme.textSecondary,
+  },
+  filterDropdownOptions: {
+    marginTop: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  filterDropdownOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  filterDropdownOptionActive: {
+    backgroundColor: theme.accent,
+  },
+  filterDropdownOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.textSecondary,
+  },
+  filterDropdownOptionTextActive: {
     color: theme.textInverse,
   },
-  addButton: {
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+  actionPrimary: {
+    flex: 1,
+    backgroundColor: theme.accent,
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  actionPrimaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textInverse,
+  },
+  actionSecondary: {
+    flex: 1,
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  actionSecondaryDisabled: {
+    backgroundColor: theme.backgroundSecondary,
+  },
+  actionSecondaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  actionSecondaryTextDisabled: {
+    color: theme.textSecondary,
+  },
+  actionIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.card,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    marginTop: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  actionIconText: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginTop: -2,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: theme.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    textAlign: 'center',
     marginBottom: 20,
   },
-  addButtonText: {
+  modalOption: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  modalOptionDisabled: {
+    opacity: 0.5,
+  },
+  modalOptionTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 4,
+  },
+  modalOptionTitleDisabled: {
+    color: theme.textSecondary,
+  },
+  modalOptionDesc: {
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
+  modalCancel: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+  modalCancelText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: theme.textSecondary,
+  },
+  sellOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sellOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  sellOptionImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#FFF',
+  },
+  sellOptionPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+  },
+  sellOptionPlaceholderText: {
+    fontFamily: fonts.heading,
+    fontSize: 16,
+    color: theme.accent,
+  },
+  sellOptionText: {
+    flex: 1,
+  },
+  sellOptionMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  custodyTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 215, 181, 0.3)',
+  },
+  custodyTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  sellOptionValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: theme.accent,
+    color: theme.textPrimary,
+  },
+  emptySellState: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  emptySellTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 6,
+  },
+  emptySellSubtitle: {
+    fontSize: 14,
+    color: theme.textSecondary,
   },
 });

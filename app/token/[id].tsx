@@ -1,6 +1,6 @@
 // Token Detail Screen - Ownership-first model with status-specific views
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -57,7 +57,11 @@ interface TokenDetail {
   pnl_percent: number | null;
   is_listed_for_sale: boolean;
   listing_price: number | null;
-  status: 'acquiring' | 'in_custody' | 'listed' | 'redeeming' | 'shipped' | 'redeemed';
+  status: 'acquiring' | 'in_custody' | 'listed' | 'redeeming' | 'shipped' | 'redeemed' | 'shipping_to_bloom';
+  match_status?: 'matched' | 'pending';
+  matched_asset_id?: string | null;
+  last_price_checked_at?: string | null;
+  last_price_updated_at?: string | null;
   // Redemption fields
   redemption_name: string | null;
   redemption_address_line1: string | null;
@@ -72,7 +76,7 @@ interface TokenDetail {
 }
 
 export default function TokenDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, sell } = useLocalSearchParams<{ id: string; sell?: string }>();
   const { session } = useAuth();
   const [token, setToken] = useState<TokenDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,6 +84,8 @@ export default function TokenDetailScreen() {
   const [showListingModal, setShowListingModal] = useState(false);
   const [listingPrice, setListingPrice] = useState('');
   const [listingLoading, setListingLoading] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [sellTriggered, setSellTriggered] = useState(false);
 
   const fetchToken = useCallback(async () => {
     if (!id || !session) return;
@@ -117,6 +123,10 @@ export default function TokenDetailScreen() {
     const sign = value >= 0 ? '+' : '';
     return `${sign}${formatPrice(value)}`;
   };
+
+  const cashOutEstimate = token
+    ? Math.round(token.current_value * 0.88 * 100) / 100
+    : 0;
 
   const handleListForSale = () => {
     if (!token?.is_exchange_eligible) {
@@ -234,6 +244,18 @@ export default function TokenDetailScreen() {
     );
   };
 
+  const handleSellEntry = () => {
+    if (!token) return;
+    if (token.custody_type === 'bloom') {
+      handleListForSale();
+      return;
+    }
+    showAlert(
+      'Coming Soon',
+      `Marketplace selling is coming soon. You’ll receive ~${formatPrice(cashOutEstimate)} after fees.`
+    );
+  };
+
   const handleRemove = () => {
     showAlert(
       'Remove from Portfolio?',
@@ -277,8 +299,20 @@ export default function TokenDetailScreen() {
   const isInCustodyOrListed = isInCustody || isListed;
   const isRedeeming = token?.status === 'redeeming' || token?.status === 'shipped';
   const isRedeemed = token?.status === 'redeemed';
+  const isShippingToBloom = token?.status === 'shipping_to_bloom';
   const isBloomCustody = token?.custody_type === 'bloom';
   const isHomeCustody = token?.custody_type === 'home';
+
+  useEffect(() => {
+    if (!token || sell !== '1' || sellTriggered) return;
+    setSellTriggered(true);
+
+    if (isListed || isInCustody) {
+      handleSellEntry();
+    } else {
+      showAlert('Sell not available', 'This item cannot be sold right now.');
+    }
+  }, [token, sell, sellTriggered, isListed, isInCustody]);
 
   if (loading) {
     return (
@@ -326,7 +360,9 @@ export default function TokenDetailScreen() {
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>{token.product_name}</Text>
-        <View style={styles.headerSpacer} />
+        <Pressable style={styles.moreButton} onPress={() => setShowMoreMenu(true)}>
+          <Text style={styles.moreButtonText}>•••</Text>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -355,9 +391,9 @@ export default function TokenDetailScreen() {
           <Text style={styles.productName}>{token.product_name}</Text>
           <Text style={styles.productMeta}>Size {token.size}</Text>
           {/* Custody Badge */}
-          <View style={[styles.custodyBadge, isHomeCustody && styles.custodyBadgeHome]}>
+          <View style={[styles.custodyBadge, isHomeCustody && !isShippingToBloom && styles.custodyBadgeHome, isShippingToBloom && styles.custodyBadgeShipping]}>
             <Text style={styles.custodyBadgeText}>
-              {isBloomCustody ? 'Bloom Vault' : 'At Home'}
+              {isShippingToBloom ? 'SHIPPING TO BLOOM' : isBloomCustody ? 'BLOOM' : 'HOME'}
             </Text>
           </View>
         </View>
@@ -372,23 +408,11 @@ export default function TokenDetailScreen() {
             </Text>
           )}
 
-          {/* Cash Out Value - What user would actually get */}
-          {isInCustodyOrListed && (
-            <View style={styles.cashOutSection}>
-              <View style={styles.cashOutRow}>
-                <Text style={styles.cashOutLabel}>Cash Out Value</Text>
-                <Text style={styles.cashOutValue}>
-                  {formatPrice(Math.round(token.current_value * 0.88 * 100) / 100)}
-                </Text>
-              </View>
-              <Text style={styles.spreadNote}>
-                ~12% spread · StockX fees apply
-              </Text>
-            </View>
-          )}
-
           {isAcquiring && (
             <Text style={styles.statusNote}>Arriving in 5-7 days</Text>
+          )}
+          {isShippingToBloom && (
+            <Text style={styles.statusNote}>Ship to Bloom to enable instant resale</Text>
           )}
           {isRedeeming && (
             <Text style={styles.statusNote}>
@@ -412,29 +436,27 @@ export default function TokenDetailScreen() {
 
       {/* Action Buttons */}
       <View style={styles.actionContainer}>
+        {/* Shipping to Bloom - Show shipping code and waiting message */}
+        {isShippingToBloom && token.vault_location && (
+          <View style={styles.shippingInfo}>
+            <Text style={styles.shippingInfoLabel}>Your Shipping Code</Text>
+            <Text style={styles.shippingInfoCode}>{token.vault_location}</Text>
+            <Text style={styles.shippingInfoNote}>Include this code inside the box</Text>
+          </View>
+        )}
         {/* In Custody - Show Sell button (routing is invisible to user) */}
         {isInCustody && (
           <>
-            <Pressable
-              style={[styles.actionButton, isHomeCustody && styles.actionButtonDisabled]}
-              onPress={isBloomCustody ? handleListForSale : () => {
-                showAlert('Coming Soon', 'Marketplace selling is coming soon. Your item will be listed and shipped directly to the buyer.');
-              }}
-            >
-              <Text style={[styles.actionButtonText, isHomeCustody && styles.actionButtonTextDisabled]}>
-                Sell
-              </Text>
-            </Pressable>
             {isBloomCustody && (
-              <Pressable style={styles.secondaryButton} onPress={handleRedeem}>
-                <Text style={styles.secondaryButtonText}>Ship to Me</Text>
+              <Pressable style={styles.actionButton} onPress={handleRedeem}>
+                <Text style={styles.actionButtonText}>Ship to Me</Text>
               </Pressable>
             )}
             {isHomeCustody && (
-              <Pressable style={styles.secondaryButton} onPress={() => {
-                showAlert('Upgrade to Instant', 'Send this item to Bloom Vault to enable instant selling. Ships in 2-3 days.');
+              <Pressable style={styles.actionButton} onPress={() => {
+                showAlert('Send to Bloom', 'Ship this item to Bloom to enable instant selling. Transit takes 2-3 days.');
               }}>
-                <Text style={styles.secondaryButtonText}>Upgrade to Instant</Text>
+                <Text style={styles.actionButtonText}>Send to Bloom</Text>
               </Pressable>
             )}
           </>
@@ -444,18 +466,8 @@ export default function TokenDetailScreen() {
             <View style={styles.listedInfo}>
               <Text style={styles.listedLabel}>Listed for {formatPrice(token.listing_price || 0)}</Text>
             </View>
-            <Pressable style={styles.actionButton} onPress={handleListForSale}>
-              <Text style={styles.actionButtonText}>Update Price</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={handleUnlist}>
-              <Text style={styles.secondaryButtonText}>Remove Listing</Text>
-            </Pressable>
           </>
         )}
-        {/* Remove from Portfolio - always available */}
-        <Pressable style={styles.dangerButton} onPress={handleRemove}>
-          <Text style={styles.dangerButtonText}>Remove from Portfolio</Text>
-        </Pressable>
       </View>
 
       {/* Listing Modal */}
@@ -492,7 +504,7 @@ export default function TokenDetailScreen() {
               </View>
 
               <Text style={styles.feeNote}>
-                You receive {formatPrice((parseFloat(listingPrice) || 0) * 0.97)} after 3% fee
+                You’ll receive ~{formatPrice((parseFloat(listingPrice) || 0) * 0.97)} after fees
               </Text>
 
               <Pressable
@@ -507,6 +519,44 @@ export default function TokenDetailScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Overflow Menu */}
+      <Modal
+        visible={showMoreMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMoreMenu(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setShowMoreMenu(false)}>
+          <View style={styles.menuContent}>
+            {(isInCustody || isListed) && (
+              <Pressable style={styles.menuItem} onPress={() => {
+                setShowMoreMenu(false);
+                handleSellEntry();
+              }}>
+                <Text style={styles.menuItemText}>{isListed ? 'Update Price' : 'Sell'}</Text>
+              </Pressable>
+            )}
+            {isListed && (
+              <Pressable style={styles.menuItem} onPress={() => {
+                setShowMoreMenu(false);
+                handleUnlist();
+              }}>
+                <Text style={styles.menuItemText}>Remove Listing</Text>
+              </Pressable>
+            )}
+            <Pressable style={styles.menuItem} onPress={() => {
+              setShowMoreMenu(false);
+              handleRemove();
+            }}>
+              <Text style={styles.menuItemDanger}>Remove from Portfolio</Text>
+            </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => setShowMoreMenu(false)}>
+              <Text style={styles.menuItemText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
@@ -545,6 +595,16 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  moreButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreButtonText: {
+    fontSize: 18,
+    color: theme.textPrimary,
   },
   scrollView: {
     flex: 1,
@@ -615,6 +675,9 @@ const styles = StyleSheet.create({
   custodyBadgeHome: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
+  custodyBadgeShipping: {
+    backgroundColor: 'rgba(245, 166, 35, 0.2)',
+  },
   custodyBadgeText: {
     fontSize: 12,
     fontWeight: '600',
@@ -641,34 +704,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     marginTop: 4,
-  },
-  cashOutSection: {
-    marginTop: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-    width: '100%',
-    paddingHorizontal: 32,
-  },
-  cashOutRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cashOutLabel: {
-    fontSize: 15,
-    color: theme.textSecondary,
-  },
-  cashOutValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  spreadNote: {
-    fontSize: 12,
-    color: theme.textTertiary,
-    textAlign: 'center',
-    marginTop: 8,
   },
   statusNote: {
     fontSize: 15,
@@ -699,16 +734,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
-  actionButtonDisabled: {
-    backgroundColor: theme.card,
-  },
   actionButtonText: {
     fontSize: 17,
     fontWeight: '600',
     color: theme.textInverse,
-  },
-  actionButtonTextDisabled: {
-    color: theme.textSecondary,
   },
   secondaryButton: {
     backgroundColor: theme.card,
@@ -732,15 +761,57 @@ const styles = StyleSheet.create({
     color: theme.success,
     fontWeight: '500',
   },
-  dangerButton: {
-    marginTop: 16,
-    paddingVertical: 12,
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  menuContent: {
+    backgroundColor: theme.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    paddingBottom: 32,
+  },
+  menuItem: {
+    paddingVertical: 14,
     alignItems: 'center',
   },
-  dangerButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  menuItemDanger: {
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.error,
+  },
+  shippingInfo: {
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(245, 166, 35, 0.1)',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  shippingInfoLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  shippingInfoCode: {
+    fontFamily: fonts.heading,
+    fontSize: 28,
+    color: '#F5A623',
+    letterSpacing: 3,
+    marginBottom: 8,
+  },
+  shippingInfoNote: {
+    fontSize: 13,
+    color: theme.textSecondary,
   },
   // Modal styles
   modalOverlay: {

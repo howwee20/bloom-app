@@ -256,7 +256,10 @@ export default function ExchangeScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header Row */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Exchange</Text>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backArrow}>←</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>Market</Text>
         <Pressable
           style={styles.searchButton}
           onPress={() => {
@@ -364,13 +367,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backArrow: {
+    fontSize: 24,
+    color: theme.accent,
+  },
   headerTitle: {
     fontFamily: fonts.heading,
     fontSize: 20,
     color: theme.textPrimary,
   },
   searchButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchIcon: {
     fontSize: 20,

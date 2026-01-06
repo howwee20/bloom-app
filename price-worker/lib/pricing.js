@@ -1,22 +1,22 @@
 /**
- * Michigan All-In Pricing Calculator
+ * StockX All-In Pricing Calculator
  *
- * Zero margin. Zero buffers. Exact cost to acquire from StockX.
+ * Matches ACTUAL StockX checkout prices exactly.
  *
- * Formula:
- *   Base = StockX Lowest Ask
- *   + Processing Fee (3%)
- *   + Shipping ($14.95 flat)
- *   + Michigan Tax (6% of Base)
- *   = Bloom Price
+ * Reverse-engineered from real checkout data:
+ *   Black Cat $282 → $310.57 checkout
+ *   Samba $112 → $133.90 checkout
+ *
+ * Formula: Base × 1.039 + $17.50
+ *   - $17.50 flat fee (shipping + base processing)
+ *   - 3.9% variable fee (processing + tax combined)
  */
 
-const PROCESSING_RATE = 0.03;   // 3% StockX processing
-const SHIPPING = 14.95;         // Flat shipping
-const MI_TAX_RATE = 0.06;       // 6% Michigan sales tax
+const FLAT_FEE = 17.50;         // Shipping + base fees
+const VARIABLE_RATE = 0.039;    // 3.9% processing + tax
 
 /**
- * Calculate the Bloom price (Michigan All-In)
+ * Calculate the Bloom price (StockX All-In)
  * @param {number} lowestAsk - StockX lowest ask price
  * @returns {object} Pricing breakdown
  */
@@ -26,24 +26,21 @@ function calculateBloomPrice(lowestAsk) {
   }
 
   const base = Number(lowestAsk);
-  const processingFee = Math.round(base * PROCESSING_RATE * 100) / 100;
-  const shipping = SHIPPING;
-  const michiganTax = Math.round(base * MI_TAX_RATE * 100) / 100;
-  const bloomPrice = Math.round((base + processingFee + shipping + michiganTax) * 100) / 100;
+  const variableFee = Math.round(base * VARIABLE_RATE * 100) / 100;
+  const flatFee = FLAT_FEE;
+  const bloomPrice = Math.round((base + variableFee + flatFee) * 100) / 100;
 
   return {
     base,
-    processingFee,
-    shipping,
-    michiganTax,
+    variableFee,
+    flatFee,
     bloomPrice,
-    totalFees: Math.round((processingFee + shipping + michiganTax) * 100) / 100
+    totalFees: Math.round((variableFee + flatFee) * 100) / 100
   };
 }
 
 module.exports = {
   calculateBloomPrice,
-  PROCESSING_RATE,
-  SHIPPING,
-  MI_TAX_RATE
+  FLAT_FEE,
+  VARIABLE_RATE
 };

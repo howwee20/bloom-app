@@ -161,7 +161,7 @@ export default function OrderDetailScreen() {
 
     // Verified in vault step (all orders are now vault custody)
     steps.push({
-      label: 'Verified in Vault',
+      label: 'Verified at Bloom',
       date: order.token_status === 'active' ? 'Complete' : null,
       completed: order.token_status === 'active',
     });
@@ -259,7 +259,7 @@ export default function OrderDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>CUSTODY</Text>
           <View style={styles.deliveryCard}>
-            <Text style={styles.deliveryType}>Bloom Vault</Text>
+            <Text style={styles.deliveryType}>Bloom Custody</Text>
             <Text style={styles.deliveryDescription}>
               Securely stored, exchange eligible
             </Text>

@@ -1,5 +1,5 @@
 // supabase/functions/update-prices/index.ts
-// Edge Function to fetch and update StockX prices with ALIVE Protocol fallback
+// Edge Function to fetch and update StockX prices (real data only)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { Hono } from 'https://deno.land/x/hono@v3.7.4/mod.ts'
 import { cors } from 'https://esm.sh/hono@v3.7.4/cors'
@@ -8,51 +8,47 @@ const app = new Hono()
 app.use('*', cors())
 
 // Default config (used if database config unavailable)
-// Calibrated from real StockX Michigan checkout screenshot
+// Reverse-engineered from ACTUAL StockX checkout prices (Jan 2026):
+//   Black Cat $282 → $310.57 checkout
+//   Samba $112 → $133.90 checkout
+// Formula: All-In = Base × 1.039 + $17.50
 const DEFAULT_CONFIG = {
-  processing_rate: 0.04831,      // 4.831% processing fee
-  tax_rate: 0.06,                // 6% Michigan sales tax
-  shipping_sneakers: 14.95,      // Flat shipping
-  alive_fluctuation: 0.015,      // +/- 1.5%
+  flat_fee: 17.50,              // Flat fee (shipping + base processing)
+  variable_rate: 0.039,         // 3.9% variable (processing + tax)
 };
 
 interface PricingConfig {
-  processing_rate: number;
-  tax_rate: number;
-  shipping_sneakers: number;
-  alive_fluctuation: number;
+  flat_fee: number;
+  variable_rate: number;
 }
+
+const MAX_RUNTIME_MS = 25000;
+const MAX_RETRIES = 2;
+const BASE_BACKOFF_MS = 500;
+const MAX_CONCURRENCY = 3;
+const CHECK_MARGIN_MS = 1500;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const shouldStop = (deadlineMs: number) => Date.now() >= deadlineMs - CHECK_MARGIN_MS;
 
 interface PriceBreakdown {
   base: number;
-  processingFee: number;
-  salesTax: number;
-  shippingFee: number;
+  variableFee: number;
+  flatFee: number;
   total: number;
 }
 
-// ALIVE Protocol: Synthetic Market Fluctuation
-// When StockX rate-limits us, fluctuate price by +/- X% to keep the market feeling "alive"
-function applySyntheticFluctuation(currentPrice: number, fluctuationRange: number): number {
-  const fluctuation = (Math.random() * fluctuationRange * 2) - fluctuationRange;
-  const newPrice = currentPrice * (1 + fluctuation);
-  return Math.round(newPrice * 100) / 100;
-}
-
-// Calculate all-in buyer price from lowest ask (Michigan formula - ADDITIVE)
-// Formula: total = base + processingFee + salesTax + shippingFee
-// Where: salesTax = (base + processingFee) × taxRate
+// Calculate all-in buyer price from lowest ask
+// Formula: All-In = Base × 1.039 + $17.50 (matches actual StockX checkout)
 function calculateAllInPrice(base: number, config: PricingConfig): PriceBreakdown {
-  const processingFee = Math.round(base * config.processing_rate * 100) / 100;
-  const salesTax = Math.round((base + processingFee) * config.tax_rate * 100) / 100;
-  const shippingFee = config.shipping_sneakers;
-  const total = Math.round((base + processingFee + salesTax + shippingFee) * 100) / 100;
+  const variableFee = Math.round(base * config.variable_rate * 100) / 100;
+  const flatFee = config.flat_fee;
+  const total = Math.round((base + variableFee + flatFee) * 100) / 100;
 
   return {
     base,
-    processingFee,
-    salesTax,
-    shippingFee,
+    variableFee,
+    flatFee,
     total,
   };
 }
@@ -62,7 +58,7 @@ async function getPricingConfig(supabase: any): Promise<PricingConfig> {
   try {
     const { data, error } = await supabase
       .from('pricing_config')
-      .select('processing_rate, tax_rate, shipping_sneakers, alive_fluctuation')
+      .select('flat_fee, variable_rate')
       .single();
 
     if (error || !data) {
@@ -71,10 +67,8 @@ async function getPricingConfig(supabase: any): Promise<PricingConfig> {
     }
 
     return {
-      processing_rate: Number(data.processing_rate) || DEFAULT_CONFIG.processing_rate,
-      tax_rate: Number(data.tax_rate) || DEFAULT_CONFIG.tax_rate,
-      shipping_sneakers: Number(data.shipping_sneakers) || DEFAULT_CONFIG.shipping_sneakers,
-      alive_fluctuation: Number(data.alive_fluctuation) || DEFAULT_CONFIG.alive_fluctuation,
+      flat_fee: Number(data.flat_fee) || DEFAULT_CONFIG.flat_fee,
+      variable_rate: Number(data.variable_rate) || DEFAULT_CONFIG.variable_rate,
     };
   } catch (e) {
     console.log('Error fetching config, using defaults:', e);
@@ -89,11 +83,16 @@ interface PriceResult {
   new_price: number;
   price_change: number;
   price_change_percent: number;
-  source: 'stockx' | 'alive_protocol';
+  source: 'stockx' | 'stockx_unavailable';
   breakdown?: PriceBreakdown;
   success: boolean;
   error?: string;
 }
+
+type UpdateOutcome = PriceResult & {
+  changed: boolean;
+  checked_at: string;
+};
 
 // Fetch base price from StockX for a specific product and size
 // Returns just the lowest ask - all-in calculation happens later with config
@@ -103,7 +102,7 @@ async function fetchStockXBasePrice(slug: string, size: string): Promise<number 
     const url = `https://stockx.com/api/products/${slug}?includes=market`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
     const response = await fetch(url, {
       headers: {
@@ -148,7 +147,7 @@ async function fetchStockXBasePrice(slug: string, size: string): Promise<number 
 
     return lowestAsk > 0 ? lowestAsk : null;
   } catch (error) {
-    // Timeout or network error - trigger ALIVE protocol
+    // Timeout or network error - treat as unavailable
     console.error('Error fetching StockX price:', error.message || error);
     return null;
   }
@@ -160,7 +159,7 @@ async function fetchStockXBasePriceBrowse(sku: string, size: string): Promise<nu
     const url = `https://stockx.com/api/browse?_search=${encodeURIComponent(sku)}`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
     const response = await fetch(url, {
       headers: {
@@ -202,6 +201,38 @@ async function fetchStockXBasePriceBrowse(sku: string, size: string): Promise<nu
   }
 }
 
+async function fetchBasePriceWithRetry(
+  asset: { stockx_slug: string | null; stockx_sku: string | null; size: string | null },
+  deadlineMs: number
+): Promise<number | null> {
+  let attempt = 0;
+  let backoffMs = BASE_BACKOFF_MS;
+
+  while (attempt <= MAX_RETRIES && !shouldStop(deadlineMs)) {
+    let basePrice: number | null = null;
+
+    if (asset.stockx_slug) {
+      basePrice = await fetchStockXBasePrice(asset.stockx_slug, asset.size || '');
+    }
+
+    if (basePrice === null && asset.stockx_sku) {
+      basePrice = await fetchStockXBasePriceBrowse(asset.stockx_sku, asset.size || '');
+    }
+
+    if (basePrice !== null) {
+      return basePrice;
+    }
+
+    attempt += 1;
+    if (attempt <= MAX_RETRIES && !shouldStop(deadlineMs)) {
+      await sleep(backoffMs);
+      backoffMs *= 2;
+    }
+  }
+
+  return null;
+}
+
 // Update price for a single asset
 app.post('/single', async (c) => {
   try {
@@ -229,65 +260,8 @@ app.post('/single', async (c) => {
     if (assetError || !asset) {
       return c.json({ error: 'Asset not found' }, 404);
     }
-
-    const previousPrice = asset.price || 0;
-    let newPrice = previousPrice;
-    let source: 'stockx' | 'alive_protocol' = 'alive_protocol';
-    let basePrice: number | null = null;
-    let breakdown: PriceBreakdown | undefined;
-
-    // Try to fetch real price from StockX
-    if (asset.stockx_slug) {
-      basePrice = await fetchStockXBasePrice(asset.stockx_slug, asset.size || '');
-    }
-
-    if (basePrice === null && asset.stockx_sku) {
-      basePrice = await fetchStockXBasePriceBrowse(asset.stockx_sku, asset.size || '');
-    }
-
-    if (basePrice !== null) {
-      // Real price fetched - calculate all-in with correct formula
-      breakdown = calculateAllInPrice(basePrice, config);
-      newPrice = breakdown.total;
-      source = 'stockx';
-    } else {
-      // ALIVE Protocol: Apply synthetic fluctuation
-      console.log(`ALIVE Protocol activated for ${asset.name || asset.id}`);
-      newPrice = applySyntheticFluctuation(previousPrice, config.alive_fluctuation);
-      source = 'alive_protocol';
-    }
-
-    // Insert into price_history
-    await supabaseAdmin.from('price_history').insert({
-      asset_id: asset.id,
-      price: newPrice,
-      fees_estimate: breakdown ? (breakdown.processingFee + breakdown.salesTax + breakdown.shippingFee) : 0,
-      source: source,
-    });
-
-    // Update asset current price
-    await supabaseAdmin
-      .from('assets')
-      .update({
-        price: newPrice,
-        last_price_update: new Date().toISOString(),
-      })
-      .eq('id', asset.id);
-
-    const priceChange = newPrice - previousPrice;
-    const priceChangePercent = previousPrice > 0 ? (priceChange / previousPrice) * 100 : 0;
-
-    const result: PriceResult = {
-      asset_id: asset.id,
-      name: asset.name,
-      previous_price: previousPrice,
-      new_price: newPrice,
-      price_change: Math.round(priceChange * 100) / 100,
-      price_change_percent: Math.round(priceChangePercent * 100) / 100,
-      source: source,
-      breakdown: breakdown,
-      success: true,
-    };
+    const deadlineMs = Date.now() + MAX_RUNTIME_MS;
+    const result = await updateAssetPrice(asset, supabaseAdmin, config, deadlineMs);
 
     return c.json(result);
   } catch (error) {
@@ -296,150 +270,320 @@ app.post('/single', async (c) => {
   }
 });
 
-// Update prices for all assets with StockX SKU
+type CursorPayload = {
+  phase: 'nulls' | 'checked';
+  id: string;
+  lastPriceCheckedAt: string | null;
+  runStartedAt: string;
+};
+
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 25;
+const MIN_LIMIT = 10;
+const MAX_FETCH = 75;
+
+const encodeCursor = (payload: CursorPayload) => btoa(JSON.stringify(payload));
+const decodeCursor = (cursor?: string): CursorPayload | null => {
+  if (!cursor) return null;
+  try {
+    return JSON.parse(atob(cursor));
+  } catch {
+    return null;
+  }
+};
+
+const isAssetActive = (asset: any, activeSkus: Set<string>) => {
+  return Boolean(asset.owner_id) || (asset.stockx_sku && activeSkus.has(asset.stockx_sku));
+};
+
+const fetchActiveSkus = async (supabaseAdmin: any) => {
+  const { data } = await supabaseAdmin
+    .from('tokens')
+    .select('sku, match_status');
+  const skus = (data || [])
+    .filter((row: any) => row.match_status !== 'pending')
+    .map((row: any) => row.sku)
+    .filter((sku: string) => Boolean(sku));
+  return new Set(skus);
+};
+
+const updateAssetPrice = async (
+  asset: any,
+  supabaseAdmin: any,
+  config: PricingConfig,
+  deadlineMs: number
+): Promise<UpdateOutcome> => {
+  const previousPrice = asset.price || 0;
+  let newPrice = previousPrice;
+  let source: 'stockx' | 'stockx_unavailable' = 'stockx_unavailable';
+  let breakdown: PriceBreakdown | undefined;
+  const checkedAt = new Date().toISOString();
+
+  const basePrice = await fetchBasePriceWithRetry(asset, deadlineMs);
+
+  if (basePrice !== null) {
+    breakdown = calculateAllInPrice(basePrice, config);
+    newPrice = breakdown.total;
+    source = 'stockx';
+
+    const roundedPrevious = Math.round(previousPrice * 100) / 100;
+    const roundedNew = Math.round(newPrice * 100) / 100;
+    const priceChanged = roundedNew !== roundedPrevious;
+
+    if (priceChanged) {
+      await supabaseAdmin.from('price_history').insert({
+        asset_id: asset.id,
+        price: newPrice,
+        fees_estimate: breakdown ? (breakdown.variableFee + breakdown.flatFee) : 0,
+        source: source,
+      });
+
+      await supabaseAdmin
+        .from('assets')
+        .update({
+          price: newPrice,
+          last_price_update: checkedAt,
+          last_price_updated_at: checkedAt,
+          last_price_checked_at: checkedAt,
+        })
+        .eq('id', asset.id);
+    } else {
+      await supabaseAdmin
+        .from('assets')
+        .update({
+          last_price_checked_at: checkedAt,
+        })
+        .eq('id', asset.id);
+    }
+  } else {
+    await supabaseAdmin
+      .from('assets')
+      .update({
+        last_price_checked_at: checkedAt,
+      })
+      .eq('id', asset.id);
+  }
+
+  const priceChange = newPrice - previousPrice;
+  const priceChangePercent = previousPrice > 0 ? (priceChange / previousPrice) * 100 : 0;
+  const changed = source === 'stockx' && Math.round(newPrice * 100) / 100 !== Math.round(previousPrice * 100) / 100;
+
+  return {
+    asset_id: asset.id,
+    name: asset.name,
+    previous_price: previousPrice,
+    new_price: newPrice,
+    price_change: Math.round(priceChange * 100) / 100,
+    price_change_percent: Math.round(priceChangePercent * 100) / 100,
+    source,
+    breakdown,
+    success: source === 'stockx',
+    error: source === 'stockx' ? undefined : 'StockX unavailable',
+    changed,
+    checked_at: checkedAt,
+  };
+};
+
+// Update prices for active portfolio assets
 app.post('/all', async (c) => {
+  const start = Date.now();
   try {
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Fetch pricing config from database
+    const requestBody = await c.req.json().catch(() => ({}));
+    const requestedLimit = Number(requestBody.limit);
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(MIN_LIMIT, Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : DEFAULT_LIMIT)
+    );
+    const cursorPayload = decodeCursor(requestBody.cursor);
+    const runStartedAt = cursorPayload?.runStartedAt || new Date().toISOString();
+    const phase = cursorPayload?.phase || 'nulls';
+
     const config = await getPricingConfig(supabaseAdmin);
+    const activeSkus = await fetchActiveSkus(supabaseAdmin);
+    const results: UpdateOutcome[] = [];
+    let processedCount = 0;
+    let updatedCount = 0;
+    let failedCount = 0;
+    const deadlineMs = start + MAX_RUNTIME_MS;
 
-    // Fetch all assets with StockX info
-    const { data: assets, error: assetsError } = await supabaseAdmin
-      .from('assets')
-      .select('id, name, stockx_sku, stockx_slug, size, price')
-      .or('stockx_sku.not.is.null,stockx_slug.not.is.null');
+    const baseSelect = 'id, name, stockx_sku, stockx_slug, size, price, owner_id, last_price_checked_at';
 
-    if (assetsError) {
-      return c.json({ error: assetsError.message }, 500);
+    const fetchLimit = Math.min(limit * 3, MAX_FETCH);
+    let assets: any[] = [];
+    let nextCursor: string | null = null;
+    let stockxSuccesses = 0;
+
+    if (phase === 'nulls') {
+      let query = supabaseAdmin
+        .from('assets')
+        .select(baseSelect)
+        .or('stockx_sku.not.is.null,stockx_slug.not.is.null')
+        .is('last_price_checked_at', null)
+        .order('id', { ascending: true })
+        .limit(fetchLimit);
+
+      if (cursorPayload?.id) {
+        query = query.gt('id', cursorPayload.id);
+      }
+
+      const { data: nullsData } = await query;
+      assets = (nullsData || [])
+        .filter((asset: any) => isAssetActive(asset, activeSkus))
+        .slice(0, limit)
+        .map((asset: any) => ({ ...asset, __phase: 'nulls' }));
+
+      if (assets.length === limit) {
+        const last = assets[assets.length - 1];
+        nextCursor = encodeCursor({
+          phase: 'nulls',
+          id: last.id,
+          lastPriceCheckedAt: null,
+          runStartedAt,
+        });
+      }
     }
 
-    const results: PriceResult[] = [];
-    let stockxSuccesses = 0;
-    let aliveProtocolActivations = 0;
-
-    for (const asset of assets || []) {
-      const previousPrice = asset.price || 0;
-      let newPrice = previousPrice;
-      let source: 'stockx' | 'alive_protocol' = 'alive_protocol';
-      let basePrice: number | null = null;
-      let breakdown: PriceBreakdown | undefined;
-
-      // Try to fetch real price from StockX
-      if (asset.stockx_slug) {
-        basePrice = await fetchStockXBasePrice(asset.stockx_slug, asset.size || '');
-      }
-
-      if (basePrice === null && asset.stockx_sku) {
-        basePrice = await fetchStockXBasePriceBrowse(asset.stockx_sku, asset.size || '');
-      }
-
-      if (basePrice !== null) {
-        // Real price fetched - calculate all-in with correct formula
-        breakdown = calculateAllInPrice(basePrice, config);
-        newPrice = breakdown.total;
-        source = 'stockx';
-        stockxSuccesses++;
-      } else {
-        // ALIVE Protocol: Apply synthetic fluctuation
-        newPrice = applySyntheticFluctuation(previousPrice, config.alive_fluctuation);
-        source = 'alive_protocol';
-        aliveProtocolActivations++;
-      }
-
-      // Insert into price_history
-      await supabaseAdmin.from('price_history').insert({
-        asset_id: asset.id,
-        price: newPrice,
-        fees_estimate: breakdown ? (breakdown.processingFee + breakdown.salesTax + breakdown.shippingFee) : 0,
-        source: source,
-      });
-
-      // Update asset current price
-      await supabaseAdmin
+    if (assets.length < limit) {
+      const remaining = limit - assets.length;
+      let query = supabaseAdmin
         .from('assets')
-        .update({
-          price: newPrice,
-          last_price_update: new Date().toISOString(),
-        })
-        .eq('id', asset.id);
+        .select(baseSelect)
+        .or('stockx_sku.not.is.null,stockx_slug.not.is.null')
+        .not('last_price_checked_at', 'is', null)
+        .lte('last_price_checked_at', runStartedAt)
+        .order('last_price_checked_at', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(fetchLimit);
 
-      const priceChange = newPrice - previousPrice;
-      const priceChangePercent = previousPrice > 0 ? (priceChange / previousPrice) * 100 : 0;
+      if (cursorPayload?.phase === 'checked' && cursorPayload.lastPriceCheckedAt) {
+        query = query.or(
+          `last_price_checked_at.gt.${cursorPayload.lastPriceCheckedAt},and(last_price_checked_at.eq.${cursorPayload.lastPriceCheckedAt},id.gt.${cursorPayload.id})`
+        );
+      }
 
-      results.push({
-        asset_id: asset.id,
-        name: asset.name,
-        previous_price: previousPrice,
-        new_price: newPrice,
-        price_change: Math.round(priceChange * 100) / 100,
-        price_change_percent: Math.round(priceChangePercent * 100) / 100,
-        source: source,
-        breakdown: breakdown,
-        success: true,
+      const { data: checkedData } = await query;
+      const selected = (checkedData || [])
+        .filter((asset: any) => isAssetActive(asset, activeSkus))
+        .slice(0, remaining)
+        .map((asset: any) => ({ ...asset, __phase: 'checked' }));
+
+      assets = assets.concat(selected);
+
+      if (selected.length === remaining && selected.length > 0) {
+        const last = assets[assets.length - 1];
+        nextCursor = encodeCursor({
+          phase: 'checked',
+          id: last.id,
+          lastPriceCheckedAt: last.last_price_checked_at,
+          runStartedAt,
+        });
+      }
+    }
+
+    const concurrency = Math.min(MAX_CONCURRENCY, assets.length);
+    let index = 0;
+    let maxProcessedIndex = -1;
+
+    const workers = Array.from({ length: concurrency }).map(async () => {
+      while (index < assets.length && !shouldStop(deadlineMs)) {
+        const assetIndex = index++;
+        const asset = assets[assetIndex];
+        const result = await updateAssetPrice(asset, supabaseAdmin, config, deadlineMs);
+        results.push(result);
+        processedCount += 1;
+        if (result.source === 'stockx') {
+          stockxSuccesses++;
+        }
+        if (result.changed) {
+          updatedCount += 1;
+        }
+        if (!result.success) {
+          failedCount += 1;
+        }
+        if (assetIndex > maxProcessedIndex) {
+          maxProcessedIndex = assetIndex;
+        }
+        await sleep(250);
+      }
+    });
+
+    await Promise.all(workers);
+
+    if (maxProcessedIndex >= 0 && maxProcessedIndex < assets.length - 1) {
+      const last = assets[maxProcessedIndex];
+      nextCursor = encodeCursor({
+        phase: last.__phase,
+        id: last.id,
+        lastPriceCheckedAt: last.last_price_checked_at || null,
+        runStartedAt,
       });
+    }
 
-      // Rate limit: wait 500ms between requests to be nice to StockX
-      await new Promise(resolve => setTimeout(resolve, 500));
+    const { data: tokenSyncResult, error: tokenSyncError } = await supabaseAdmin.rpc('sync_token_prices_from_assets');
+    const tokensSynced = tokenSyncResult || 0;
+    if (tokenSyncError) {
+      console.error('Token sync error:', tokenSyncError);
     }
 
     return c.json({
-      message: 'Price update complete',
-      total: results.length,
+      ok: true,
+      processed: processedCount,
+      updated: updatedCount,
+      failed: failedCount,
+      tokens_synced: tokensSynced,
       stockx_fetched: stockxSuccesses,
-      alive_protocol_used: aliveProtocolActivations,
-      alive_protocol_explanation: `When StockX is unavailable, prices fluctuate +/- ${config.alive_fluctuation * 100}% to simulate market activity`,
+      durationMs: Date.now() - start,
+      nextCursor,
       pricing_config: {
-        processing_rate: `${config.processing_rate * 100}%`,
-        tax_rate: `${config.tax_rate * 100}%`,
-        shipping: config.shipping_sneakers,
+        variable_rate: `${config.variable_rate * 100}%`,
+        flat_fee: `$${config.flat_fee}`,
+        formula: 'base × 1.039 + $17.50',
       },
       results,
     });
   } catch (error) {
     console.error('Error updating all prices:', error);
-    return c.json({ error: error.message }, 500);
+    return c.json({ ok: false, error: error.message, durationMs: Date.now() - start }, 500);
   }
 });
 
 // Health check / manual trigger endpoint
 app.get('/', async (c) => {
-  // Calculate example to show in response
-  const exampleBase = 302;
-  const exampleBreakdown = calculateAllInPrice(exampleBase, DEFAULT_CONFIG);
+  const exampleBlackCat = calculateAllInPrice(282, DEFAULT_CONFIG);
+  const exampleSamba = calculateAllInPrice(112, DEFAULT_CONFIG);
 
   return c.json({
     status: 'ok',
-    message: 'Price update function ready with ALIVE Protocol',
+    message: 'Price update function ready',
     pricing_formula: {
-      description: 'All-in Buyer Price - Michigan (what you would pay at checkout)',
-      formula: 'total = base + processingFee + salesTax + shippingFee',
+      description: 'All-in Buyer Price (matches actual StockX checkout)',
+      formula: 'total = base × 1.039 + $17.50',
       details: {
-        processingFee: 'base × 4.831%',
-        salesTax: '(base + processingFee) × 6%',
-        shippingFee: '$14.95',
+        variableFee: 'base × 3.9%',
+        flatFee: '$17.50',
       },
-      example: {
-        base: exampleBase,
-        processingFee: exampleBreakdown.processingFee,
-        salesTax: exampleBreakdown.salesTax,
-        shippingFee: exampleBreakdown.shippingFee,
-        total: exampleBreakdown.total,
-        note: 'Calibrated from real StockX Michigan checkout screenshot',
-      },
-    },
-    alive_protocol: {
-      description: 'Synthetic market fluctuation when StockX is unavailable',
-      trigger: 'HTTP 403, 429, timeout, or network error from StockX',
-      behavior: `Price fluctuates randomly by +/- ${DEFAULT_CONFIG.alive_fluctuation * 100}%`,
-      purpose: 'Keeps the market feeling alive and P&L moving even when rate-limited',
+      examples: [
+        {
+          item: 'Black Cat ($282 base)',
+          calculated: exampleBlackCat.total,
+          stockx_actual: 310.57,
+        },
+        {
+          item: 'Samba ($112 base)',
+          calculated: exampleSamba.total,
+          stockx_actual: 133.90,
+        },
+      ],
+      note: 'Reverse-engineered from actual StockX checkout (Jan 2026)',
     },
     endpoints: {
       'POST /single': 'Update single asset price (body: { asset_id })',
-      'POST /all': 'Update all assets with StockX SKU',
+      'POST /all': 'Update active assets (body: { limit?, cursor? })',
     }
   });
 });

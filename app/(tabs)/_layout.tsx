@@ -18,11 +18,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: theme.accent,
         tabBarInactiveTintColor: theme.tabIconDefault,
         tabBarStyle: {
-          backgroundColor: theme.tabBar,
-          borderTopColor: theme.tabBarBorder,
-          borderTopWidth: 1,
-          paddingTop: 8,
-          height: 85,
+          display: 'none', // Wallet is the product - no tabs needed
         },
         tabBarLabelStyle: {
           fontFamily: fonts.heading,

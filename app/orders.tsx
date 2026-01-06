@@ -159,7 +159,7 @@ export default function OrdersScreen() {
             <Text style={styles.productName} numberOfLines={2}>{item.product_name}</Text>
             <Text style={styles.productSize}>Size {item.size}</Text>
             <View style={styles.laneBadge}>
-              <Text style={styles.laneBadgeText}>Vault Custody</Text>
+              <Text style={styles.laneBadgeText}>Bloom Custody</Text>
             </View>
           </View>
 

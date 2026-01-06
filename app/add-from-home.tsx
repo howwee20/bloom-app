@@ -83,11 +83,6 @@ export default function AddFromHomeScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!purchasePrice || parseFloat(purchasePrice) <= 0) {
-      setError('Please enter what you paid');
-      return;
-    }
-
     if (!selectedProduct && !manualName) {
       setError('Please select a product or enter details manually');
       return;
@@ -97,12 +92,15 @@ export default function AddFromHomeScreen() {
     setError(null);
 
     try {
+      // Purchase price is optional - use 0 if not provided
+      const price = purchasePrice ? parseFloat(purchasePrice) : 0;
+
       const { data, error: rpcError } = await supabase.rpc('add_home_token', {
         p_sku: selectedProduct?.sku || null,
         p_product_name: selectedProduct?.title || manualName,
         p_size: selectedSize,
         p_product_image_url: selectedProduct?.imageUrl || null,
-        p_purchase_price: parseFloat(purchasePrice),
+        p_purchase_price: price,
       });
 
       if (rpcError) throw rpcError;
@@ -117,7 +115,7 @@ export default function AddFromHomeScreen() {
     }
   };
 
-  const canSubmit = (selectedProduct || manualName) && purchasePrice && parseFloat(purchasePrice) > 0;
+  const canSubmit = (selectedProduct || manualName);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -237,7 +235,7 @@ export default function AddFromHomeScreen() {
 
           {/* Purchase Price */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>What did you pay?</Text>
+            <Text style={styles.sectionLabel}>What did you pay? (optional)</Text>
             <View style={styles.priceInputContainer}>
               <Text style={styles.priceCurrency}>$</Text>
               <TextInput
