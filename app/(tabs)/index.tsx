@@ -1473,9 +1473,16 @@ const styles = StyleSheet.create({
   },
   filterDropdownOptions: {
     marginTop: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 4,
+    borderWidth: 1,
+    borderColor: theme.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   filterDropdownOption: {
     paddingHorizontal: 14,
@@ -1646,15 +1653,16 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: theme.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 48,
+    maxHeight: '85%',
   },
   modalTitle: {
     fontSize: 20,
@@ -1664,10 +1672,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalOption: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   sellPickRow: {
     flexDirection: 'row',
@@ -1885,12 +1895,12 @@ const styles = StyleSheet.create({
     color: theme.textPrimary,
   },
   sellOptionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: theme.backgroundSecondary,
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: theme.border,
   },
   sellOptionHeader: {
     flexDirection: 'row',
