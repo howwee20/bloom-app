@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Dimensions,
   Image,
   Linking,
@@ -38,6 +39,7 @@ interface Asset {
   description: string | null;
   provenance: string | null;
   category: string | null;
+  stockx_sku: string | null;
   last_price_update: string | null;
   last_price_checked_at: string | null;
   last_price_updated_at: string | null;
@@ -52,6 +54,15 @@ interface PricePoint {
   recorded_at: string;
 }
 
+interface ExchangeListing {
+  id: string;
+  sku: string;
+  product_name: string;
+  size: string | null;
+  product_image_url: string | null;
+  listing_price: number;
+}
+
 export default function AssetDetailScreen() {
   const { id, sell } = useLocalSearchParams<{ id: string; sell?: string }>();
   const { session } = useAuth();
@@ -64,6 +75,10 @@ export default function AssetDetailScreen() {
   const [imageError, setImageError] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [sellTriggered, setSellTriggered] = useState(false);
+  const [showBuyIntent, setShowBuyIntent] = useState(false);
+  const [showHomeBuyOptions, setShowHomeBuyOptions] = useState(false);
+  const [matchingListing, setMatchingListing] = useState<ExchangeListing | null>(null);
+  const [matchingListingLoading, setMatchingListingLoading] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertType, setAlertType] = useState<'above' | 'below'>('above');
   const [alertThreshold, setAlertThreshold] = useState('');
@@ -235,10 +250,35 @@ export default function AssetDetailScreen() {
   const hasChange = asset?.price_change !== null && asset?.price_change !== 0;
   const isPositive = (asset?.price_change || 0) >= 0;
   const changeColor = hasChange ? (isPositive ? theme.success : theme.error) : theme.textSecondary;
+  const canBuy = hasFixedSize || Boolean(selectedSize);
 
   // Check if price is stale (older than 4 hours)
   const isStale = !asset?.last_price_update ||
     ((Date.now() - new Date(asset.last_price_update).getTime()) / 60000) > STALE_MINUTES;
+
+  const buildSearchQuery = () => {
+    if (!asset) return '';
+    const size = hasFixedSize ? asset.size : selectedSize;
+    if (asset.stockx_sku) {
+      return size ? `${asset.stockx_sku} ${size}` : asset.stockx_sku;
+    }
+    if (size) return `${asset.name} ${size}`;
+    return asset.name;
+  };
+
+  const buildMarketplaceUrl = (marketplace: string) => {
+    const query = encodeURIComponent(buildSearchQuery());
+    switch (marketplace) {
+      case 'stockx':
+        return `https://stockx.com/search?s=${query}`;
+      case 'goat':
+        return `https://www.goat.com/search?query=${query}`;
+      case 'ebay':
+        return `https://www.ebay.com/sch/i.html?_nkw=${query}`;
+      default:
+        return `https://www.google.com/search?q=${query}`;
+    }
+  };
 
   useEffect(() => {
     if (!asset || sell !== '1' || sellTriggered) return;
@@ -246,6 +286,50 @@ export default function AssetDetailScreen() {
     setSellTriggered(true);
     handleSell();
   }, [asset, sell, sellTriggered, isOwned]);
+
+  useEffect(() => {
+    const loadMatchingListing = async () => {
+      if (!showBuyIntent || !session || !asset?.stockx_sku) {
+        setMatchingListing(null);
+        setMatchingListingLoading(false);
+        return;
+      }
+
+      const sizeToMatch = hasFixedSize ? asset.size : selectedSize;
+      if (!sizeToMatch) {
+        setMatchingListing(null);
+        setMatchingListingLoading(false);
+        return;
+      }
+
+      try {
+        setMatchingListingLoading(true);
+        const { data, error } = await supabase.rpc('get_exchange_listings');
+        if (error) throw error;
+
+        const matches = (data || []).filter((listing: any) =>
+          listing.sku === asset.stockx_sku && listing.size === sizeToMatch
+        );
+        if (matches.length === 0) {
+          setMatchingListing(null);
+          return;
+        }
+
+        const best = matches.reduce((lowest: any, current: any) => {
+          if (!lowest || current.listing_price < lowest.listing_price) return current;
+          return lowest;
+        }, null);
+        setMatchingListing(best);
+      } catch (e) {
+        console.error('Error loading exchange listings:', e);
+        setMatchingListing(null);
+      } finally {
+        setMatchingListingLoading(false);
+      }
+    };
+
+    loadMatchingListing();
+  }, [showBuyIntent, session, asset?.stockx_sku, selectedSize, hasFixedSize]);
 
   const handlePurchase = () => {
     if (!asset || !session) return;
@@ -424,7 +508,7 @@ export default function AssetDetailScreen() {
         {/* Size & Delivery Info */}
         <View style={styles.infoRow}>
           <Text style={styles.infoText}>
-            Size {hasFixedSize ? asset.size : selectedSize || '—'} · {asset.custody_status === 'in_vault' ? 'Instant' : 'Ships 5-7d'}
+            Size {hasFixedSize ? asset.size : selectedSize || '—'} · {asset.custody_status === 'in_vault' ? 'Instant transfer' : 'Ships to Bloom'}
           </Text>
         </View>
 
@@ -459,29 +543,25 @@ export default function AssetDetailScreen() {
       {/* Action Button */}
       {!isOwned && isAvailable && (
         <View style={styles.actionContainer}>
-          {isStale ? (
-            <View style={styles.staleBadge}>
-              <Text style={styles.staleText}>Price Updating...</Text>
-              <Text style={styles.staleSubtext}>Check back shortly</Text>
-            </View>
-          ) : (
-            <Pressable
+          <Pressable
+            style={[
+              styles.actionButton,
+              (purchasing || !canBuy) && styles.actionButtonDisabled
+            ]}
+            onPress={() => setShowBuyIntent(true)}
+            disabled={purchasing || !canBuy}
+          >
+            <Text
               style={[
-                styles.actionButton,
-                (purchasing || (!hasFixedSize && !selectedSize)) && styles.actionButtonDisabled
+                styles.actionButtonText,
+                (purchasing || !canBuy) && styles.actionButtonTextDisabled
               ]}
-              onPress={handlePurchase}
-              disabled={purchasing}
             >
-              <Text
-                style={[
-                  styles.actionButtonText,
-                  (purchasing || (!hasFixedSize && !selectedSize)) && styles.actionButtonTextDisabled
-                ]}
-              >
-                {purchasing ? 'Processing...' : !hasFixedSize && !selectedSize ? 'Select Size' : `Buy`}
-              </Text>
-            </Pressable>
+              {purchasing ? 'Processing...' : !canBuy ? 'Select Size' : 'Buy'}
+            </Text>
+          </Pressable>
+          {isStale && (
+            <Text style={styles.staleNote}>Bloom price updating · Route Home still available</Text>
           )}
         </View>
       )}
@@ -501,6 +581,146 @@ export default function AssetDetailScreen() {
           </View>
         </View>
       )}
+
+      {/* Buy Intent Modal */}
+      <Modal
+        visible={showBuyIntent}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBuyIntent(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowBuyIntent(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Buy</Text>
+            <Text style={styles.intentSubtitle}>Choose how you want to own it</Text>
+
+            {isStale && (
+              <View style={styles.intentNotice}>
+                <Text style={styles.intentNoticeText}>Bloom pricing is updating. Route Home is still available.</Text>
+              </View>
+            )}
+
+            <Pressable
+              style={styles.intentOption}
+              onPress={() => {
+                setShowBuyIntent(false);
+                setShowHomeBuyOptions(true);
+              }}
+            >
+              <Text style={styles.intentOptionTitle}>Route Home</Text>
+              <Text style={styles.intentOptionDesc}>Best all-in price across marketplaces</Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.intentOption,
+                styles.intentOptionPrimary,
+                (!canBuy || isStale) && styles.intentOptionDisabled,
+              ]}
+              onPress={() => {
+                if (!canBuy) {
+                  Alert.alert('Select Size', 'Choose a size to continue.');
+                  return;
+                }
+                if (isStale) {
+                  Alert.alert('Price Updating', 'Bloom pricing is updating. Try again shortly.');
+                  return;
+                }
+                setShowBuyIntent(false);
+                handlePurchase();
+              }}
+            >
+              <Text style={styles.intentOptionTitle}>Ship to Bloom</Text>
+              <Text style={styles.intentOptionDesc}>Bloom custody, verified on arrival</Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.intentOption,
+                styles.intentOptionSecondary,
+                (!canBuy || isStale || (!matchingListing && asset?.custody_status !== 'in_vault')) && styles.intentOptionDisabled,
+              ]}
+              onPress={() => {
+                if (!canBuy) {
+                  Alert.alert('Select Size', 'Choose a size to continue.');
+                  return;
+                }
+                if (isStale) {
+                  Alert.alert('Price Updating', 'Bloom pricing is updating. Try again shortly.');
+                  return;
+                }
+                if (asset?.custody_status === 'in_vault') {
+                  setShowBuyIntent(false);
+                  handlePurchase();
+                  return;
+                }
+                if (matchingListing) {
+                  setShowBuyIntent(false);
+                  router.push({ pathname: '/exchange/buy', params: { listing_id: matchingListing.id } });
+                  return;
+                }
+                Alert.alert('No instant inventory', 'No Bloom custody listing is available for this size yet.');
+              }}
+            >
+              <View style={styles.intentOptionRow}>
+                <Text style={styles.intentOptionTitle}>Instant Transfer</Text>
+                {matchingListingLoading && <ActivityIndicator size="small" color={theme.textPrimary} />}
+              </View>
+              <Text style={styles.intentOptionDesc}>
+                {asset?.custody_status === 'in_vault'
+                  ? 'Already in Bloom custody'
+                  : matchingListing
+                  ? `From ${formatPrice(matchingListing.listing_price)} in Bloom custody`
+                  : 'Bloom custody only'}
+              </Text>
+            </Pressable>
+
+            <Pressable style={styles.modalCancel} onPress={() => setShowBuyIntent(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Route Home Modal */}
+      <Modal
+        visible={showHomeBuyOptions}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowHomeBuyOptions(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowHomeBuyOptions(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Route Home</Text>
+            <Text style={styles.intentSubtitle}>We send you to the best marketplace</Text>
+
+            <View style={styles.intentCard}>
+              <Text style={styles.intentOptionTitle}>Your selection</Text>
+              <Text style={styles.intentOptionDesc}>
+                {asset.name} · {hasFixedSize ? asset.size : selectedSize || 'Size —'}
+              </Text>
+            </View>
+
+            {['stockx', 'goat', 'ebay'].map((marketplace) => (
+              <Pressable
+                key={marketplace}
+                style={styles.routeOption}
+                onPress={() => {
+                  Linking.openURL(buildMarketplaceUrl(marketplace));
+                  setShowHomeBuyOptions(false);
+                }}
+              >
+                <Text style={styles.routeOptionTitle}>{marketplace.toUpperCase()}</Text>
+                <Text style={styles.routeOptionDesc}>Open search and checkout</Text>
+              </Pressable>
+            ))}
+
+            <Pressable style={styles.modalCancel} onPress={() => setShowHomeBuyOptions(false)}>
+              <Text style={styles.modalCancelText}>Close</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Overflow Menu */}
       <Modal
@@ -812,6 +1032,12 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginTop: 4,
   },
+  staleNote: {
+    fontSize: 12,
+    color: theme.warning,
+    textAlign: 'center',
+    marginTop: 10,
+  },
   menuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
@@ -851,6 +1077,84 @@ const styles = StyleSheet.create({
     color: theme.textPrimary,
     textAlign: 'center',
     marginBottom: 16,
+  },
+  intentSubtitle: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  intentNotice: {
+    backgroundColor: theme.warningBg,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+  },
+  intentNoticeText: {
+    fontSize: 12,
+    color: theme.warning,
+    textAlign: 'center',
+  },
+  intentOption: {
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.borderLight,
+  },
+  intentOptionPrimary: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  intentOptionSecondary: {
+    backgroundColor: theme.card,
+    borderColor: theme.border,
+  },
+  intentOptionDisabled: {
+    opacity: 0.5,
+  },
+  intentOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  intentOptionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 4,
+  },
+  intentOptionDesc: {
+    fontSize: 12,
+    color: theme.textSecondary,
+  },
+  intentCard: {
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginBottom: 12,
+  },
+  routeOption: {
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: theme.borderLight,
+  },
+  routeOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    marginBottom: 4,
+  },
+  routeOptionDesc: {
+    fontSize: 12,
+    color: theme.textSecondary,
   },
   alertToggleRow: {
     flexDirection: 'row',

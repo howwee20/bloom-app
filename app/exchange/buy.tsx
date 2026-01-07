@@ -1,4 +1,4 @@
-// Buy Token Screen - Purchase a token from another user
+// Instant Transfer Screen - Purchase a Bloom custody listing
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
@@ -136,7 +136,7 @@ export default function BuyTokenScreen() {
           <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backArrow}>←</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Buy Token</Text>
+          <Text style={styles.headerTitle}>Instant Transfer</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.loadingContainer}>
@@ -153,7 +153,7 @@ export default function BuyTokenScreen() {
           <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backArrow}>←</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Buy Token</Text>
+          <Text style={styles.headerTitle}>Instant Transfer</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.errorContainer}>
@@ -171,7 +171,7 @@ export default function BuyTokenScreen() {
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Buy Token</Text>
+        <Text style={styles.headerTitle}>Instant Transfer</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -205,7 +205,7 @@ export default function BuyTokenScreen() {
             <Text style={styles.instantText}>Instant Transfer</Text>
           </View>
           <Text style={styles.instantDescription}>
-            This token transfers to your wallet immediately upon purchase. The physical item remains securely at Bloom.
+            This transfer settles instantly because the item is already in Bloom custody.
           </Text>
         </View>
 
@@ -225,7 +225,7 @@ export default function BuyTokenScreen() {
           <Text style={styles.sectionTitle}>Order Summary</Text>
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Token Price</Text>
+              <Text style={styles.summaryLabel}>Transfer Price</Text>
               <Text style={styles.summaryValue}>{formatPrice(listing.listing_price)}</Text>
             </View>
             <View style={styles.summaryRow}>
@@ -247,22 +247,22 @@ export default function BuyTokenScreen() {
             <View style={styles.optionRow}>
               <Text style={styles.optionIcon}>🏦</Text>
               <View style={styles.optionInfo}>
-                <Text style={styles.optionTitle}>Verified Ownership</Text>
-                <Text style={styles.optionDesc}>Token representing authenticated item at Bloom</Text>
+                <Text style={styles.optionTitle}>Bloom Custody</Text>
+                <Text style={styles.optionDesc}>Chain of custody never breaks</Text>
               </View>
             </View>
             <View style={styles.optionRow}>
               <Text style={styles.optionIcon}>🔄</Text>
               <View style={styles.optionInfo}>
-                <Text style={styles.optionTitle}>Instant Trading</Text>
-                <Text style={styles.optionDesc}>Resell immediately on the exchange</Text>
+                <Text style={styles.optionTitle}>Instant Settlement</Text>
+                <Text style={styles.optionDesc}>Ownership updates immediately</Text>
               </View>
             </View>
             <View style={styles.optionRow}>
               <Text style={styles.optionIcon}>📦</Text>
               <View style={styles.optionInfo}>
-                <Text style={styles.optionTitle}>Physical Redemption</Text>
-                <Text style={styles.optionDesc}>Ship the item to you anytime</Text>
+                <Text style={styles.optionTitle}>Ship to You</Text>
+                <Text style={styles.optionDesc}>Redeem anytime from your wallet</Text>
               </View>
             </View>
           </View>
@@ -270,7 +270,7 @@ export default function BuyTokenScreen() {
 
         {/* Terms */}
         <Text style={styles.termsText}>
-          By purchasing, you agree to Bloom's Terms of Service. Token transfers are instant and final.
+          By purchasing, you agree to Bloom's Terms of Service. Instant transfers are final.
         </Text>
       </ScrollView>
 

@@ -471,10 +471,10 @@ export default function TokenDetailScreen() {
           )}
 
           {isAcquiring && (
-            <Text style={styles.statusNote}>Arriving in 5-7 days</Text>
+            <Text style={styles.statusNote}>Arriving at Bloom in 5-7 days</Text>
           )}
           {isShippingToBloom && (
-            <Text style={styles.statusNote}>Ship to Bloom to enable instant resale</Text>
+            <Text style={styles.statusNote}>Ship to Bloom to enable instant transfer</Text>
           )}
           {isRedeeming && (
             <Text style={styles.statusNote}>

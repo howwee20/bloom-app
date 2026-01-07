@@ -103,7 +103,7 @@ export default function CheckoutSuccessScreen() {
 
         {/* Title - Ownership messaging */}
         <Text style={styles.title}>You Own It</Text>
-        <Text style={styles.subtitle}>Your ownership token is now in your portfolio</Text>
+        <Text style={styles.subtitle}>Your ownership now lives in Bloom</Text>
 
         {/* Product Card */}
         <View style={styles.productCard}>
@@ -127,7 +127,7 @@ export default function CheckoutSuccessScreen() {
         <View style={styles.nextCard}>
           <Text style={styles.nextTitle}>What's Next</Text>
           <Text style={styles.nextDescription}>
-            We're acquiring your item now. Once it's in our custody and verified, you can:
+            If this item is already in Bloom custody, your ownership is instant. Otherwise we’re acquiring it now.
           </Text>
           <View style={styles.optionsList}>
             <View style={styles.optionRow}>
@@ -143,7 +143,7 @@ export default function CheckoutSuccessScreen() {
               <Text style={styles.optionText}>Ship to yourself anytime</Text>
             </View>
           </View>
-          <Text style={styles.deliveryTime}>Expected in custody: 5-7 business days</Text>
+          <Text style={styles.deliveryTime}>If not already in custody: 5-7 business days</Text>
         </View>
 
         {/* Action Buttons */}

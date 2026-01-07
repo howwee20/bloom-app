@@ -121,11 +121,11 @@ export default function ConfirmOrderScreen() {
 
         {/* Delivery Info */}
         <Text style={styles.deliveryInfo}>
-          {isInstant ? 'Instant' : 'Token arrives in 5-7 days'}
+          {isInstant ? 'Instant transfer in Bloom custody' : 'Ships to Bloom in 5-7 days'}
         </Text>
 
         {/* Options */}
-        <Text style={styles.options}>Hold · Trade · Ship anytime</Text>
+        <Text style={styles.options}>Hold · Transfer · Ship anytime</Text>
 
         {/* Terms */}
         <Text style={styles.terms}>

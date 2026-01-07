@@ -185,7 +185,7 @@ export default function BloomScreen() {
           {/* Custody Badge */}
           <View style={[styles.custodyBadge, isInstant ? styles.instantBadge : styles.acquireBadge]}>
             <Text style={[styles.custodyBadgeText, isInstant ? styles.instantBadgeText : styles.acquireBadgeText]}>
-              {isInstant ? 'Instant' : '5-7d'}
+              {isInstant ? 'Instant' : 'Ship to Bloom'}
             </Text>
           </View>
         </View>

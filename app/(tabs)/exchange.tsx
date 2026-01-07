@@ -1,8 +1,7 @@
-// EXCHANGE Screen - One Pool, One Marketplace
-// All items are mint condition, vault-custodied, same quality
-// Only distinction: Instant (in vault) vs 5-7d (needs sourcing)
-import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+// Bloom Custody Market - Instant transfer or Ship to Bloom
+// Bloom is the intent router; custody items settle inside Bloom
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -39,8 +38,9 @@ type FilterType = 'all' | 'instant' | 'acquire';
 
 export default function ExchangeScreen() {
   const { session } = useAuth();
+  const { filter: filterParam } = useLocalSearchParams<{ filter?: string }>();
 
-  // Filter: All / Instant / 5-7d
+  // Filter: All / Instant / Ship to Bloom
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,6 +52,12 @@ export default function ExchangeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (filterParam === 'instant' || filterParam === 'acquire' || filterParam === 'all') {
+      setFilter(filterParam);
+    }
+  }, [filterParam]);
 
   const handleImageError = (id: string) => {
     setFailedImages(prev => new Set(prev).add(id));
@@ -216,10 +222,10 @@ export default function ExchangeScreen() {
               </Text>
             </View>
           )}
-          {/* Badge: Instant or 5-7d */}
+          {/* Badge: Instant or Ship to Bloom */}
           <View style={[styles.badge, item.is_instant ? styles.instantBadge : styles.acquireBadge]}>
             <Text style={[styles.badgeText, item.is_instant ? styles.instantBadgeText : styles.acquireBadgeText]}>
-              {item.is_instant ? 'Instant' : '5-7d'}
+              {item.is_instant ? 'Instant' : 'Ship to Bloom'}
             </Text>
           </View>
         </View>
@@ -240,7 +246,13 @@ export default function ExchangeScreen() {
   const renderEmpty = () => (
     <View style={styles.emptyState}>
       <Text style={styles.emptyTitle}>
-        {searchQuery ? 'No results found' : 'No items available'}
+        {searchQuery
+          ? 'No results found'
+          : filter === 'instant'
+          ? 'No instant inventory'
+          : filter === 'acquire'
+          ? 'Nothing to ship to Bloom yet'
+          : 'No items available'}
       </Text>
       <Text style={styles.emptySubtitle}>
         {searchQuery ? 'Try a different search' : 'Check back soon'}
@@ -259,7 +271,9 @@ export default function ExchangeScreen() {
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Market</Text>
+        <Text style={styles.headerTitle}>
+          {filter === 'instant' ? 'Instant Transfer' : filter === 'acquire' ? 'Ship to Bloom' : 'Market'}
+        </Text>
         <Pressable
           style={styles.searchButton}
           onPress={() => {
@@ -305,7 +319,7 @@ export default function ExchangeScreen() {
           <View style={styles.filterContent}>
             <View style={styles.instantDot} />
             <Text style={[styles.filterText, filter === 'instant' && styles.filterTextActive]}>
-              Instant ({instantCount})
+              Instant Transfer ({instantCount})
             </Text>
           </View>
         </Pressable>
@@ -315,7 +329,7 @@ export default function ExchangeScreen() {
           onPress={() => setFilter('acquire')}
         >
           <Text style={[styles.filterText, filter === 'acquire' && styles.filterTextActive]}>
-            5-7d ({acquireCount})
+            Ship to Bloom ({acquireCount})
           </Text>
         </Pressable>
       </View>
