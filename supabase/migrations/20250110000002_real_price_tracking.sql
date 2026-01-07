@@ -364,6 +364,8 @@ END;
 $$;
 
 -- 9) Update portfolio with P&L to include checked/updated timestamps
+DROP FUNCTION IF EXISTS get_portfolio_with_pnl();
+
 CREATE OR REPLACE FUNCTION get_portfolio_with_pnl()
 RETURNS TABLE (
   id UUID,
@@ -414,6 +416,8 @@ END;
 $$;
 
 -- 10) Update asset-with-change to expose checked/updated timestamps
+DROP FUNCTION IF EXISTS get_asset_with_price_change(UUID);
+
 CREATE OR REPLACE FUNCTION get_asset_with_price_change(p_asset_id UUID)
 RETURNS TABLE (
   id UUID,
@@ -474,6 +478,8 @@ END;
 $$;
 
 -- 11) Update market assets with changes to include checked/updated timestamps
+DROP FUNCTION IF EXISTS get_market_assets_with_changes();
+
 CREATE OR REPLACE FUNCTION get_market_assets_with_changes()
 RETURNS TABLE (
   id UUID,
