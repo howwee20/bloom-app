@@ -11,7 +11,8 @@
  */
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
-const { fetchPrice } = require('./lib/stockx');
+const stockx = require('./lib/stockx');
+const { fetchPrice } = stockx;
 const { calculateBloomPrice } = require('./lib/pricing');
 
 // Parse CLI args
@@ -30,6 +31,9 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// Initialize StockX module with Supabase for token persistence
+stockx.init(supabase);
 
 /**
  * Main update function

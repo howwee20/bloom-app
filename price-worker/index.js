@@ -2,7 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cron = require('node-cron');
 const { createClient } = require('@supabase/supabase-js');
-const { fetchPrice } = require('./lib/stockx');
+const stockx = require('./lib/stockx');
+const { fetchPrice } = stockx;
 const { calculateBloomPrice, FLAT_FEE, VARIABLE_RATE } = require('./lib/pricing');
 
 const app = express();
@@ -17,6 +18,9 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// Initialize StockX module with Supabase for token persistence
+stockx.init(supabase);
 
 // ============================================
 // CONFIGURATION
@@ -261,6 +265,11 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     lastRefresh: lastRefreshTime
   });
+});
+
+app.get('/token-health', async (req, res) => {
+  const health = await stockx.getTokenHealth();
+  res.json(health);
 });
 
 app.get('/asset/:id', async (req, res) => {

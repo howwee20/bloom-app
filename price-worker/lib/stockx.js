@@ -1,26 +1,114 @@
 const fetch = require('node-fetch');
 
-// StockX Official API V2
+// StockX Official API V2 Configuration
 const STOCKX_API_KEY = process.env.STOCKX_API_KEY;
 const STOCKX_CLIENT_ID = process.env.STOCKX_CLIENT_ID;
 const STOCKX_CLIENT_SECRET = process.env.STOCKX_CLIENT_SECRET;
-const STOCKX_REFRESH_TOKEN = process.env.STOCKX_REFRESH_TOKEN;
+
+// Fallback env var (only used if DB has no token yet)
+const STOCKX_REFRESH_TOKEN_ENV = process.env.STOCKX_REFRESH_TOKEN;
 
 const TOKEN_URL = 'https://accounts.stockx.com/oauth/token';
 const API_BASE = 'https://api.stockx.com';
 
+// In-memory cache (per process lifetime)
 let cachedAccessToken = null;
 let tokenExpiry = 0;
 
+// Module-level supabase client (set via init)
+let supabaseClient = null;
+
+/**
+ * Initialize the StockX module with a Supabase client
+ * Must be called before using any API functions
+ */
+function init(supabase) {
+  supabaseClient = supabase;
+  console.log('[STOCKX] Initialized with Supabase client');
+}
+
+/**
+ * Get current refresh token from Supabase (or fall back to env var)
+ */
+async function getRefreshToken() {
+  if (!supabaseClient) {
+    console.log('[STOCKX] No Supabase client, using env var fallback');
+    return STOCKX_REFRESH_TOKEN_ENV;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.rpc('get_stockx_tokens');
+
+    if (error) {
+      console.error('[STOCKX] Failed to fetch tokens from DB:', error.message);
+      return STOCKX_REFRESH_TOKEN_ENV;
+    }
+
+    const tokens = data?.[0];
+
+    if (tokens?.refresh_token) {
+      const age = tokens.refresh_token_updated_at
+        ? Math.round((Date.now() - new Date(tokens.refresh_token_updated_at).getTime()) / 1000 / 60)
+        : 'unknown';
+      console.log(`[STOCKX] Using refresh token from DB (age: ${age} minutes)`);
+      return tokens.refresh_token;
+    }
+
+    console.log('[STOCKX] No refresh token in DB, using env var fallback');
+    return STOCKX_REFRESH_TOKEN_ENV;
+
+  } catch (err) {
+    console.error('[STOCKX] Error fetching tokens:', err.message);
+    return STOCKX_REFRESH_TOKEN_ENV;
+  }
+}
+
+/**
+ * Save new tokens to Supabase after successful refresh
+ */
+async function saveTokens(accessToken, expiresAt, refreshToken) {
+  if (!supabaseClient) {
+    console.warn('[STOCKX] No Supabase client, cannot persist new refresh token!');
+    console.warn('[STOCKX] The new refresh token will be lost on next run.');
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient.rpc('update_stockx_tokens', {
+      p_access_token: accessToken,
+      p_access_token_expires_at: expiresAt.toISOString(),
+      p_refresh_token: refreshToken
+    });
+
+    if (error) {
+      console.error('[STOCKX] Failed to save tokens to DB:', error.message);
+      console.error('[STOCKX] CRITICAL: New refresh token was not persisted!');
+    } else {
+      console.log('[STOCKX] New tokens saved to DB successfully');
+    }
+  } catch (err) {
+    console.error('[STOCKX] Error saving tokens:', err.message);
+  }
+}
+
 /**
  * Get access token using refresh token (auto-refreshes)
+ * Now properly saves the new refresh token to the database
  */
 async function getAccessToken() {
+  // Return cached token if still valid (5 min buffer)
   if (cachedAccessToken && Date.now() < tokenExpiry - 300000) {
     return cachedAccessToken;
   }
 
   console.log('[STOCKX] Refreshing access token...');
+
+  // Get current refresh token (DB or env fallback)
+  const refreshToken = await getRefreshToken();
+
+  if (!refreshToken) {
+    throw new Error('No refresh token available (check DB and STOCKX_REFRESH_TOKEN env var)');
+  }
 
   const response = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -29,20 +117,34 @@ async function getAccessToken() {
       grant_type: 'refresh_token',
       client_id: STOCKX_CLIENT_ID,
       client_secret: STOCKX_CLIENT_SECRET,
-      refresh_token: STOCKX_REFRESH_TOKEN,
+      refresh_token: refreshToken,
     }),
   });
 
   if (!response.ok) {
     const error = await response.text();
+    console.error('[STOCKX] Token refresh failed:', response.status, error);
     throw new Error(`Token refresh failed: ${response.status} - ${error}`);
   }
 
   const data = await response.json();
+
+  // Cache the new access token
   cachedAccessToken = data.access_token;
   tokenExpiry = Date.now() + (data.expires_in * 1000);
+  const expiresAt = new Date(tokenExpiry);
 
-  console.log('[STOCKX] Token refreshed, valid for', Math.round(data.expires_in / 3600), 'hours');
+  console.log('[STOCKX] Token refreshed successfully');
+  console.log(`[STOCKX] Access token valid until: ${expiresAt.toISOString()}`);
+  console.log(`[STOCKX] New refresh token received: ${data.refresh_token ? 'YES' : 'NO'}`);
+
+  // CRITICAL: Save the new refresh token to database
+  if (data.refresh_token) {
+    await saveTokens(data.access_token, expiresAt, data.refresh_token);
+  } else {
+    console.warn('[STOCKX] No new refresh token in response (unusual)');
+  }
+
   return cachedAccessToken;
 }
 
@@ -170,10 +272,49 @@ async function fetchPrice(sku, size = '10') {
   };
 }
 
+/**
+ * Get token health status (for monitoring)
+ */
+async function getTokenHealth() {
+  if (!supabaseClient) {
+    return {
+      source: 'env',
+      hasRefreshToken: !!STOCKX_REFRESH_TOKEN_ENV,
+      cachedAccessTokenValid: cachedAccessToken && Date.now() < tokenExpiry,
+      accessTokenExpiresIn: cachedAccessToken ? Math.round((tokenExpiry - Date.now()) / 1000 / 60) : null
+    };
+  }
+
+  try {
+    const { data, error } = await supabaseClient.rpc('get_stockx_tokens');
+
+    if (error) {
+      return { source: 'error', error: error.message };
+    }
+
+    const tokens = data?.[0];
+
+    return {
+      source: 'database',
+      hasRefreshToken: !!tokens?.refresh_token,
+      refreshTokenAge: tokens?.refresh_token_updated_at
+        ? Math.round((Date.now() - new Date(tokens.refresh_token_updated_at).getTime()) / 1000 / 60)
+        : null,
+      accessTokenExpiresAt: tokens?.access_token_expires_at,
+      cachedAccessTokenValid: cachedAccessToken && Date.now() < tokenExpiry,
+      cachedAccessTokenExpiresIn: cachedAccessToken ? Math.round((tokenExpiry - Date.now()) / 1000 / 60) : null
+    };
+  } catch (err) {
+    return { source: 'error', error: err.message };
+  }
+}
+
 module.exports = {
+  init,
   fetchPrice,
   searchProduct,
   getProductVariants,
   getProductMarketData,
-  getAccessToken
+  getAccessToken,
+  getTokenHealth
 };
