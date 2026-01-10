@@ -119,23 +119,24 @@ async function getAccessToken() {
     throw new Error('No refresh token available (check DB and STOCKX_REFRESH_TOKEN env var)');
   }
 
-  // Log request details (no secrets)
+  // Log request details (NO SECRETS - tokens are sensitive)
   console.log(`[STOCKX] Token URL: ${TOKEN_URL}`);
   console.log(`[STOCKX] Grant type: refresh_token`);
   console.log(`[STOCKX] Client ID: ${STOCKX_CLIENT_ID ? STOCKX_CLIENT_ID.slice(0, 8) + '...' : '(missing)'}`);
-  console.log(`[STOCKX] Refresh token: ${refreshToken.slice(0, 8)}...${refreshToken.slice(-8)}`);
+  console.log(`[STOCKX] Refresh token: present (${refreshToken.length} chars)`);
 
-  // Build request body (OAuth 2.0 spec-correct)
+  // Build request - try Basic auth header (some OAuth servers require this)
+  const basicAuth = Buffer.from(`${STOCKX_CLIENT_ID}:${STOCKX_CLIENT_SECRET}`).toString('base64');
+
   const requestBody = new URLSearchParams({
     grant_type: 'refresh_token',
-    client_id: STOCKX_CLIENT_ID,
-    client_secret: STOCKX_CLIENT_SECRET,
     refresh_token: refreshToken,
   });
 
   const response = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: {
+      'Authorization': `Basic ${basicAuth}`,
       'Content-Type': 'application/x-www-form-urlencoded',
       'Accept': 'application/json'
     },
@@ -312,40 +313,109 @@ async function fetchPrice(sku, size = '10') {
 }
 
 /**
- * Get token health status (for monitoring)
+ * Test token refresh - actually attempts ONE refresh to verify auth works
+ * Returns { ok, status, error, description }
  */
-async function getTokenHealth() {
-  if (!supabaseClient) {
-    return {
-      source: 'env',
-      hasRefreshToken: !!STOCKX_REFRESH_TOKEN_ENV,
-      cachedAccessTokenValid: cachedAccessToken && Date.now() < tokenExpiry,
-      accessTokenExpiresIn: cachedAccessToken ? Math.round((tokenExpiry - Date.now()) / 1000 / 60) : null
-    };
+async function testRefresh() {
+  const refreshToken = await getRefreshToken();
+
+  if (!refreshToken) {
+    return { ok: false, error: 'no_refresh_token', description: 'No refresh token in DB or env' };
+  }
+
+  if (!STOCKX_CLIENT_ID || !STOCKX_CLIENT_SECRET) {
+    return { ok: false, error: 'missing_credentials', description: 'STOCKX_CLIENT_ID or STOCKX_CLIENT_SECRET not set' };
   }
 
   try {
-    const { data, error } = await supabaseClient.rpc('get_stockx_tokens');
+    const basicAuth = Buffer.from(`${STOCKX_CLIENT_ID}:${STOCKX_CLIENT_SECRET}`).toString('base64');
 
-    if (error) {
-      return { source: 'error', error: error.message };
+    const response = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+
+      // Save the new tokens if we got them
+      if (data.refresh_token && supabaseClient) {
+        const expiresAt = new Date(Date.now() + data.expires_in * 1000);
+        await saveTokens(data.access_token, expiresAt, data.refresh_token);
+      }
+
+      return {
+        ok: true,
+        status: response.status,
+        accessTokenReceived: !!data.access_token,
+        refreshTokenRotated: !!data.refresh_token,
+        expiresIn: data.expires_in
+      };
+    } else {
+      const errorText = await response.text();
+      let errorBody;
+      try {
+        errorBody = JSON.parse(errorText);
+      } catch {
+        errorBody = { raw: errorText.slice(0, 200) };
+      }
+
+      return {
+        ok: false,
+        status: response.status,
+        error: errorBody.error || 'unknown',
+        description: errorBody.error_description || errorText.slice(0, 100)
+      };
     }
-
-    const tokens = data?.[0];
-
-    return {
-      source: 'database',
-      hasRefreshToken: !!tokens?.refresh_token,
-      refreshTokenAge: tokens?.refresh_token_updated_at
-        ? Math.round((Date.now() - new Date(tokens.refresh_token_updated_at).getTime()) / 1000 / 60)
-        : null,
-      accessTokenExpiresAt: tokens?.access_token_expires_at,
-      cachedAccessTokenValid: cachedAccessToken && Date.now() < tokenExpiry,
-      cachedAccessTokenExpiresIn: cachedAccessToken ? Math.round((tokenExpiry - Date.now()) / 1000 / 60) : null
-    };
   } catch (err) {
-    return { source: 'error', error: err.message };
+    return { ok: false, error: 'network_error', description: err.message };
   }
+}
+
+/**
+ * Get token health status (for monitoring)
+ * Actually tests the refresh - ok:true ONLY if StockX returns 200
+ */
+async function getTokenHealth() {
+  const result = {
+    timestamp: new Date().toISOString(),
+    source: supabaseClient ? 'database' : 'env',
+    hasClientId: !!STOCKX_CLIENT_ID,
+    hasClientSecret: !!STOCKX_CLIENT_SECRET
+  };
+
+  // Get token info from DB
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient.rpc('get_stockx_tokens');
+      if (!error && data?.[0]) {
+        const tokens = data[0];
+        result.hasRefreshToken = !!tokens.refresh_token;
+        result.refreshTokenAge = tokens.refresh_token_updated_at
+          ? Math.round((Date.now() - new Date(tokens.refresh_token_updated_at).getTime()) / 1000 / 60)
+          : null;
+      }
+    } catch (err) {
+      result.dbError = err.message;
+    }
+  } else {
+    result.hasRefreshToken = !!STOCKX_REFRESH_TOKEN_ENV;
+  }
+
+  // Actually test the refresh
+  const refreshTest = await testRefresh();
+  result.ok = refreshTest.ok;
+  result.refreshTest = refreshTest;
+
+  return result;
 }
 
 module.exports = {

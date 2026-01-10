@@ -147,18 +147,21 @@ async function runProbe() {
   console.log('\n[2/3] Attempting StockX token refresh...');
   console.log(`  URL: ${TOKEN_URL}`);
   console.log(`  Grant Type: refresh_token`);
+  console.log(`  Auth: Basic (client_id:client_secret)`);
   console.log(`  Client ID: ${redact(STOCKX_CLIENT_ID)}`);
 
   try {
+    const basicAuth = Buffer.from(`${STOCKX_CLIENT_ID}:${STOCKX_CLIENT_SECRET}`).toString('base64');
+
     const response = await fetch(TOKEN_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
       },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
-        client_id: STOCKX_CLIENT_ID,
-        client_secret: STOCKX_CLIENT_SECRET,
         refresh_token: refreshToken
       })
     });
