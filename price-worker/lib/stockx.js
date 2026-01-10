@@ -94,37 +94,71 @@ async function saveTokens(accessToken, expiresAt, refreshToken) {
 /**
  * Get access token using refresh token (auto-refreshes)
  * Now properly saves the new refresh token to the database
+ *
+ * OAuth 2.0 Spec-Correct Implementation:
+ * - Content-Type: application/x-www-form-urlencoded
+ * - grant_type=refresh_token
+ * - client_id + client_secret in body (not Basic auth header)
  */
 async function getAccessToken() {
   // Return cached token if still valid (5 min buffer)
   if (cachedAccessToken && Date.now() < tokenExpiry - 300000) {
+    const remainingMinutes = Math.round((tokenExpiry - Date.now()) / 1000 / 60);
+    console.log(`[STOCKX] Using cached token (expires in ${remainingMinutes}m)`);
     return cachedAccessToken;
   }
 
-  console.log('[STOCKX] Refreshing access token...');
+  console.log('[STOCKX] ─────────────────────────────────────');
+  console.log('[STOCKX] Starting token refresh...');
 
   // Get current refresh token (DB or env fallback)
   const refreshToken = await getRefreshToken();
 
   if (!refreshToken) {
+    console.error('[STOCKX] ✗ No refresh token available');
     throw new Error('No refresh token available (check DB and STOCKX_REFRESH_TOKEN env var)');
   }
 
-  const response = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: STOCKX_CLIENT_ID,
-      client_secret: STOCKX_CLIENT_SECRET,
-      refresh_token: refreshToken,
-    }),
+  // Log request details (no secrets)
+  console.log(`[STOCKX] Token URL: ${TOKEN_URL}`);
+  console.log(`[STOCKX] Grant type: refresh_token`);
+  console.log(`[STOCKX] Client ID: ${STOCKX_CLIENT_ID ? STOCKX_CLIENT_ID.slice(0, 8) + '...' : '(missing)'}`);
+  console.log(`[STOCKX] Refresh token: ${refreshToken.slice(0, 8)}...${refreshToken.slice(-8)}`);
+
+  // Build request body (OAuth 2.0 spec-correct)
+  const requestBody = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: STOCKX_CLIENT_ID,
+    client_secret: STOCKX_CLIENT_SECRET,
+    refresh_token: refreshToken,
   });
 
+  const response = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json'
+    },
+    body: requestBody
+  });
+
+  console.log(`[STOCKX] Response status: ${response.status}`);
+
   if (!response.ok) {
-    const error = await response.text();
-    console.error('[STOCKX] Token refresh failed:', response.status, error);
-    throw new Error(`Token refresh failed: ${response.status} - ${error}`);
+    const errorText = await response.text();
+    let errorBody;
+    try {
+      errorBody = JSON.parse(errorText);
+    } catch {
+      errorBody = { raw: errorText.slice(0, 200) };
+    }
+
+    console.error('[STOCKX] ✗ Token refresh FAILED');
+    console.error(`[STOCKX] Error: ${errorBody.error || 'Unknown'}`);
+    console.error(`[STOCKX] Description: ${errorBody.error_description || errorText.slice(0, 100)}`);
+    console.log('[STOCKX] ─────────────────────────────────────');
+
+    throw new Error(`Token refresh failed: ${response.status} - ${errorBody.error || errorText.slice(0, 100)}`);
   }
 
   const data = await response.json();
@@ -134,16 +168,21 @@ async function getAccessToken() {
   tokenExpiry = Date.now() + (data.expires_in * 1000);
   const expiresAt = new Date(tokenExpiry);
 
-  console.log('[STOCKX] Token refreshed successfully');
-  console.log(`[STOCKX] Access token valid until: ${expiresAt.toISOString()}`);
-  console.log(`[STOCKX] New refresh token received: ${data.refresh_token ? 'YES' : 'NO'}`);
+  console.log('[STOCKX] ✓ Token refresh SUCCESSFUL');
+  console.log(`[STOCKX] Access token: ${data.access_token ? 'received' : 'MISSING'}`);
+  console.log(`[STOCKX] Refresh token: ${data.refresh_token ? 'received (rotated)' : 'NOT rotated'}`);
+  console.log(`[STOCKX] Expires at: ${expiresAt.toISOString()}`);
+  console.log(`[STOCKX] Expires in: ${Math.round(data.expires_in / 60)} minutes`);
 
   // CRITICAL: Save the new refresh token to database
   if (data.refresh_token) {
+    console.log('[STOCKX] Saving rotated tokens to database...');
     await saveTokens(data.access_token, expiresAt, data.refresh_token);
   } else {
-    console.warn('[STOCKX] No new refresh token in response (unusual)');
+    console.warn('[STOCKX] ⚠ No new refresh token in response (token may not have rotated)');
   }
+
+  console.log('[STOCKX] ─────────────────────────────────────');
 
   return cachedAccessToken;
 }

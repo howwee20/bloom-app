@@ -228,17 +228,25 @@ export default function HomeScreen() {
         .maybeSingle();
       setWeeklyDigest((digestData as WeeklyDigest) || null);
 
-      const latestTokenCheck = (tokenData || [])
-        .map((item: Token) => item.last_price_checked_at)
-        .filter((value: string | null | undefined): value is string => Boolean(value))
-        .map(value => new Date(value).getTime());
-      const latestAssetCheck = (assets || [])
-        .map((item: Asset) => item.last_price_checked_at)
-        .filter((value: string | null | undefined): value is string => Boolean(value))
-        .map(value => new Date(value).getTime());
-      const allChecks = [...latestTokenCheck, ...latestAssetCheck];
-      const latestCheck = allChecks.length > 0 ? Math.max(...allChecks) : null;
-      setLastUpdatedAt(latestCheck ? new Date(latestCheck) : null);
+      // Get last successful price update from job tracking table (DB truth)
+      // Falls back to individual token/asset timestamps if RPC not available
+      const { data: lastJobUpdate } = await supabase.rpc('get_last_successful_price_update');
+      if (lastJobUpdate) {
+        setLastUpdatedAt(new Date(lastJobUpdate));
+      } else {
+        // Fallback to max of individual timestamps
+        const latestTokenCheck = (tokenData || [])
+          .map((item: Token) => item.last_price_checked_at)
+          .filter((value: string | null | undefined): value is string => Boolean(value))
+          .map(value => new Date(value).getTime());
+        const latestAssetCheck = (assets || [])
+          .map((item: Asset) => item.last_price_checked_at)
+          .filter((value: string | null | undefined): value is string => Boolean(value))
+          .map(value => new Date(value).getTime());
+        const allChecks = [...latestTokenCheck, ...latestAssetCheck];
+        const latestCheck = allChecks.length > 0 ? Math.max(...allChecks) : null;
+        setLastUpdatedAt(latestCheck ? new Date(latestCheck) : null);
+      }
       setUpdateDelayed(false);
       setPollIntervalMs(2 * 60 * 1000);
     } catch (e) {
@@ -367,13 +375,15 @@ export default function HomeScreen() {
   };
 
   const formatTimeAgo = (date: Date | null) => {
-    if (!date) return 'Updated —';
+    if (!date) return 'Not updated yet';
     const diffMs = now - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
     if (diffMins < 1) return 'Updated just now';
     if (diffMins < 60) return `Updated ${diffMins}m ago`;
-    return `Updated ${diffHours}h ago`;
+    if (diffHours < 24) return `Updated ${diffHours}h ago`;
+    return `Updated ${diffDays}d ago`;
   };
 
   const buildSearchQuery = (item: SellItem) => {

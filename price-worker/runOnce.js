@@ -40,8 +40,9 @@ stockx.init(supabase);
  */
 async function runOnce() {
   const startTime = Date.now();
+  const jobStartedAt = new Date().toISOString();  // Function-level timestamp for job tracking
   console.log('\n' + '='.repeat(60));
-  console.log(`[PRICE-WORKER] Starting at ${new Date().toISOString()}`);
+  console.log(`[PRICE-WORKER] Starting at ${jobStartedAt}`);
   console.log(`[CONFIG] Batch limit: ${BATCH_LIMIT}, Delay: ${API_DELAY_MS}ms`);
   console.log('='.repeat(60));
 
@@ -196,17 +197,22 @@ async function runOnce() {
     console.log('-'.repeat(60) + '\n');
 
     // Update cron status table
+    const jobFinishedAt = new Date().toISOString();
     await supabase.from('cron_status').upsert({
       job_name: 'price-worker',
-      last_run_at: new Date().toISOString(),
-      last_status: results.failed > 0 ? 'partial' : 'success',
+      last_run_at: jobFinishedAt,
+      last_status: results.authFailed ? 'auth_failed' : (results.failed > 0 ? 'partial' : 'success'),
       last_payload: {
         updated: results.updated,
         failed: results.failed,
         elapsed_seconds: parseFloat(elapsed),
+        started_at: jobStartedAt,
+        finished_at: jobFinishedAt,
+        auth_failed: results.authFailed || false,
+        auth_error: results.authError || null,
         errors: results.errors.slice(0, 5) // Only keep first 5 errors
       },
-      updated_at: new Date().toISOString()
+      updated_at: jobFinishedAt
     }, { onConflict: 'job_name' });
   }
 }

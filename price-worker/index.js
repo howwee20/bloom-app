@@ -38,8 +38,9 @@ let lastCronTick = null;
 
 async function refreshAllAssets() {
   const startTime = Date.now();
+  const jobStartedAt = new Date().toISOString();  // Function-level timestamp for job tracking
   console.log('\n' + '='.repeat(60));
-  console.log(`[REFRESH] Starting at ${new Date().toISOString()}`);
+  console.log(`[REFRESH] Starting at ${jobStartedAt}`);
   console.log(`[CONFIG] Batch: ${BATCH_LIMIT}, Storing: Raw StockX Ask (no markup)`);
   console.log('='.repeat(60));
 
@@ -62,7 +63,8 @@ async function refreshAllAssets() {
     success: true,
     updated: 0,
     failed: 0,
-    details: []
+    details: [],
+    jobId: null
   };
 
   try {
@@ -83,6 +85,13 @@ async function refreshAllAssets() {
       console.log('[WARN] No assets with SKUs found');
       return { success: true, updated: 0, failed: 0 };
     }
+
+    // Create job tracking record
+    const { data: jobId } = await supabase.rpc('create_price_refresh_job', {
+      p_items_targeted: assets.length
+    });
+    results.jobId = jobId;
+    console.log(`[JOB] Created job: ${jobId}`);
 
     console.log(`[INFO] Processing ${assets.length} assets\n`);
 
@@ -192,17 +201,42 @@ async function refreshAllAssets() {
     lastRefreshResults = results;
 
     // Update cron status table
+    const jobFinishedAt = new Date().toISOString();
     await supabase.from('cron_status').upsert({
       job_name: 'price-worker',
-      last_run_at: now,
-      last_status: results.failed > 0 ? 'partial' : 'success',
+      last_run_at: jobFinishedAt,
+      last_status: results.authFailed ? 'auth_failed' : (results.failed > 0 ? 'partial' : 'success'),
       last_payload: {
         updated: results.updated,
         failed: results.failed,
-        elapsed_seconds: parseFloat(elapsed)
+        elapsed_seconds: parseFloat(elapsed),
+        started_at: jobStartedAt,
+        finished_at: jobFinishedAt,
+        auth_failed: results.authFailed || false,
+        auth_error: results.authError || null,
+        job_id: results.jobId
       },
-      updated_at: now
+      updated_at: jobFinishedAt
     }, { onConflict: 'job_name' });
+
+    // Complete job tracking record
+    if (results.jobId) {
+      if (results.authFailed) {
+        await supabase.rpc('fail_price_refresh_job', {
+          p_job_id: results.jobId,
+          p_error: results.authError,
+          p_is_auth_failure: true
+        });
+        console.log(`[JOB] Marked job ${results.jobId} as auth_failed`);
+      } else {
+        await supabase.rpc('complete_price_refresh_job', {
+          p_job_id: results.jobId,
+          p_items_updated: results.updated,
+          p_items_failed: results.failed
+        });
+        console.log(`[JOB] Completed job ${results.jobId}: ${results.updated} updated, ${results.failed} failed`);
+      }
+    }
 
     return results;
 
@@ -291,8 +325,31 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/token-health', async (req, res) => {
-  const health = await stockx.getTokenHealth();
-  res.json(health);
+  try {
+    const health = await stockx.getTokenHealth();
+    const supabaseHost = (() => {
+      try { return new URL(SUPABASE_URL).host; } catch { return 'invalid'; }
+    })();
+
+    // Determine overall health status
+    const ok = health.source === 'database' && health.hasRefreshToken;
+
+    res.json({
+      ok,
+      status: ok ? 'healthy' : 'unhealthy',
+      supabaseHost,
+      nodeVersion: process.version,
+      ...health,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      status: 'error',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 app.get('/asset/:id', async (req, res) => {
