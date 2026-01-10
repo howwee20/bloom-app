@@ -15,7 +15,8 @@
  * Usage: node scripts/stockx_auth_probe.js
  */
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -26,19 +27,11 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABAS
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const STOCKX_CLIENT_ID = process.env.STOCKX_CLIENT_ID;
 const STOCKX_CLIENT_SECRET = process.env.STOCKX_CLIENT_SECRET;
-const STOCKX_REFRESH_TOKEN_ENV = process.env.STOCKX_REFRESH_TOKEN;
-
 const TOKEN_URL = 'https://accounts.stockx.com/oauth/token';
 
 // ============================================
 // HELPERS
 // ============================================
-function redact(str, showChars = 8) {
-  if (!str) return '(null)';
-  if (str.length <= showChars * 2) return '***';
-  return `${str.slice(0, showChars)}...${str.slice(-showChars)}`;
-}
-
 function getSupabaseHost() {
   try {
     return new URL(SUPABASE_URL).host;
@@ -59,8 +52,7 @@ async function runProbe() {
       SUPABASE_URL: !!SUPABASE_URL,
       SUPABASE_SERVICE_KEY: !!SUPABASE_SERVICE_KEY,
       STOCKX_CLIENT_ID: !!STOCKX_CLIENT_ID,
-      STOCKX_CLIENT_SECRET: !!STOCKX_CLIENT_SECRET,
-      STOCKX_REFRESH_TOKEN_ENV: !!STOCKX_REFRESH_TOKEN_ENV
+      STOCKX_CLIENT_SECRET: !!STOCKX_CLIENT_SECRET
     },
     dbConnection: false,
     dbTokenFound: false,
@@ -121,26 +113,27 @@ async function runProbe() {
         : null;
       console.log(`  ✓ Refresh token found in DB`);
       console.log(`    Token age: ${results.tokenAgeMinutes !== null ? results.tokenAgeMinutes + ' minutes' : 'unknown'}`);
-      console.log(`    Token preview: ${redact(tokens.refresh_token)}`);
-    } else if (STOCKX_REFRESH_TOKEN_ENV) {
-      console.log('  ⚠ No token in DB, using env var fallback');
-      console.log(`    Token preview: ${redact(STOCKX_REFRESH_TOKEN_ENV)}`);
     } else {
-      console.error('  ✗ No refresh token available (DB or env)');
-      return { ...results, ok: false, error: 'No refresh token available' };
+      console.error('  ✗ No refresh token available in database');
+      return { ...results, ok: false, error: 'No refresh token available in database' };
     }
   } catch (err) {
     console.error(`  ✗ Exception: ${err.message}`);
     return { ...results, ok: false, error: err.message };
   }
 
-  // Get refresh token (same logic as worker)
-  let refreshToken;
+  // Get refresh token (DB only)
+  let refreshToken = null;
   try {
     const { data } = await supabase.rpc('get_stockx_tokens');
-    refreshToken = data?.[0]?.refresh_token || STOCKX_REFRESH_TOKEN_ENV;
+    refreshToken = data?.[0]?.refresh_token || null;
   } catch {
-    refreshToken = STOCKX_REFRESH_TOKEN_ENV;
+    refreshToken = null;
+  }
+
+  if (!refreshToken) {
+    console.error('\n[FATAL] No refresh token available in database');
+    return { ...results, ok: false, error: 'No refresh token available in database' };
   }
 
   // Attempt token refresh
@@ -148,7 +141,6 @@ async function runProbe() {
   console.log(`  URL: ${TOKEN_URL}`);
   console.log(`  Grant Type: refresh_token`);
   console.log(`  Auth: Basic (client_id:client_secret)`);
-  console.log(`  Client ID: ${redact(STOCKX_CLIENT_ID)}`);
 
   try {
     const basicAuth = Buffer.from(`${STOCKX_CLIENT_ID}:${STOCKX_CLIENT_SECRET}`).toString('base64');

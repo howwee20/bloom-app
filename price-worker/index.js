@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const express = require('express');
 const cron = require('node-cron');
 const { createClient } = require('@supabase/supabase-js');
@@ -11,6 +12,9 @@ app.use(express.json());
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const STOCKX_CLIENT_ID = process.env.STOCKX_CLIENT_ID;
+const STOCKX_CLIENT_SECRET = process.env.STOCKX_CLIENT_SECRET;
+const STOCKX_API_KEY = process.env.STOCKX_API_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   console.error('[BOOT] Missing Supabase credentials. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
@@ -28,6 +32,7 @@ stockx.init(supabase);
 const BATCH_LIMIT = 25;                       // Assets per run
 const API_DELAY_MS = 1200;                    // 1.2s between calls (StockX: 1/sec limit)
 const CRON_SCHEDULE = '*/5 * * * *';          // Every 5 minutes
+const MAX_RUNTIME_MS = 25_000;                // Safety cap per run
 
 // ============================================
 // CORE: REFRESH ASSETS (with advisory lock)
@@ -35,6 +40,44 @@ const CRON_SCHEDULE = '*/5 * * * *';          // Every 5 minutes
 let lastRefreshTime = null;
 let lastRefreshResults = null;
 let lastCronTick = null;
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const isAuthError = (err) => (
+  err?.status === 401 ||
+  err?.message?.includes('401') ||
+  err?.message?.includes('Token refresh failed') ||
+  err?.message?.includes('No refresh token')
+);
+
+const withTimeout = (promise, timeoutMs) => {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const err = new Error(`Request timed out after ${timeoutMs}ms`);
+      err.status = 408;
+      reject(err);
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+};
+
+async function fetchPriceWithRetry(sku, size, attempts = 3) {
+  let delayMs = 500;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await withTimeout(fetchPrice(sku, size), 10_000);
+    } catch (err) {
+      if (isAuthError(err) || attempt === attempts) {
+        throw err;
+      }
+      await sleep(delayMs);
+      delayMs *= 2;
+    }
+  }
+  throw new Error('Price fetch failed');
+}
 
 async function refreshAllAssets() {
   const startTime = Date.now();
@@ -64,10 +107,41 @@ async function refreshAllAssets() {
     updated: 0,
     failed: 0,
     details: [],
-    jobId: null
+    jobId: null,
+    authFailed: false,
+    authError: null,
+    timedOut: false
   };
 
   try {
+    const { data: jobId, error: jobError } = await supabase.rpc('create_price_refresh_job', {
+      p_items_targeted: 0
+    });
+
+    if (jobError) {
+      console.error('[JOB] Failed to create job row:', jobError.message);
+    } else {
+      results.jobId = jobId;
+      console.log(`[JOB] Created job: ${jobId}`);
+    }
+
+    if (!STOCKX_CLIENT_ID || !STOCKX_CLIENT_SECRET || !STOCKX_API_KEY) {
+      console.error('[AUTH] Missing StockX client credentials.');
+      results.authFailed = true;
+      results.authError = 'Missing STOCKX_CLIENT_ID/SECRET/API_KEY';
+      results.success = false;
+      return results;
+    }
+
+    const { data: tokensData, error: tokensError } = await supabase.rpc('get_stockx_tokens');
+    if (tokensError || !tokensData?.[0]?.refresh_token) {
+      console.error('[AUTH] Missing StockX refresh token in database.');
+      results.authFailed = true;
+      results.authError = 'Missing StockX refresh token in database';
+      results.success = false;
+      return results;
+    }
+
     // Select stale assets (oldest checked first)
     const { data: assets, error } = await supabase
       .from('assets')
@@ -86,41 +160,62 @@ async function refreshAllAssets() {
       return { success: true, updated: 0, failed: 0 };
     }
 
-    // Create job tracking record
-    const { data: jobId } = await supabase.rpc('create_price_refresh_job', {
-      p_items_targeted: assets.length
-    });
-    results.jobId = jobId;
-    console.log(`[JOB] Created job: ${jobId}`);
+    if (results.jobId) {
+      await supabase
+        .from('price_refresh_jobs')
+        .update({ items_targeted: assets.length })
+        .eq('id', results.jobId);
+    }
 
     console.log(`[INFO] Processing ${assets.length} assets\n`);
 
     for (const asset of assets) {
+      if (Date.now() - startTime >= MAX_RUNTIME_MS) {
+        results.timedOut = true;
+        results.success = false;
+        console.warn('[WARN] Max runtime reached. Ending batch early.');
+        break;
+      }
+
       const size = asset.size || '10';
-      const oldPrice = asset.price || 0;
+      const oldPrice = asset.price;
       const now = new Date().toISOString();  // Define at top of loop iteration
 
       try {
         // Fetch live price from StockX
-        const liveData = await fetchPrice(asset.stockx_sku, size);
+        const liveData = await fetchPriceWithRetry(asset.stockx_sku, size);
         const rawPrice = liveData.lowestAsk;  // RAW TRUTH - no markup
         const highestBid = liveData.highestBid;
+        const priceChanged = oldPrice === null || oldPrice === undefined || Number(oldPrice) !== rawPrice;
 
         // Store RAW price (fees calculated on frontend at buy time)
         // Update database - ALWAYS update timestamps even if price unchanged
-        await supabase
+        const assetUpdate = {
+          base_price: rawPrice,
+          price: rawPrice,              // RAW StockX Ask - matches public marketplaces
+          raw_stockx_ask: rawPrice,
+          raw_stockx_currency: 'USD',
+          highest_bid: highestBid,
+          last_price_checked_at: now,   // ALWAYS update
+          updated_at_pricing: now,      // Timestamp for freshness (successful check)
+          price_error: null,
+          price_source: 'stockx'
+        };
+
+        if (priceChanged) {
+          assetUpdate.last_price_updated_at = now;
+          assetUpdate.price_updated_at = now;
+          assetUpdate.last_price_update = now;
+        }
+
+        const { error: assetUpdateError } = await supabase
           .from('assets')
-          .update({
-            base_price: rawPrice,
-            price: rawPrice,              // RAW StockX Ask - matches public marketplaces
-            highest_bid: highestBid,
-            last_price_checked_at: now,   // ALWAYS update
-            price_updated_at: now,        // ALWAYS update
-            last_price_update: now,       // ALWAYS update
-            price_error: null,
-            price_source: 'stockx'
-          })
+          .update(assetUpdate)
           .eq('id', asset.id);
+
+        if (assetUpdateError) {
+          throw new Error(`DB update failed: ${assetUpdateError.message}`);
+        }
 
         // Log price history (raw price)
         await supabase.from('price_history').insert({
@@ -135,34 +230,32 @@ async function refreshAllAssets() {
           .from('tokens')
           .update({
             current_value: rawPrice,      // RAW price - wallet shows true market value
-            value_updated_at: now,        // ALWAYS update
             last_price_checked_at: now,   // ALWAYS update
-            last_price_updated_at: now    // ALWAYS update
+            value_updated_at: priceChanged ? now : undefined,
+            last_price_updated_at: priceChanged ? now : undefined
           })
           .eq('sku', asset.stockx_sku);
 
-        const diff = rawPrice - oldPrice;
+        const oldValue = Number.isFinite(oldPrice) ? Number(oldPrice) : rawPrice;
+        const diff = rawPrice - oldValue;
         const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
-        console.log(`✓ ${asset.stockx_sku}: $${oldPrice.toFixed(2)} → $${rawPrice.toFixed(2)} ${arrow} (RAW)`);
+        const oldDisplay = Number.isFinite(oldPrice) ? Number(oldPrice).toFixed(2) : '--';
+        console.log(`✓ ${asset.stockx_sku}: $${oldDisplay} → $${rawPrice.toFixed(2)} ${arrow} (RAW)`);
 
         results.updated++;
         results.details.push({
           sku: asset.stockx_sku,
           name: asset.name,
-          oldPrice,
+          oldPrice: oldPrice ?? null,
           newPrice: rawPrice,
           rawAsk: rawPrice
         });
 
-        await new Promise(r => setTimeout(r, API_DELAY_MS));
+        await sleep(API_DELAY_MS);
 
       } catch (err) {
         // Check for auth failure - abort entire batch if token is dead
-        const isAuthError = err.message.includes('401') ||
-                           err.message.includes('Token refresh failed') ||
-                           err.message.includes('No refresh token');
-
-        if (isAuthError) {
+        if (isAuthError(err)) {
           console.error('[CRITICAL] Auth failed. Aborting batch.');
           console.error(`[CRITICAL] Error: ${err.message}`);
           results.failed++;
@@ -187,7 +280,7 @@ async function refreshAllAssets() {
           name: asset.name,
           error: err.message
         });
-        await new Promise(r => setTimeout(r, API_DELAY_MS));
+        await sleep(API_DELAY_MS);
       }
     }
 
@@ -200,47 +293,26 @@ async function refreshAllAssets() {
     lastRefreshTime = new Date().toISOString();
     lastRefreshResults = results;
 
-    // Update cron status table
-    const jobFinishedAt = new Date().toISOString();
-    await supabase.from('cron_status').upsert({
-      job_name: 'price-worker',
-      last_run_at: jobFinishedAt,
-      last_status: results.authFailed ? 'auth_failed' : (results.failed > 0 ? 'partial' : 'success'),
-      last_payload: {
-        updated: results.updated,
-        failed: results.failed,
-        elapsed_seconds: parseFloat(elapsed),
-        started_at: jobStartedAt,
-        finished_at: jobFinishedAt,
-        auth_failed: results.authFailed || false,
-        auth_error: results.authError || null,
-        job_id: results.jobId
-      },
-      updated_at: jobFinishedAt
-    }, { onConflict: 'job_name' });
-
-    // Complete job tracking record
-    if (results.jobId) {
-      if (results.authFailed) {
-        await supabase.rpc('fail_price_refresh_job', {
-          p_job_id: results.jobId,
-          p_error: results.authError,
-          p_is_auth_failure: true
-        });
-        console.log(`[JOB] Marked job ${results.jobId} as auth_failed`);
-      } else {
-        await supabase.rpc('complete_price_refresh_job', {
-          p_job_id: results.jobId,
-          p_items_updated: results.updated,
-          p_items_failed: results.failed
-        });
-        console.log(`[JOB] Completed job ${results.jobId}: ${results.updated} updated, ${results.failed} failed`);
-      }
-    }
-
     return results;
 
   } finally {
+    if (results.jobId) {
+      const status = results.authFailed ? 'auth_failed' : (results.failed > 0 || results.timedOut ? 'error' : 'success');
+      await supabase
+        .from('price_refresh_jobs')
+        .update({
+          finished_at: new Date().toISOString(),
+          status,
+          updated_count: results.updated,
+          failed_count: results.failed,
+          items_updated: results.updated,
+          items_failed: results.failed,
+          error_summary: results.authError || (results.timedOut ? 'Max runtime reached' : null),
+          error: results.authError || (results.timedOut ? 'Max runtime reached' : null)
+        })
+        .eq('id', results.jobId);
+    }
+
     // Always release lock
     const { error: unlockError } = await supabase.rpc('release_price_update_lock');
     if (unlockError) {
@@ -306,14 +378,60 @@ app.get('/run-now', (req, res) => {
 });
 
 app.get('/status', (req, res) => {
-  res.json({
-    lastRefresh: lastRefreshTime,
-    lastResults: lastRefreshResults,
-    lastCronTick,
-    schedule: CRON_SCHEDULE,
-    batchLimit: BATCH_LIMIT,
-    pricing: 'RAW StockX Ask (fees on frontend)'
-  });
+  (async () => {
+    try {
+      const { data: lastJob, error: lastJobError } = await supabase
+        .from('price_refresh_jobs')
+        .select('id, status, started_at, finished_at, updated_count, failed_count, items_updated, items_failed, error_summary, error')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastJobError) {
+        throw new Error(lastJobError.message);
+      }
+
+      const { data: lastSuccess, error: lastSuccessError } = await supabase
+        .from('price_refresh_jobs')
+        .select('finished_at')
+        .eq('status', 'success')
+        .order('finished_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastSuccessError) {
+        throw new Error(lastSuccessError.message);
+      }
+
+      const lastSuccessAt = lastSuccess?.finished_at || null;
+      const minutesSinceLastSuccess = lastSuccessAt
+        ? Math.round((Date.now() - new Date(lastSuccessAt).getTime()) / 60000)
+        : null;
+      const pricingFresh = minutesSinceLastSuccess !== null && minutesSinceLastSuccess <= 15;
+
+      res.json({
+        ok: true,
+        schedule: CRON_SCHEDULE,
+        batchLimit: BATCH_LIMIT,
+        lastCronTick,
+        lastRefresh: lastRefreshTime,
+        lastResults: lastRefreshResults,
+        lastJob: lastJob || null,
+        lastSuccessAt,
+        minutesSinceLastSuccess,
+        pricingFresh,
+        pricingStatus: pricingFresh ? 'fresh' : 'stale',
+        pricing: 'RAW StockX Ask (fees on frontend)'
+      });
+    } catch (err) {
+      res.status(500).json({
+        ok: false,
+        error: err.message,
+        schedule: CRON_SCHEDULE,
+        batchLimit: BATCH_LIMIT
+      });
+    }
+  })();
 });
 
 app.get('/health', (req, res) => {
@@ -332,7 +450,7 @@ app.get('/token-health', async (req, res) => {
     })();
 
     // Determine overall health status
-    const ok = health.source === 'database' && health.hasRefreshToken;
+    const ok = Boolean(health.ok);
 
     res.json({
       ok,

@@ -43,6 +43,7 @@ interface Asset {
   last_price_update: string | null;
   last_price_checked_at: string | null;
   last_price_updated_at: string | null;
+  updated_at_pricing: string | null;
   price_24h_ago: number | null;
   price_change: number | null;
   price_change_percent: number | null;
@@ -252,9 +253,11 @@ export default function AssetDetailScreen() {
   const changeColor = hasChange ? (isPositive ? theme.success : theme.error) : theme.textSecondary;
   const canBuy = hasFixedSize || Boolean(selectedSize);
 
+  const pricingUpdatedAt = asset?.updated_at_pricing || asset?.last_price_checked_at || asset?.last_price_updated_at || asset?.last_price_update;
+
   // Check if price is stale (older than 4 hours)
-  const isStale = !asset?.last_price_update ||
-    ((Date.now() - new Date(asset.last_price_update).getTime()) / 60000) > STALE_MINUTES;
+  const isStale = !pricingUpdatedAt ||
+    ((Date.now() - new Date(pricingUpdatedAt).getTime()) / 60000) > STALE_MINUTES;
 
   const buildSearchQuery = () => {
     if (!asset) return '';
@@ -491,9 +494,9 @@ export default function AssetDetailScreen() {
               {isPositive ? '▲' : '▼'} {formatPriceChange(asset.price_change)} ({formatPercentChange(asset.price_change_percent)}) today
             </Text>
           )}
-          {asset.last_price_checked_at && (
+          {pricingUpdatedAt && (
             <Text style={styles.updatedText}>
-              Updated {formatTimeAgo(asset.last_price_checked_at)}
+              Updated {formatTimeAgo(pricingUpdatedAt)}
             </Text>
           )}
         </View>

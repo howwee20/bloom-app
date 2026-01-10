@@ -13,7 +13,8 @@
  * Usage: node seed-stockx-token.js
  */
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const { createClient } = require('@supabase/supabase-js');
 
 const STOCKX_REFRESH_TOKEN = process.env.STOCKX_REFRESH_TOKEN;
@@ -40,7 +41,6 @@ async function main() {
   console.log('='.repeat(60));
 
   console.log('\n[SEED] Copying refresh token from env to database...');
-  console.log(`[SEED] Token preview: ${STOCKX_REFRESH_TOKEN.slice(0, 20)}...`);
 
   const { error } = await supabase.rpc('update_stockx_tokens', {
     p_access_token: null,

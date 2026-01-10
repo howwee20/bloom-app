@@ -44,6 +44,8 @@ const showAlert = (title: string, message: string, buttons?: Array<{text: string
 
 // Filter types for custody
 type CustodyFilter = 'all' | 'bloom' | 'home';
+const PRICE_FRESHNESS_MINUTES = 15;
+const PRICE_STALE_HOURS = 24;
 
 // Token interface for ownership-first model
 interface Token {
@@ -62,6 +64,7 @@ interface Token {
   pnl_percent: number | null;
   match_status?: 'matched' | 'pending';
   last_price_checked_at?: string | null;
+  last_price_updated_at?: string | null;
   status: 'acquiring' | 'in_custody' | 'listed' | 'redeeming' | 'shipped' | 'redeemed' | 'shipping_to_bloom';
 }
 
@@ -93,6 +96,8 @@ interface Asset {
   pnl_percent: number | null;
   last_price_update: string | null;
   last_price_checked_at?: string | null;
+  last_price_updated_at?: string | null;
+  updated_at_pricing?: string | null;
 }
 
 interface PortfolioSummary {
@@ -228,24 +233,12 @@ export default function HomeScreen() {
         .maybeSingle();
       setWeeklyDigest((digestData as WeeklyDigest) || null);
 
-      // Get last successful price update from job tracking table (DB truth)
-      // Falls back to individual token/asset timestamps if RPC not available
-      const { data: lastJobUpdate } = await supabase.rpc('get_last_successful_price_update');
-      if (lastJobUpdate) {
+      // Use last successful job timestamp only (truth source)
+      const { data: lastJobUpdate, error: lastJobError } = await supabase.rpc('get_last_successful_price_update');
+      if (!lastJobError && lastJobUpdate) {
         setLastUpdatedAt(new Date(lastJobUpdate));
       } else {
-        // Fallback to max of individual timestamps
-        const latestTokenCheck = (tokenData || [])
-          .map((item: Token) => item.last_price_checked_at)
-          .filter((value: string | null | undefined): value is string => Boolean(value))
-          .map(value => new Date(value).getTime());
-        const latestAssetCheck = (assets || [])
-          .map((item: Asset) => item.last_price_checked_at)
-          .filter((value: string | null | undefined): value is string => Boolean(value))
-          .map(value => new Date(value).getTime());
-        const allChecks = [...latestTokenCheck, ...latestAssetCheck];
-        const latestCheck = allChecks.length > 0 ? Math.max(...allChecks) : null;
-        setLastUpdatedAt(latestCheck ? new Date(latestCheck) : null);
+        setLastUpdatedAt(null);
       }
       setUpdateDelayed(false);
       setPollIntervalMs(2 * 60 * 1000);
@@ -374,16 +367,22 @@ export default function HomeScreen() {
     return `${dollarStr}${percentStr}`;
   };
 
-  const formatTimeAgo = (date: Date | null) => {
-    if (!date) return 'Not updated yet';
+  const formatRelativeTime = (date: Date) => {
     const diffMs = now - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-    if (diffMins < 1) return 'Updated just now';
-    if (diffMins < 60) return `Updated ${diffMins}m ago`;
-    if (diffHours < 24) return `Updated ${diffHours}h ago`;
-    return `Updated ${diffDays}d ago`;
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
+
+  const isTimestampStale = (value?: string | null) => {
+    if (!value) return true;
+    const timestampMs = new Date(value).getTime();
+    if (Number.isNaN(timestampMs)) return true;
+    return (now - timestampMs) > PRICE_STALE_HOURS * 60 * 60 * 1000;
   };
 
   const buildSearchQuery = (item: SellItem) => {
@@ -541,6 +540,8 @@ export default function HomeScreen() {
     const pnlStr = isPendingMatch ? null : formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
     const pnlColor = getPnlColor(item.pnl_dollars);
     const isBloom = item.custody_type === 'bloom';
+    const pricingTimestamp = item.last_price_checked_at || item.last_price_updated_at || null;
+    const isPriceStale = !isPendingMatch && isTimestampStale(pricingTimestamp);
 
     return (
       <Pressable
@@ -575,6 +576,11 @@ export default function HomeScreen() {
           <Text style={[styles.cardPrice, isBloom && styles.cardPriceBloom]}>
             {isPendingMatch ? 'Needs match' : formatPrice(item.current_value)}
           </Text>
+          {isPriceStale && (
+            <View style={styles.priceStaleBadge}>
+              <Text style={styles.priceStaleBadgeText}>Price stale</Text>
+            </View>
+          )}
           <View style={styles.cardPnlRow}>
             {pnlStr ? (
               <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
@@ -600,6 +606,8 @@ export default function HomeScreen() {
     const showImage = item.image_url && !failedImages.has(item.id);
     const pnlStr = formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
     const pnlColor = getPnlColor(item.pnl_dollars);
+    const pricingTimestamp = item.updated_at_pricing || item.last_price_checked_at || item.last_price_updated_at || item.last_price_update;
+    const isPriceStale = isTimestampStale(pricingTimestamp);
 
     return (
       <Pressable style={styles.assetCard} onPress={() => router.push(`/asset/${item.id}`)}>
@@ -621,6 +629,11 @@ export default function HomeScreen() {
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
           <Text style={styles.cardPrice}>{formatPrice(item.current_price)}</Text>
+          {isPriceStale && (
+            <View style={styles.priceStaleBadge}>
+              <Text style={styles.priceStaleBadgeText}>Price stale</Text>
+            </View>
+          )}
           <View style={styles.cardPnlRow}>
             {pnlStr ? (
               <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
@@ -696,6 +709,10 @@ export default function HomeScreen() {
     })),
   ];
   const sortedSellItems = [...sellItems].sort((a, b) => b.value - a.value);
+  const lastUpdatedLabel = lastUpdatedAt ? formatRelativeTime(lastUpdatedAt) : null;
+  const pricingFresh = lastUpdatedAt
+    ? (now - lastUpdatedAt.getTime()) <= PRICE_FRESHNESS_MINUTES * 60 * 1000
+    : false;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -724,8 +741,16 @@ export default function HomeScreen() {
           </Text>
         )}
         <View style={styles.updatedRow}>
-          <Text style={styles.updatedText}>{formatTimeAgo(lastUpdatedAt)}</Text>
-          {updateDelayed && <Text style={styles.updatedText}> · Update delayed</Text>}
+          <Text style={[styles.updatedText, !pricingFresh && styles.updatedTextPaused]}>
+            {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
+          </Text>
+          {!pricingFresh && lastUpdatedLabel && (
+            <Text style={styles.updatedText}> · Last update {lastUpdatedLabel}</Text>
+          )}
+          {!pricingFresh && !lastUpdatedLabel && (
+            <Text style={styles.updatedText}> · No successful updates yet</Text>
+          )}
+          {pricingFresh && updateDelayed && <Text style={styles.updatedText}> · Update delayed</Text>}
         </View>
       </View>
 
@@ -1419,6 +1444,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.textSecondary,
   },
+  updatedTextPaused: {
+    color: theme.warning,
+    fontWeight: '600',
+  },
   assetsSection: {
     flex: 1,
     backgroundColor: theme.backgroundSecondary,
@@ -1536,6 +1565,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
     textTransform: 'uppercase',
+  },
+  priceStaleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: theme.warningBg,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 6,
+  },
+  priceStaleBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: theme.warning,
   },
   custodyLabel: {
     position: 'absolute',

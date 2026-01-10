@@ -464,9 +464,9 @@ export default function TokenDetailScreen() {
               {formatPnL(token.pnl_dollars)} since purchase
             </Text>
           )}
-          {token.last_price_checked_at && (
+          {(token.last_price_checked_at || token.last_price_updated_at) && (
             <Text style={styles.updatedText}>
-              Updated {formatTimeAgo(token.last_price_checked_at)}
+              Updated {formatTimeAgo(token.last_price_checked_at || token.last_price_updated_at)}
             </Text>
           )}
 

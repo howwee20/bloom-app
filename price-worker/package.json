@@ -5,7 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js"
+    "dev": "node index.js",
+    "start:pm2": "bash scripts/pm2-start.sh",
+    "logs:pm2": "pm2 logs bloom-prices --lines 200",
+    "stop:pm2": "pm2 stop bloom-prices",
+    "restart:pm2": "pm2 restart bloom-prices"
   },
   "engines": {
     "node": ">=18.0.0"
