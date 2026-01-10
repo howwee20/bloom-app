@@ -4,7 +4,7 @@ const cron = require('node-cron');
 const { createClient } = require('@supabase/supabase-js');
 const stockx = require('./lib/stockx');
 const { fetchPrice } = stockx;
-const { calculateBloomPrice, FLAT_FEE, VARIABLE_RATE } = require('./lib/pricing');
+// Note: calculateBloomPrice removed - we now store RAW prices (fees on frontend)
 
 const app = express();
 app.use(express.json());
@@ -27,7 +27,7 @@ stockx.init(supabase);
 // ============================================
 const BATCH_LIMIT = 25;                       // Assets per run
 const API_DELAY_MS = 1200;                    // 1.2s between calls (StockX: 1/sec limit)
-const CRON_SCHEDULE = '*/10 * * * *';         // Every 10 minutes
+const CRON_SCHEDULE = '*/5 * * * *';          // Every 5 minutes
 
 // ============================================
 // CORE: REFRESH ASSETS (with advisory lock)
@@ -40,7 +40,7 @@ async function refreshAllAssets() {
   const startTime = Date.now();
   console.log('\n' + '='.repeat(60));
   console.log(`[REFRESH] Starting at ${new Date().toISOString()}`);
-  console.log(`[CONFIG] Batch: ${BATCH_LIMIT}, Formula: Base × 1.039 + $17.50`);
+  console.log(`[CONFIG] Batch: ${BATCH_LIMIT}, Storing: Raw StockX Ask (no markup)`);
   console.log('='.repeat(60));
 
   // Try to acquire advisory lock
@@ -94,59 +94,55 @@ async function refreshAllAssets() {
       try {
         // Fetch live price from StockX
         const liveData = await fetchPrice(asset.stockx_sku, size);
-        const newAsk = liveData.lowestAsk;
-        const newBid = liveData.highestBid;
+        const rawPrice = liveData.lowestAsk;  // RAW TRUTH - no markup
+        const highestBid = liveData.highestBid;
 
-        // Calculate Bloom price
-        const pricing = calculateBloomPrice(newAsk);
-        const newPrice = pricing.bloomPrice;
-
-        // Update database
+        // Store RAW price (fees calculated on frontend at buy time)
+        // Update database - ALWAYS update timestamps even if price unchanged
         await supabase
           .from('assets')
           .update({
-            base_price: newAsk,
-            price: newPrice,
-            highest_bid: newBid,
-            last_price_checked_at: now,
-            price_updated_at: now,
-            last_price_update: now,
+            base_price: rawPrice,
+            price: rawPrice,              // RAW StockX Ask - matches public marketplaces
+            highest_bid: highestBid,
+            last_price_checked_at: now,   // ALWAYS update
+            price_updated_at: now,        // ALWAYS update
+            last_price_update: now,       // ALWAYS update
             price_error: null,
             price_source: 'stockx'
           })
           .eq('id', asset.id);
 
-        // Log price history
+        // Log price history (raw price)
         await supabase.from('price_history').insert({
           asset_id: asset.id,
-          price: newPrice,
+          price: rawPrice,
           source: 'stockx',
           created_at: now
         });
 
-        // Update token current_values for this SKU
+        // Update token current_values for this SKU (RAW price for wallet view)
         await supabase
           .from('tokens')
           .update({
-            current_value: newPrice,
-            value_updated_at: now,
-            last_price_checked_at: now,
-            last_price_updated_at: now
+            current_value: rawPrice,      // RAW price - wallet shows true market value
+            value_updated_at: now,        // ALWAYS update
+            last_price_checked_at: now,   // ALWAYS update
+            last_price_updated_at: now    // ALWAYS update
           })
           .eq('sku', asset.stockx_sku);
 
-        const diff = newPrice - oldPrice;
+        const diff = rawPrice - oldPrice;
         const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
-        console.log(`✓ ${asset.stockx_sku}: $${oldPrice.toFixed(2)} → $${newPrice.toFixed(2)} ${arrow}`);
+        console.log(`✓ ${asset.stockx_sku}: $${oldPrice.toFixed(2)} → $${rawPrice.toFixed(2)} ${arrow} (RAW)`);
 
         results.updated++;
         results.details.push({
           sku: asset.stockx_sku,
           name: asset.name,
           oldPrice,
-          newPrice,
-          ask: newAsk,
-          fees: pricing.totalFees
+          newPrice: rawPrice,
+          rawAsk: rawPrice
         });
 
         await new Promise(r => setTimeout(r, API_DELAY_MS));
@@ -212,17 +208,11 @@ async function refreshAllAssets() {
 // ============================================
 
 app.get('/', (req, res) => {
-  const example = calculateBloomPrice(180);
   res.json({
     status: 'Bloom Price Worker',
     source: 'StockX Official API',
-    formula: `Base × ${1 + VARIABLE_RATE} + $${FLAT_FEE}`,
-    example: {
-      stockxAsk: '$180.00',
-      variableFee: `$${example.variableFee} (${VARIABLE_RATE * 100}%)`,
-      flatFee: `$${example.flatFee}`,
-      bloomPrice: `$${example.bloomPrice}`
-    },
+    pricing: 'RAW StockX Ask (no markup)',
+    note: 'Fees calculated on frontend at buy time',
     schedule: CRON_SCHEDULE,
     endpoints: {
       'GET /run-now': 'Trigger instant update (non-blocking)',
@@ -274,10 +264,7 @@ app.get('/status', (req, res) => {
     lastCronTick,
     schedule: CRON_SCHEDULE,
     batchLimit: BATCH_LIMIT,
-    formula: {
-      variableRate: `${VARIABLE_RATE * 100}%`,
-      flatFee: `$${FLAT_FEE}`
-    }
+    pricing: 'RAW StockX Ask (fees on frontend)'
   });
 });
 
@@ -346,17 +333,16 @@ function startCron() {
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
-  const example = calculateBloomPrice(180);
   console.log('');
   console.log('='.repeat(60));
   console.log('  BLOOM PRICE WORKER');
   console.log('='.repeat(60));
   console.log(`  Port: ${PORT}`);
   console.log(`  Source: StockX Official API`);
-  console.log(`  Formula: Base × ${1 + VARIABLE_RATE} + $${FLAT_FEE}`);
+  console.log(`  Pricing: RAW StockX Ask (no markup)`);
   console.log(`  Batch Size: ${BATCH_LIMIT} assets per run`);
-  console.log(`  Schedule: ${CRON_SCHEDULE} (every 10 minutes)`);
-  console.log(`  Example: $180 Ask → $${example.bloomPrice} Bloom`);
+  console.log(`  Schedule: ${CRON_SCHEDULE} (every 5 minutes)`);
+  console.log(`  Note: Fees calculated on frontend at buy time`);
   console.log('='.repeat(60));
   console.log('');
 

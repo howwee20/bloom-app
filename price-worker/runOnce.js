@@ -13,7 +13,7 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const stockx = require('./lib/stockx');
 const { fetchPrice } = stockx;
-const { calculateBloomPrice } = require('./lib/pricing');
+// Note: calculateBloomPrice removed - we now store RAW prices
 
 // Parse CLI args
 const args = process.argv.slice(2);
@@ -96,23 +96,19 @@ async function runOnce() {
       try {
         // Fetch live price from StockX
         const liveData = await fetchPrice(asset.stockx_sku, size);
-        const lowestAsk = liveData.lowestAsk;
+        const rawPrice = liveData.lowestAsk;  // RAW TRUTH - no markup
         const highestBid = liveData.highestBid;
 
-        // Calculate Bloom price
-        const pricing = calculateBloomPrice(lowestAsk);
-        const newPrice = pricing.bloomPrice;
-
-        // Update asset with new price
+        // Store RAW price (fees calculated on frontend at buy time)
         const { error: updateError } = await supabase
           .from('assets')
           .update({
-            base_price: lowestAsk,
-            price: newPrice,
+            base_price: rawPrice,
+            price: rawPrice,              // RAW StockX Ask - matches public marketplaces
             highest_bid: highestBid,
-            last_price_checked_at: now,
-            price_updated_at: now,
-            last_price_update: now,
+            last_price_checked_at: now,   // ALWAYS update
+            price_updated_at: now,        // ALWAYS update
+            last_price_update: now,       // ALWAYS update
             price_error: null,
             price_source: 'stockx'
           })
@@ -122,29 +118,29 @@ async function runOnce() {
           throw new Error(`DB update failed: ${updateError.message}`);
         }
 
-        // Log price history
+        // Log price history (raw price)
         await supabase.from('price_history').insert({
           asset_id: asset.id,
-          price: newPrice,
+          price: rawPrice,
           source: 'stockx',
           created_at: now
         });
 
-        // Sync token prices for this SKU
+        // Sync token prices for this SKU (RAW price for wallet view)
         await supabase
           .from('tokens')
           .update({
-            current_value: newPrice,
-            value_updated_at: now,
-            last_price_checked_at: now,
-            last_price_updated_at: now
+            current_value: rawPrice,      // RAW price - wallet shows true market value
+            value_updated_at: now,        // ALWAYS update
+            last_price_checked_at: now,   // ALWAYS update
+            last_price_updated_at: now    // ALWAYS update
           })
           .eq('sku', asset.stockx_sku);
 
         // Log result
-        const diff = newPrice - oldPrice;
+        const diff = rawPrice - oldPrice;
         const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
-        console.log(`✓ ${asset.stockx_sku}: $${oldPrice.toFixed(2)} → $${newPrice.toFixed(2)} ${arrow}`);
+        console.log(`✓ ${asset.stockx_sku}: $${oldPrice.toFixed(2)} → $${rawPrice.toFixed(2)} ${arrow} (RAW)`);
 
         results.updated++;
 
