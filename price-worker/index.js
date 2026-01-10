@@ -365,7 +365,7 @@ app.get('/asset/:id', async (req, res) => {
 
   res.json({
     ...asset,
-    pricing: asset.base_price ? calculateBloomPrice(asset.base_price) : null
+    note: 'price is RAW StockX Ask - fees calculated on frontend'
   });
 });
 
@@ -414,6 +414,14 @@ app.listen(PORT, () => {
   console.log(`  Batch Size: ${BATCH_LIMIT} assets per run`);
   console.log(`  Schedule: ${CRON_SCHEDULE} (every 5 minutes)`);
   console.log(`  Note: Fees calculated on frontend at buy time`);
+  console.log('');
+  console.log('  Environment Check:');
+  const supabaseHost = (() => { try { return new URL(SUPABASE_URL).host; } catch { return 'INVALID'; } })();
+  console.log(`    Supabase Host: ${supabaseHost}`);
+  console.log(`    SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_KEY ? '✓ SET' : '✗ MISSING'}`);
+  console.log(`    STOCKX_CLIENT_ID: ${process.env.STOCKX_CLIENT_ID ? '✓ SET' : '✗ MISSING'}`);
+  console.log(`    STOCKX_CLIENT_SECRET: ${process.env.STOCKX_CLIENT_SECRET ? '✓ SET' : '✗ MISSING'}`);
+  console.log(`    STOCKX_API_KEY: ${process.env.STOCKX_API_KEY ? '✓ SET' : '✗ MISSING'}`);
   console.log('='.repeat(60));
   console.log('');
 
