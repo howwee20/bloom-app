@@ -1,5 +1,18 @@
+# nixpacks.toml
+
 [phases.setup]
+# Force Node.js 18
 nixPkgs = ["nodejs_18"]
 
+[phases.install]
+# Install dependencies using NPM
+cmds = ["npm install"]
+
+[phases.build]
+# If you are just running a JS file, leave this empty or use "echo 'Skipping build'"
+# If you have TypeScript, use: "npm run build"
+cmds = ["echo 'Build phase complete'"]
+
 [start]
-cmd = "npm start"
+# Command to run your worker
+cmd = "node index.js"
