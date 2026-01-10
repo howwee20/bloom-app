@@ -145,7 +145,21 @@ async function runOnce() {
         results.updated++;
 
       } catch (err) {
-        // On failure: update checked_at and error, but DON'T change price
+        // Check for auth failure - abort entire batch if token is dead
+        const isAuthError = err.message.includes('401') ||
+                           err.message.includes('Token refresh failed') ||
+                           err.message.includes('No refresh token');
+
+        if (isAuthError) {
+          console.error('[CRITICAL] Auth failed. Aborting batch.');
+          console.error(`[CRITICAL] Error: ${err.message}`);
+          results.failed++;
+          results.authFailed = true;
+          results.authError = err.message;
+          break;  // Stop processing - don't retry with dead token
+        }
+
+        // On non-auth failure: update checked_at and error, but DON'T change price
         await supabase
           .from('assets')
           .update({
