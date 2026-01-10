@@ -106,6 +106,7 @@ async function refreshAllAssets() {
     success: true,
     updated: 0,
     failed: 0,
+    skipped: 0,
     details: [],
     jobId: null,
     authFailed: false,
@@ -264,6 +265,28 @@ async function refreshAllAssets() {
           break;  // Stop processing - don't retry with dead token
         }
 
+        const isNoPriceData = err?.message?.includes('No price data');
+        if (isNoPriceData) {
+          await supabase
+            .from('assets')
+            .update({
+              last_price_checked_at: now,
+              price_error: err.message
+            })
+            .eq('id', asset.id);
+
+          console.warn(`~ ${asset.stockx_sku}: ${err.message} (skipped)`);
+          results.skipped++;
+          results.details.push({
+            sku: asset.stockx_sku,
+            name: asset.name,
+            skipped: true,
+            reason: err.message
+          });
+          await sleep(API_DELAY_MS);
+          continue;
+        }
+
         // On non-auth failure: update checked_at and error, but DON'T change price
         await supabase
           .from('assets')
@@ -297,7 +320,9 @@ async function refreshAllAssets() {
 
   } finally {
     if (results.jobId) {
-      const status = results.authFailed ? 'auth_failed' : (results.failed > 0 || results.timedOut ? 'error' : 'success');
+      const status = results.authFailed
+        ? 'auth_failed'
+        : (results.updated > 0 ? (results.failed > 0 || results.timedOut ? 'partial' : 'success') : 'error');
       await supabase
         .from('price_refresh_jobs')
         .update({
@@ -305,6 +330,7 @@ async function refreshAllAssets() {
           status,
           updated_count: results.updated,
           failed_count: results.failed,
+          skipped_count: results.skipped,
           items_updated: results.updated,
           items_failed: results.failed,
           error_summary: results.authError || (results.timedOut ? 'Max runtime reached' : null),
@@ -382,7 +408,7 @@ app.get('/status', (req, res) => {
     try {
       const { data: lastJob, error: lastJobError } = await supabase
         .from('price_refresh_jobs')
-        .select('id, status, started_at, finished_at, updated_count, failed_count, items_updated, items_failed, error_summary, error')
+        .select('id, status, started_at, finished_at, updated_count, failed_count, skipped_count, items_updated, items_failed, error_summary, error')
         .order('started_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -394,7 +420,7 @@ app.get('/status', (req, res) => {
       const { data: lastSuccess, error: lastSuccessError } = await supabase
         .from('price_refresh_jobs')
         .select('finished_at')
-        .eq('status', 'success')
+        .in('status', ['success', 'partial'])
         .order('finished_at', { ascending: false })
         .limit(1)
         .maybeSingle();

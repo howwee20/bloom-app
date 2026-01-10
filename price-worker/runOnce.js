@@ -226,6 +226,22 @@ async function runOnce() {
           break;  // Stop processing - don't retry with dead token
         }
 
+        const isNoPriceData = err?.message?.includes('No price data');
+        if (isNoPriceData) {
+          await supabase
+            .from('assets')
+            .update({
+              last_price_checked_at: now,
+              price_error: err.message
+            })
+            .eq('id', asset.id);
+
+          console.warn(`~ ${asset.stockx_sku}: ${err.message} (skipped)`);
+          results.skipped++;
+          await sleep(API_DELAY_MS);
+          continue;
+        }
+
         // On non-auth failure: update checked_at and error, but DON'T change price
         await supabase
           .from('assets')

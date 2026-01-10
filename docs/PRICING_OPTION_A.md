@@ -60,3 +60,12 @@ Default port: `http://localhost:3001`
 3) Wallet header shows:
    - `Updated Xm ago` only when fresh
    - `Prices paused` when stale or missing
+
+## SQL: verify job freshness
+
+```sql
+select id,status,updated_count,failed_count,skipped_count,finished_at
+from price_refresh_jobs
+order by started_at desc
+limit 5;
+```
