@@ -225,8 +225,10 @@ app.get('/', (req, res) => {
     },
     schedule: CRON_SCHEDULE,
     endpoints: {
-      'GET /refresh': 'Trigger manual refresh',
+      'GET /run-now': 'Trigger instant update (non-blocking)',
+      'GET /refresh': 'Trigger manual refresh (waits for completion)',
       'GET /status': 'Check worker status',
+      'GET /token-health': 'Check StockX token status',
       'GET /health': 'Health check'
     },
     lastRefresh: lastRefreshTime
@@ -243,6 +245,26 @@ app.post('/refresh', async (req, res) => {
   console.log('[API] Refresh triggered via POST');
   const results = await refreshAllAssets();
   res.json(results);
+});
+
+app.get('/run-now', (req, res) => {
+  console.log('[MANUAL TRIGGER] User requested immediate update');
+
+  // Fire and forget - don't await
+  refreshAllAssets()
+    .then(results => {
+      console.log(`[MANUAL TRIGGER] Completed: ${results?.updated || 0} updated, ${results?.failed || 0} failed`);
+    })
+    .catch(err => {
+      console.error('[MANUAL TRIGGER] Error:', err.message);
+    });
+
+  // Return immediately
+  res.json({
+    status: 'Update started',
+    timestamp: new Date().toISOString(),
+    message: 'Check /status for results when complete'
+  });
 });
 
 app.get('/status', (req, res) => {
