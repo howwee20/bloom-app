@@ -1,0 +1,1002 @@
+[
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Military Blue (Industrial Blue)",
+    "display_name": "Jordan Air Jordan 4 Retro Military Blue (Industrial Blue)",
+    "style_code": "FV5029-141",
+    "release_year": 2024,
+    "popularity_rank": 1,
+    "aliases": ["AJ4", "Military Blue"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Bred Reimagined",
+    "display_name": "Jordan Air Jordan 4 Retro Bred Reimagined",
+    "style_code": "FV5029-006",
+    "release_year": 2024,
+    "popularity_rank": 2,
+    "aliases": ["AJ4", "Bred"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "White Thunder",
+    "display_name": "Jordan Air Jordan 4 Retro White Thunder",
+    "style_code": "FQ8138-001",
+    "release_year": 2024,
+    "popularity_rank": 3,
+    "aliases": ["AJ4", "White Thunder"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Wet Cement (Paris Olympics)",
+    "display_name": "Jordan Air Jordan 4 Retro Wet Cement (Paris Olympics)",
+    "style_code": "FQ7928-001",
+    "release_year": 2024,
+    "popularity_rank": 4,
+    "aliases": ["AJ4", "Wet Cement"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Oxidized Green",
+    "display_name": "Jordan Air Jordan 4 Retro Oxidized Green",
+    "style_code": "FQ8138-103",
+    "release_year": 2024,
+    "popularity_rank": 5,
+    "aliases": ["AJ4", "Oxidized Green"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Red Cement",
+    "display_name": "Jordan Air Jordan 4 Retro Red Cement",
+    "style_code": "DH6927-161",
+    "release_year": 2023,
+    "popularity_rank": 6,
+    "aliases": ["AJ4", "Red Cement"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Thunder (2023)",
+    "display_name": "Jordan Air Jordan 4 Retro Thunder (2023)",
+    "style_code": "DH6927-017",
+    "release_year": 2023,
+    "popularity_rank": 7,
+    "aliases": ["AJ4", "Thunder"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Midnight Navy",
+    "display_name": "Jordan Air Jordan 4 Retro Midnight Navy",
+    "style_code": "DH6927-140",
+    "release_year": 2022,
+    "popularity_rank": 8,
+    "aliases": ["AJ4", "Midnight Navy"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Military Black",
+    "display_name": "Jordan Air Jordan 4 Retro Military Black",
+    "style_code": "DH6927-111",
+    "release_year": 2022,
+    "popularity_rank": 9,
+    "aliases": ["AJ4", "Military Black"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Black Canvas",
+    "display_name": "Jordan Air Jordan 4 Retro Black Canvas",
+    "style_code": "DH7138-006",
+    "release_year": 2022,
+    "popularity_rank": 10,
+    "aliases": ["AJ4", "Black Canvas"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 4 Retro",
+    "colorway_name": "Red Thunder",
+    "display_name": "Jordan Air Jordan 4 Retro Red Thunder",
+    "style_code": "CT8527-016",
+    "release_year": 2022,
+    "popularity_rank": 11,
+    "aliases": ["AJ4", "Red Thunder"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 3 Retro",
+    "colorway_name": "Black Cement (Reimagined)",
+    "display_name": "Jordan Air Jordan 3 Retro Black Cement (Reimagined)",
+    "style_code": "DN3707-010",
+    "release_year": 2024,
+    "popularity_rank": 12,
+    "aliases": ["AJ3", "Black Cement"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 3 Retro",
+    "colorway_name": "White Cement Reimagined",
+    "display_name": "Jordan Air Jordan 3 Retro White Cement Reimagined",
+    "style_code": "DN3707-100",
+    "release_year": 2023,
+    "popularity_rank": 13,
+    "aliases": ["AJ3", "White Cement"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 3 Retro",
+    "colorway_name": "Fire Red (2022)",
+    "display_name": "Jordan Air Jordan 3 Retro Fire Red (2022)",
+    "style_code": "DN3707-160",
+    "release_year": 2022,
+    "popularity_rank": 14,
+    "aliases": ["AJ3", "Fire Red"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 11 Retro",
+    "colorway_name": "Gratitude (DMP)",
+    "display_name": "Jordan Air Jordan 11 Retro Gratitude (DMP)",
+    "style_code": "CT8012-170",
+    "release_year": 2023,
+    "popularity_rank": 15,
+    "aliases": ["AJ11", "Gratitude", "DMP"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 11 Retro",
+    "colorway_name": "Cherry",
+    "display_name": "Jordan Air Jordan 11 Retro Cherry",
+    "style_code": "CT8012-116",
+    "release_year": 2022,
+    "popularity_rank": 16,
+    "aliases": ["AJ11", "Cherry"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 11 Retro",
+    "colorway_name": "Cool Grey (2021)",
+    "display_name": "Jordan Air Jordan 11 Retro Cool Grey (2021)",
+    "style_code": "CT8012-005",
+    "release_year": 2021,
+    "popularity_rank": 17,
+    "aliases": ["AJ11", "Cool Grey"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 11 Retro",
+    "colorway_name": "Jubilee (25th Anniversary)",
+    "display_name": "Jordan Air Jordan 11 Retro Jubilee (25th Anniversary)",
+    "style_code": "CT8012-011",
+    "release_year": 2020,
+    "popularity_rank": 18,
+    "aliases": ["AJ11", "Jubilee"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 11 Retro",
+    "colorway_name": "Bred (2019)",
+    "display_name": "Jordan Air Jordan 11 Retro Bred (2019)",
+    "style_code": "378037-061",
+    "release_year": 2019,
+    "popularity_rank": 19,
+    "aliases": ["AJ11", "Bred"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 11 Retro",
+    "colorway_name": "Concord (2018)",
+    "display_name": "Jordan Air Jordan 11 Retro Concord (2018)",
+    "style_code": "378037-100",
+    "release_year": 2018,
+    "popularity_rank": 20,
+    "aliases": ["AJ11", "Concord"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 11 Retro",
+    "colorway_name": "Legend Blue (2024)",
+    "display_name": "Jordan Air Jordan 11 Retro Legend Blue (2024)",
+    "style_code": "CT8012-104",
+    "release_year": 2024,
+    "popularity_rank": 21,
+    "aliases": ["AJ11", "Legend Blue"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 11 Retro Low",
+    "colorway_name": "Space Jam",
+    "display_name": "Jordan Air Jordan 11 Retro Low Space Jam",
+    "style_code": "FV5104-004",
+    "release_year": 2024,
+    "popularity_rank": 22,
+    "aliases": ["AJ11 Low", "Space Jam"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Retro High OG",
+    "colorway_name": "Chicago Lost and Found",
+    "display_name": "Jordan Air Jordan 1 Retro High OG Chicago Lost and Found",
+    "style_code": "DZ5485-612",
+    "release_year": 2022,
+    "popularity_rank": 23,
+    "aliases": ["AJ1", "Lost and Found", "Chicago"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Retro High OG",
+    "colorway_name": "University Blue",
+    "display_name": "Jordan Air Jordan 1 Retro High OG University Blue",
+    "style_code": "555088-134",
+    "release_year": 2021,
+    "popularity_rank": 24,
+    "aliases": ["AJ1", "University Blue"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Retro High OG",
+    "colorway_name": "Dark Mocha",
+    "display_name": "Jordan Air Jordan 1 Retro High OG Dark Mocha",
+    "style_code": "555088-105",
+    "release_year": 2020,
+    "popularity_rank": 25,
+    "aliases": ["AJ1", "Dark Mocha"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Retro High OG",
+    "colorway_name": "Patent Bred",
+    "display_name": "Jordan Air Jordan 1 Retro High OG Patent Bred",
+    "style_code": "555088-063",
+    "release_year": 2021,
+    "popularity_rank": 26,
+    "aliases": ["AJ1", "Patent Bred"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Retro High OG",
+    "colorway_name": "Yellow Ochre",
+    "display_name": "Jordan Air Jordan 1 Retro High OG Yellow Ochre",
+    "style_code": "DZ5485-701",
+    "release_year": 2024,
+    "popularity_rank": 27,
+    "aliases": ["AJ1", "Yellow Ochre"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Retro High OG",
+    "colorway_name": "Palomino",
+    "display_name": "Jordan Air Jordan 1 Retro High OG Palomino",
+    "style_code": "DZ5485-020",
+    "release_year": 2023,
+    "popularity_rank": 28,
+    "aliases": ["AJ1", "Palomino"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Retro High OG",
+    "colorway_name": "Taxi (Yellow Toe)",
+    "display_name": "Jordan Air Jordan 1 Retro High OG Taxi (Yellow Toe)",
+    "style_code": "555088-711",
+    "release_year": 2022,
+    "popularity_rank": 29,
+    "aliases": ["AJ1", "Taxi", "Yellow Toe"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Retro Low OG",
+    "colorway_name": "Black Toe",
+    "display_name": "Jordan Air Jordan 1 Retro Low OG Black Toe",
+    "style_code": "CZ0790-106",
+    "release_year": 2023,
+    "popularity_rank": 30,
+    "aliases": ["AJ1 Low", "Black Toe"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Low",
+    "colorway_name": "Wolf Grey",
+    "display_name": "Jordan Air Jordan 1 Low Wolf Grey",
+    "style_code": "553558-057",
+    "release_year": 2021,
+    "popularity_rank": 31,
+    "aliases": ["AJ1 Low", "Wolf Grey"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Low",
+    "colorway_name": "Ice Blue (W)",
+    "display_name": "Jordan Air Jordan 1 Low Ice Blue (W)",
+    "style_code": "DC0774-141",
+    "release_year": 2022,
+    "popularity_rank": 32,
+    "aliases": ["AJ1 Low", "Ice Blue", "Aluminum"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Low",
+    "colorway_name": "Bred Toe",
+    "display_name": "Jordan Air Jordan 1 Low Bred Toe",
+    "style_code": "553558-612",
+    "release_year": 2021,
+    "popularity_rank": 33,
+    "aliases": ["AJ1 Low", "Bred Toe"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Low",
+    "colorway_name": "Shadow Toe",
+    "display_name": "Jordan Air Jordan 1 Low Shadow Toe",
+    "style_code": "553558-052",
+    "release_year": 2022,
+    "popularity_rank": 34,
+    "aliases": ["AJ1 Low", "Shadow Toe"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Low",
+    "colorway_name": "White Black (Panda Style)",
+    "display_name": "Jordan Air Jordan 1 Low White Black (Panda Style)",
+    "style_code": "553558-132",
+    "release_year": 2023,
+    "popularity_rank": 35,
+    "aliases": ["AJ1 Low", "Panda"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Mid",
+    "colorway_name": "Light Smoke Grey",
+    "display_name": "Jordan Air Jordan 1 Mid Light Smoke Grey",
+    "style_code": "554724-092",
+    "release_year": 2020,
+    "popularity_rank": 36,
+    "aliases": ["AJ1 Mid", "Light Smoke Grey"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Mid",
+    "colorway_name": "Chicago (2020)",
+    "display_name": "Jordan Air Jordan 1 Mid Chicago (2020)",
+    "style_code": "554724-173",
+    "release_year": 2020,
+    "popularity_rank": 37,
+    "aliases": ["AJ1 Mid", "Chicago"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Mid",
+    "colorway_name": "Banned (2020)",
+    "display_name": "Jordan Air Jordan 1 Mid Banned (2020)",
+    "style_code": "554724-074",
+    "release_year": 2020,
+    "popularity_rank": 38,
+    "aliases": ["AJ1 Mid", "Banned"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Mid",
+    "colorway_name": "Shadow Red",
+    "display_name": "Jordan Air Jordan 1 Mid Shadow Red",
+    "style_code": "554724-096",
+    "release_year": 2021,
+    "popularity_rank": 39,
+    "aliases": ["AJ1 Mid", "Shadow Red"]
+  },
+  {
+    "brand": "Jordan",
+    "model": "Air Jordan 1 Mid",
+    "colorway_name": "Armory Navy",
+    "display_name": "Jordan Air Jordan 1 Mid Armory Navy",
+    "style_code": "554724-411",
+    "release_year": 2022,
+    "popularity_rank": 40,
+    "aliases": ["AJ1 Mid", "Armory Navy"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "White Black (Panda)",
+    "display_name": "Nike Dunk Low White Black (Panda)",
+    "style_code": "DD1391-100",
+    "release_year": 2021,
+    "popularity_rank": 41,
+    "aliases": ["Panda", "Dunk"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Grey Fog",
+    "display_name": "Nike Dunk Low Grey Fog",
+    "style_code": "DD1391-103",
+    "release_year": 2021,
+    "popularity_rank": 42,
+    "aliases": ["Dunk", "Grey Fog"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Photon Dust (W)",
+    "display_name": "Nike Dunk Low Photon Dust (W)",
+    "style_code": "DD1503-103",
+    "release_year": 2021,
+    "popularity_rank": 43,
+    "aliases": ["Dunk", "Photon Dust"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Rose Whisper (W)",
+    "display_name": "Nike Dunk Low Rose Whisper (W)",
+    "style_code": "DD1503-118",
+    "release_year": 2022,
+    "popularity_rank": 44,
+    "aliases": ["Dunk", "Rose Whisper"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Cacao Wow (W)",
+    "display_name": "Nike Dunk Low Cacao Wow (W)",
+    "style_code": "DD1503-124",
+    "release_year": 2023,
+    "popularity_rank": 45,
+    "aliases": ["Dunk", "Cacao Wow"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Valerian Blue",
+    "display_name": "Nike Dunk Low Valerian Blue",
+    "style_code": "DD1391-400",
+    "release_year": 2022,
+    "popularity_rank": 46,
+    "aliases": ["Dunk", "Valerian Blue"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Polar Blue",
+    "display_name": "Nike Dunk Low Polar Blue",
+    "style_code": "DV0833-400",
+    "release_year": 2023,
+    "popularity_rank": 47,
+    "aliases": ["Dunk", "Polar Blue"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Vintage Green (W)",
+    "display_name": "Nike Dunk Low Vintage Green (W)",
+    "style_code": "DQ8580-100",
+    "release_year": 2022,
+    "popularity_rank": 48,
+    "aliases": ["Dunk", "Vintage Green"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Industrial Blue Sashiko",
+    "display_name": "Nike Dunk Low Industrial Blue Sashiko",
+    "style_code": "DV0834-101",
+    "release_year": 2023,
+    "popularity_rank": 49,
+    "aliases": ["Dunk", "Sashiko"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Light Smoke Grey (W)",
+    "display_name": "Nike Dunk Low Light Smoke Grey (W)",
+    "style_code": "DD1503-117",
+    "release_year": 2022,
+    "popularity_rank": 50,
+    "aliases": ["Dunk", "Light Smoke Grey"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Reverse Panda",
+    "display_name": "Nike Dunk Low Reverse Panda",
+    "style_code": "FD9064-010",
+    "release_year": 2022,
+    "popularity_rank": 51,
+    "aliases": ["Dunk", "Reverse Panda"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Sanddrift (W)",
+    "display_name": "Nike Dunk Low Sanddrift (W)",
+    "style_code": "FD0873-126",
+    "release_year": 2023,
+    "popularity_rank": 52,
+    "aliases": ["Dunk", "Sanddrift"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "University Blue",
+    "display_name": "Nike Dunk Low University Blue",
+    "style_code": "DD1391-102",
+    "release_year": 2021,
+    "popularity_rank": 53,
+    "aliases": ["Dunk", "University Blue"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Championship Red",
+    "display_name": "Nike Dunk Low Championship Red",
+    "style_code": "DD1391-600",
+    "release_year": 2021,
+    "popularity_rank": 54,
+    "aliases": ["Dunk", "Championship Red"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Michigan State",
+    "display_name": "Nike Dunk Low Michigan State",
+    "style_code": "DD1391-101",
+    "release_year": 2021,
+    "popularity_rank": 55,
+    "aliases": ["Dunk", "Michigan State"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Syracuse",
+    "display_name": "Nike Dunk Low Syracuse",
+    "style_code": "CU1726-101",
+    "release_year": 2022,
+    "popularity_rank": 56,
+    "aliases": ["Dunk", "Syracuse"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low",
+    "colorway_name": "Kentucky",
+    "display_name": "Nike Dunk Low Kentucky",
+    "style_code": "CU1726-100",
+    "release_year": 2022,
+    "popularity_rank": 57,
+    "aliases": ["Dunk", "Kentucky"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Dunk Low Next Nature",
+    "colorway_name": "White Black (W)",
+    "display_name": "Nike Dunk Low Next Nature White Black (W)",
+    "style_code": "DD1873-102",
+    "release_year": 2021,
+    "popularity_rank": 58,
+    "aliases": ["Dunk", "Next Nature", "Panda"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Air Force 1 Low",
+    "colorway_name": "White '07",
+    "display_name": "Nike Air Force 1 Low White '07",
+    "style_code": "CW2288-111",
+    "release_year": 2020,
+    "popularity_rank": 59,
+    "aliases": ["AF1", "White"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Air Force 1 Low",
+    "colorway_name": "Black '07",
+    "display_name": "Nike Air Force 1 Low Black '07",
+    "style_code": "CW2288-001",
+    "release_year": 2020,
+    "popularity_rank": 60,
+    "aliases": ["AF1", "Black"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Air Force 1 Low",
+    "colorway_name": "Supreme White",
+    "display_name": "Nike Air Force 1 Low Supreme White",
+    "style_code": "CU9225-100",
+    "release_year": 2020,
+    "popularity_rank": 61,
+    "aliases": ["AF1", "Supreme"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Air Force 1 Low",
+    "colorway_name": "Wheat Mocha",
+    "display_name": "Nike Air Force 1 Low Wheat Mocha",
+    "style_code": "DC7504-700",
+    "release_year": 2020,
+    "popularity_rank": 62,
+    "aliases": ["AF1", "Wheat"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Air Force 1 Low",
+    "colorway_name": "Flax",
+    "display_name": "Nike Air Force 1 Low Flax",
+    "style_code": "CJ9179-200",
+    "release_year": 2019,
+    "popularity_rank": 63,
+    "aliases": ["AF1", "Flax"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Air Force 1 Low",
+    "colorway_name": "White Black",
+    "display_name": "Nike Air Force 1 Low White Black",
+    "style_code": "CT2302-100",
+    "release_year": 2020,
+    "popularity_rank": 64,
+    "aliases": ["AF1", "White Black"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Zoom Vomero 5",
+    "colorway_name": "Vast Grey",
+    "display_name": "Nike Zoom Vomero 5 Vast Grey",
+    "style_code": "BV1358-001",
+    "release_year": 2023,
+    "popularity_rank": 65,
+    "aliases": ["Vomero 5", "Vast Grey"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Zoom Vomero 5",
+    "colorway_name": "Supersonic",
+    "display_name": "Nike Zoom Vomero 5 Supersonic",
+    "style_code": "FN7649-110",
+    "release_year": 2023,
+    "popularity_rank": 66,
+    "aliases": ["Vomero 5", "Supersonic"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Air Max 1 '86",
+    "colorway_name": "Big Bubble University Red",
+    "display_name": "Nike Air Max 1 '86 Big Bubble University Red",
+    "style_code": "DQ3989-100",
+    "release_year": 2023,
+    "popularity_rank": 67,
+    "aliases": ["Air Max 1", "Big Bubble"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Air Max 90",
+    "colorway_name": "Infrared",
+    "display_name": "Nike Air Max 90 Infrared",
+    "style_code": "CT1685-100",
+    "release_year": 2020,
+    "popularity_rank": 68,
+    "aliases": ["Air Max 90", "Infrared"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Air Max 97",
+    "colorway_name": "Silver Bullet",
+    "display_name": "Nike Air Max 97 Silver Bullet",
+    "style_code": "DM0028-002",
+    "release_year": 2022,
+    "popularity_rank": 69,
+    "aliases": ["Air Max 97", "Silver Bullet"]
+  },
+  {
+    "brand": "Nike",
+    "model": "Kobe 6 Protro",
+    "colorway_name": "Reverse Grinch",
+    "display_name": "Nike Kobe 6 Protro Reverse Grinch",
+    "style_code": "FV4921-600",
+    "release_year": 2023,
+    "popularity_rank": 70,
+    "aliases": ["Kobe 6", "Reverse Grinch"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Samba OG",
+    "colorway_name": "White Black Gum",
+    "display_name": "adidas Samba OG White Black Gum",
+    "style_code": "B75806",
+    "release_year": 2018,
+    "popularity_rank": 71,
+    "aliases": ["Samba", "White Black Gum"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Samba OG",
+    "colorway_name": "Black White Gum",
+    "display_name": "adidas Samba OG Black White Gum",
+    "style_code": "B75807",
+    "release_year": 2018,
+    "popularity_rank": 72,
+    "aliases": ["Samba", "Black White Gum"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Campus 00s",
+    "colorway_name": "Core Black",
+    "display_name": "adidas Campus 00s Core Black",
+    "style_code": "HQ8708",
+    "release_year": 2023,
+    "popularity_rank": 73,
+    "aliases": ["Campus 00s", "Core Black"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Gazelle Indoor",
+    "colorway_name": "Bliss Pink (W)",
+    "display_name": "adidas Gazelle Indoor Bliss Pink (W)",
+    "style_code": "IE7002",
+    "release_year": 2023,
+    "popularity_rank": 74,
+    "aliases": ["Gazelle", "Bliss Pink"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Yeezy Slide",
+    "colorway_name": "Bone",
+    "display_name": "adidas Yeezy Slide Bone",
+    "style_code": "FZ5897",
+    "release_year": 2022,
+    "popularity_rank": 75,
+    "aliases": ["Yeezy Slide", "Bone"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Yeezy Slide",
+    "colorway_name": "Onyx",
+    "display_name": "adidas Yeezy Slide Onyx",
+    "style_code": "HQ6448",
+    "release_year": 2022,
+    "popularity_rank": 76,
+    "aliases": ["Yeezy Slide", "Onyx"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Yeezy Slide",
+    "colorway_name": "Slate Grey",
+    "display_name": "adidas Yeezy Slide Slate Grey",
+    "style_code": "ID2350",
+    "release_year": 2023,
+    "popularity_rank": 77,
+    "aliases": ["Yeezy Slide", "Slate Grey"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Yeezy Slide",
+    "colorway_name": "Granite",
+    "display_name": "adidas Yeezy Slide Granite",
+    "style_code": "ID4132",
+    "release_year": 2023,
+    "popularity_rank": 78,
+    "aliases": ["Yeezy Slide", "Granite"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Yeezy Foam RNR",
+    "colorway_name": "Onyx",
+    "display_name": "adidas Yeezy Foam RNR Onyx",
+    "style_code": "HP8739",
+    "release_year": 2022,
+    "popularity_rank": 79,
+    "aliases": ["Foam RNR", "Onyx"]
+  },
+  {
+    "brand": "adidas",
+    "model": "Yeezy Foam RNR",
+    "colorway_name": "Sand",
+    "display_name": "adidas Yeezy Foam RNR Sand",
+    "style_code": "FY4567",
+    "release_year": 2021,
+    "popularity_rank": 80,
+    "aliases": ["Foam RNR", "Sand"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "550",
+    "colorway_name": "White Green",
+    "display_name": "New Balance 550 White Green",
+    "style_code": "BB550WT1",
+    "release_year": 2021,
+    "popularity_rank": 81,
+    "aliases": ["NB 550", "White Green"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "550",
+    "colorway_name": "White Grey",
+    "display_name": "New Balance 550 White Grey",
+    "style_code": "BB550PB1",
+    "release_year": 2022,
+    "popularity_rank": 82,
+    "aliases": ["NB 550", "White Grey"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "550",
+    "colorway_name": "White Black (Oreo)",
+    "display_name": "New Balance 550 White Black (Oreo)",
+    "style_code": "BB550HA1",
+    "release_year": 2021,
+    "popularity_rank": 83,
+    "aliases": ["NB 550", "Oreo"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "2002R Protection Pack",
+    "colorway_name": "Rain Cloud",
+    "display_name": "New Balance 2002R Protection Pack Rain Cloud",
+    "style_code": "M2002RDA",
+    "release_year": 2021,
+    "popularity_rank": 84,
+    "aliases": ["2002R", "Rain Cloud"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "2002R Protection Pack",
+    "colorway_name": "Phantom",
+    "display_name": "New Balance 2002R Protection Pack Phantom",
+    "style_code": "M2002RDB",
+    "release_year": 2021,
+    "popularity_rank": 85,
+    "aliases": ["2002R", "Phantom"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "2002R Protection Pack",
+    "colorway_name": "Sea Salt",
+    "display_name": "New Balance 2002R Protection Pack Sea Salt",
+    "style_code": "M2002RDC",
+    "release_year": 2021,
+    "popularity_rank": 86,
+    "aliases": ["2002R", "Sea Salt"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "9060",
+    "colorway_name": "Rain Cloud",
+    "display_name": "New Balance 9060 Rain Cloud",
+    "style_code": "U9060GRY",
+    "release_year": 2022,
+    "popularity_rank": 87,
+    "aliases": ["9060", "Rain Cloud"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "9060",
+    "colorway_name": "Sea Salt",
+    "display_name": "New Balance 9060 Sea Salt",
+    "style_code": "U9060MAC",
+    "release_year": 2022,
+    "popularity_rank": 88,
+    "aliases": ["9060", "Sea Salt"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "9060",
+    "colorway_name": "Black Castlerock",
+    "display_name": "New Balance 9060 Black Castlerock",
+    "style_code": "U9060BLK",
+    "release_year": 2022,
+    "popularity_rank": 89,
+    "aliases": ["9060", "Black Castlerock"]
+  },
+  {
+    "brand": "New Balance",
+    "model": "530",
+    "colorway_name": "White Silver Navy",
+    "display_name": "New Balance 530 White Silver Navy",
+    "style_code": "MR530SG",
+    "release_year": 2021,
+    "popularity_rank": 90,
+    "aliases": ["NB 530", "White Silver Navy"]
+  },
+  {
+    "brand": "ASICS",
+    "model": "Gel-1130",
+    "colorway_name": "White Birch (W)",
+    "display_name": "ASICS Gel-1130 White Birch (W)",
+    "style_code": "1202A163-102",
+    "release_year": 2022,
+    "popularity_rank": 91,
+    "aliases": ["Gel-1130", "White Birch"]
+  },
+  {
+    "brand": "ASICS",
+    "model": "Gel-Kayano 14",
+    "colorway_name": "Cream Black",
+    "display_name": "ASICS Gel-Kayano 14 Cream Black",
+    "style_code": "1201A019-108",
+    "release_year": 2023,
+    "popularity_rank": 92,
+    "aliases": ["Gel-Kayano 14", "Cream Black"]
+  },
+  {
+    "brand": "UGG",
+    "model": "Tasman Slipper",
+    "colorway_name": "Chestnut",
+    "display_name": "UGG Tasman Slipper Chestnut",
+    "style_code": "5950",
+    "release_year": 2015,
+    "popularity_rank": 93,
+    "aliases": ["UGG Tasman", "Chestnut"]
+  },
+  {
+    "brand": "UGG",
+    "model": "Classic Ultra Mini",
+    "colorway_name": "Chestnut",
+    "display_name": "UGG Classic Ultra Mini Chestnut",
+    "style_code": "1116109",
+    "release_year": 2020,
+    "popularity_rank": 94,
+    "aliases": ["UGG Classic", "Ultra Mini"]
+  },
+  {
+    "brand": "Crocs",
+    "model": "Classic Clog",
+    "colorway_name": "Lightning McQueen",
+    "display_name": "Crocs Classic Clog Lightning McQueen",
+    "style_code": "205759-610",
+    "release_year": 2021,
+    "popularity_rank": 95,
+    "aliases": ["Crocs", "Lightning McQueen"]
+  },
+  {
+    "brand": "Crocs",
+    "model": "Classic Clog",
+    "colorway_name": "Mater",
+    "display_name": "Crocs Classic Clog Mater",
+    "style_code": "209384",
+    "release_year": 2023,
+    "popularity_rank": 96,
+    "aliases": ["Crocs", "Mater"]
+  },
+  {
+    "brand": "Salomon",
+    "model": "XT-6",
+    "colorway_name": "Black Phantom",
+    "display_name": "Salomon XT-6 Black Phantom",
+    "style_code": "L41086600",
+    "release_year": 2020,
+    "popularity_rank": 97,
+    "aliases": ["XT-6", "Black Phantom"]
+  },
+  {
+    "brand": "Hoka",
+    "model": "Clifton 9",
+    "colorway_name": "Black White",
+    "display_name": "Hoka Clifton 9 Black White",
+    "style_code": "1127895-BWHT",
+    "release_year": 2023,
+    "popularity_rank": 98,
+    "aliases": ["Clifton 9", "Black White"]
+  },
+  {
+    "brand": "On",
+    "model": "Cloud 5",
+    "colorway_name": "All Black",
+    "display_name": "On Cloud 5 All Black",
+    "style_code": "59.98919",
+    "release_year": 2022,
+    "popularity_rank": 99,
+    "aliases": ["Cloud 5", "All Black"]
+  },
+  {
+    "brand": "Timberland",
+    "model": "6 Inch Premium Boot",
+    "colorway_name": "Wheat Nubuck",
+    "display_name": "Timberland 6 Inch Premium Boot Wheat Nubuck",
+    "style_code": "10061",
+    "release_year": null,
+    "popularity_rank": 100,
+    "aliases": ["Timberland", "Wheat Boot"]
+  }
+]

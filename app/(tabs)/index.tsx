@@ -160,7 +160,6 @@ export default function HomeScreen() {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showBuyIntent, setShowBuyIntent] = useState(false);
   const [showRouteHome, setShowRouteHome] = useState(false);
   const [routeHomeQuery, setRouteHomeQuery] = useState('');
@@ -817,7 +816,7 @@ export default function HomeScreen() {
               Sell
             </Text>
           </Pressable>
-          <Pressable style={styles.actionIconButton} onPress={() => setShowAddModal(true)}>
+          <Pressable style={styles.actionIconButton} onPress={() => router.push('/add-item')}>
             <Text style={styles.actionIconText}>+</Text>
           </Pressable>
         </View>
@@ -921,46 +920,6 @@ export default function HomeScreen() {
           />
         )}
       </View>
-
-      {/* Add Item Modal */}
-      <Modal
-        visible={showAddModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAddModal(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowAddModal(false)}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add to Wallet</Text>
-
-            <Pressable
-              style={styles.modalOption}
-              onPress={() => {
-                setShowAddModal(false);
-                router.push('/add-from-home');
-              }}
-            >
-              <Text style={styles.modalOptionTitle}>Add from Home</Text>
-              <Text style={styles.modalOptionDesc}>Track something you already own</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.modalOption}
-              onPress={() => {
-                setShowAddModal(false);
-                router.push('/add-from-photo');
-              }}
-            >
-              <Text style={styles.modalOptionTitle}>Add from Photo</Text>
-              <Text style={styles.modalOptionDesc}>Snap a photo and match later</Text>
-            </Pressable>
-
-            <Pressable style={styles.modalCancel} onPress={() => setShowAddModal(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
 
       {/* Buy Intent Modal */}
       <Modal

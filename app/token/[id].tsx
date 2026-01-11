@@ -517,13 +517,6 @@ export default function TokenDetailScreen() {
                 <Text style={styles.actionButtonText}>Ship to Me</Text>
               </Pressable>
             )}
-            {isHomeCustody && (
-              <Pressable style={styles.actionButton} onPress={() => {
-                showAlert('Send to Bloom', 'Ship this item to Bloom to enable instant selling. Transit takes 2-3 days.');
-              }}>
-                <Text style={styles.actionButtonText}>Send to Bloom</Text>
-              </Pressable>
-            )}
           </>
         )}
         {isListed && (
