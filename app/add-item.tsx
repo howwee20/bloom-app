@@ -54,6 +54,7 @@ export default function AddItemScreen() {
   const [loading, setLoading] = useState(false);
   const [popularLoading, setPopularLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [sizeInput, setSizeInput] = useState('');
@@ -130,18 +131,20 @@ export default function AddItemScreen() {
     setCondition(null);
     setCostBasis('');
     setLocation('home');
+    setSubmitError(null);
     setShowConfirm(true);
   };
 
   const closeConfirm = () => {
     setShowConfirm(false);
     setSubmitting(false);
+    setSubmitError(null);
   };
 
   const handleAddAsset = async () => {
     if (!selectedItem) return;
     if (!session?.user?.id) {
-      setError('Please sign in to add an item.');
+      setSubmitError('Please sign in to add an item.');
       return;
     }
 
@@ -149,12 +152,12 @@ export default function AddItemScreen() {
     const parsedCost = costBasis.trim() ? Number.parseFloat(costBasis) : null;
 
     if (parsedCost !== null && (Number.isNaN(parsedCost) || parsedCost < 0)) {
-      setError('Enter a valid cost basis.');
+      setSubmitError('Enter a valid cost basis.');
       return;
     }
 
     setSubmitting(true);
-    setError(null);
+    setSubmitError(null);
 
     try {
       const { error: insertError } = await supabase
@@ -179,7 +182,7 @@ export default function AddItemScreen() {
       router.back();
     } catch (e) {
       console.error('Add asset error:', e);
-      setError('Failed to add item. Please try again.');
+      setSubmitError('Failed to add item. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -335,6 +338,7 @@ export default function AddItemScreen() {
               </View>
             </View>
 
+            {submitError && <Text style={styles.submitErrorText}>{submitError}</Text>}
             <Pressable
               style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
               onPress={handleAddAsset}
@@ -385,21 +389,24 @@ const styles = StyleSheet.create({
   },
   searchSection: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   searchInput: {
+    flex: 1,
     backgroundColor: theme.card,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderWidth: 1,
     borderColor: theme.border,
     color: theme.textPrimary,
+    fontSize: 16,
+    fontFamily: fonts.body,
   },
   searchSpinner: {
-    position: 'absolute',
-    right: 28,
-    top: 14,
+    marginLeft: 8,
   },
   listHeader: {
     paddingHorizontal: 16,
@@ -423,15 +430,15 @@ const styles = StyleSheet.create({
   resultRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: theme.borderLight,
   },
   resultImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
-    marginRight: 12,
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    marginRight: 14,
     backgroundColor: theme.backgroundSecondary,
   },
   resultImagePlaceholder: {
@@ -446,14 +453,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   resultName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: theme.textPrimary,
+    fontFamily: fonts.body,
   },
   resultMeta: {
-    fontSize: 12,
+    fontSize: 13,
     color: theme.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
+    fontFamily: fonts.body,
   },
   emptyState: {
     paddingHorizontal: 16,
@@ -474,6 +483,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     color: theme.error,
     fontSize: 12,
+  },
+  submitErrorText: {
+    color: theme.error,
+    fontSize: 12,
+    marginBottom: 8,
   },
   modalOverlay: {
     flex: 1,

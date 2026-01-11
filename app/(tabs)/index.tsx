@@ -90,6 +90,7 @@ interface Asset {
   size: string | null;
   category: string | null;
   stockx_sku: string | null;
+  catalog_item_id?: string | null;
   current_price: number;
   entry_price: number | null;
   pnl_dollars: number | null;
@@ -607,6 +608,10 @@ export default function HomeScreen() {
     const pnlColor = getPnlColor(item.pnl_dollars);
     const pricingTimestamp = item.updated_at_pricing || item.last_price_checked_at || item.last_price_updated_at || item.last_price_update;
     const isPriceStale = isTimestampStale(pricingTimestamp);
+    const metaParts = [];
+    if (item.size) metaParts.push(`Size ${item.size}`);
+    if (item.stockx_sku) metaParts.push(item.stockx_sku);
+    const metaLine = metaParts.length ? metaParts.join(' · ') : '—';
 
     return (
       <Pressable style={styles.assetCard} onPress={() => router.push(`/asset/${item.id}`)}>
@@ -635,9 +640,12 @@ export default function HomeScreen() {
           )}
           <View style={styles.cardPnlRow}>
             {pnlStr ? (
-              <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
+              <View style={styles.assetMetaStack}>
+                <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
+                {item.stockx_sku && <Text style={styles.cardMeta}>{item.stockx_sku}</Text>}
+              </View>
             ) : (
-              <Text style={styles.cardMeta}>Size {item.size}</Text>
+              <Text style={styles.cardMeta}>{metaLine}</Text>
             )}
           </View>
         </View>
@@ -1502,6 +1510,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  assetMetaStack: {
+    flexDirection: 'column',
+    gap: 2,
   },
   cardPnl: {
     fontSize: 11,

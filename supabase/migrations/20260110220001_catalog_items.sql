@@ -1,10 +1,8 @@
 -- Migration: Catalog items + search + asset linking
 
--- 1) Extensions for search
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE EXTENSION IF NOT EXISTS unaccent;
+-- No extensions needed - using simple ILIKE search
 
--- 2) Catalog items table
+-- 2) Catalog items table (no generated column - search done on-the-fly)
 CREATE TABLE IF NOT EXISTS public.catalog_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   brand TEXT NOT NULL,
@@ -15,16 +13,12 @@ CREATE TABLE IF NOT EXISTS public.catalog_items (
   release_year INT,
   image_url_thumb TEXT,
   aliases TEXT[],
-  popularity_rank INT NOT NULL,
-  search_text TEXT GENERATED ALWAYS AS (
-    unaccent(lower(
-      display_name || ' ' || style_code || ' ' || COALESCE(array_to_string(aliases, ' '), '')
-    ))
-  ) STORED
+  popularity_rank INT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_catalog_items_search_text
-ON public.catalog_items USING gin (search_text gin_trgm_ops);
+-- Index for name search
+CREATE INDEX IF NOT EXISTS idx_catalog_items_display_name
+ON public.catalog_items (display_name);
 
 CREATE INDEX IF NOT EXISTS idx_catalog_items_style_code
 ON public.catalog_items (style_code);
@@ -48,7 +42,7 @@ TO service_role
 USING (true)
 WITH CHECK (true);
 
--- 4) Search function
+-- 4) Search function (simple ILIKE - no pg_trgm dependency)
 CREATE OR REPLACE FUNCTION search_catalog_items(q TEXT, limit_n INT DEFAULT 20)
 RETURNS TABLE (
   id UUID,
@@ -66,9 +60,9 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_query TEXT := trim(q);
-  v_query_norm TEXT := unaccent(lower(trim(q)));
-  v_is_style_code BOOLEAN := v_query ~ '[0-9]' AND v_query ~ '-';
+  v_query_lower TEXT := lower(trim(q));
 BEGIN
+  -- Empty query: return popular items
   IF v_query IS NULL OR v_query = '' THEN
     RETURN QUERY
     SELECT
@@ -87,48 +81,32 @@ BEGIN
     RETURN;
   END IF;
 
-  IF v_is_style_code THEN
-    RETURN QUERY
-    SELECT
-      c.id,
-      c.display_name,
-      c.brand,
-      c.model,
-      c.colorway_name,
-      c.style_code,
-      c.release_year,
-      c.image_url_thumb,
-      c.popularity_rank
-    FROM public.catalog_items c
-    WHERE c.style_code ILIKE v_query || '%'
-       OR c.style_code ILIKE '%' || v_query || '%'
-    ORDER BY
-      CASE
-        WHEN c.style_code = v_query THEN 0
-        WHEN c.style_code ILIKE v_query || '%' THEN 1
-        ELSE 2
-      END,
-      c.popularity_rank ASC
-    LIMIT limit_n;
-  ELSE
-    RETURN QUERY
-    SELECT
-      c.id,
-      c.display_name,
-      c.brand,
-      c.model,
-      c.colorway_name,
-      c.style_code,
-      c.release_year,
-      c.image_url_thumb,
-      c.popularity_rank
-    FROM public.catalog_items c
-    WHERE c.search_text % v_query_norm
-    ORDER BY
-      similarity(c.search_text, v_query_norm) DESC,
-      c.popularity_rank ASC
-    LIMIT limit_n;
-  END IF;
+  -- Search by style code and name using ILIKE
+  RETURN QUERY
+  SELECT
+    c.id,
+    c.display_name,
+    c.brand,
+    c.model,
+    c.colorway_name,
+    c.style_code,
+    c.release_year,
+    c.image_url_thumb,
+    c.popularity_rank
+  FROM public.catalog_items c
+  WHERE lower(c.style_code) LIKE '%' || v_query_lower || '%'
+     OR lower(c.display_name) LIKE '%' || v_query_lower || '%'
+     OR lower(c.brand) LIKE '%' || v_query_lower || '%'
+     OR lower(c.model) LIKE '%' || v_query_lower || '%'
+  ORDER BY
+    CASE
+      WHEN lower(c.style_code) = v_query_lower THEN 0
+      WHEN lower(c.style_code) LIKE v_query_lower || '%' THEN 1
+      WHEN lower(c.display_name) LIKE v_query_lower || '%' THEN 2
+      ELSE 3
+    END,
+    c.popularity_rank ASC
+  LIMIT limit_n;
 END;
 $$;
 
