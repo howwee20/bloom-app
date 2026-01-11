@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,6 +9,7 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +21,7 @@ import { useAuth } from './_layout';
 
 type CatalogLocation = 'home' | 'bloom' | 'watchlist';
 type CatalogCondition = 'new' | 'worn' | 'used';
+type BrandFilter = 'All' | 'Jordan' | 'Nike' | 'adidas' | 'New Balance' | 'Other';
 
 interface CatalogItem {
   id: string;
@@ -32,6 +34,10 @@ interface CatalogItem {
   image_url_thumb: string | null;
   popularity_rank: number;
 }
+
+const BRAND_FILTERS: BrandFilter[] = ['All', 'Jordan', 'Nike', 'adidas', 'New Balance', 'Other'];
+const MAIN_BRANDS = ['Jordan', 'Nike', 'adidas', 'New Balance'];
+const PAGE_SIZE = 50;
 
 const CONDITION_OPTIONS: Array<{ value: CatalogCondition; label: string }> = [
   { value: 'new', label: 'New' },
@@ -49,10 +55,12 @@ export default function AddItemScreen() {
   const { session } = useAuth();
   const searchInputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<CatalogItem[]>([]);
-  const [popular, setPopular] = useState<CatalogItem[]>([]);
+  const [searchResults, setSearchResults] = useState<CatalogItem[]>([]);
+  const [browseItems, setBrowseItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [popularLoading, setPopularLoading] = useState(false);
+  const [browseLoading, setBrowseLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
@@ -62,49 +70,84 @@ export default function AddItemScreen() {
   const [costBasis, setCostBasis] = useState('');
   const [location, setLocation] = useState<CatalogLocation>('home');
   const [submitting, setSubmitting] = useState(false);
+  const [brandFilter, setBrandFilter] = useState<BrandFilter>('All');
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!query.trim()) {
-        setResults([]);
-        setError(null);
-        return;
-      }
-      searchCatalog(query);
-    }, 150);
-
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  useEffect(() => {
-    if (!popular.length) {
-      fetchPopular();
+  // Fetch browse items with brand filter and pagination
+  const fetchBrowseItems = useCallback(async (brand: BrandFilter, offset: number = 0) => {
+    if (offset === 0) {
+      setBrowseLoading(true);
+    } else {
+      setLoadingMore(true);
     }
-  }, []);
 
-  useEffect(() => {
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, []);
-
-  const fetchPopular = async () => {
-    setPopularLoading(true);
     try {
-      const { data, error: fetchError } = await supabase
+      let queryBuilder = supabase
         .from('catalog_items')
         .select('id, display_name, brand, model, colorway_name, style_code, release_year, image_url_thumb, popularity_rank')
         .order('popularity_rank', { ascending: true })
-        .limit(20);
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      // Apply brand filter
+      if (brand === 'Other') {
+        queryBuilder = queryBuilder.not('brand', 'in', `(${MAIN_BRANDS.join(',')})`);
+      } else if (brand !== 'All') {
+        queryBuilder = queryBuilder.eq('brand', brand);
+      }
+
+      const { data, error: fetchError } = await queryBuilder;
 
       if (fetchError) throw fetchError;
-      setPopular((data as CatalogItem[]) || []);
+
+      const items = (data as CatalogItem[]) || [];
+
+      if (offset === 0) {
+        setBrowseItems(items);
+      } else {
+        setBrowseItems(prev => [...prev, ...items]);
+      }
+
+      setHasMore(items.length === PAGE_SIZE);
     } catch (e) {
-      console.error('Popular fetch error:', e);
+      console.error('Browse fetch error:', e);
+      setError('Failed to load items.');
     } finally {
-      setPopularLoading(false);
+      setBrowseLoading(false);
+      setLoadingMore(false);
     }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchBrowseItems(brandFilter, 0);
+  }, []);
+
+  // Handle brand filter change
+  const handleBrandChange = (brand: BrandFilter) => {
+    setBrandFilter(brand);
+    setHasMore(true);
+    fetchBrowseItems(brand, 0);
   };
+
+  // Load more items
+  const loadMore = () => {
+    if (loadingMore || !hasMore || query.trim()) return;
+    fetchBrowseItems(brandFilter, browseItems.length);
+  };
+
+  // Search with debounce
+  useEffect(() => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setError(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      searchCatalog(query);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const searchCatalog = async (value: string) => {
     setLoading(true);
@@ -112,11 +155,11 @@ export default function AddItemScreen() {
     try {
       const { data, error: searchError } = await supabase.rpc('search_catalog_items', {
         q: value,
-        limit_n: 20,
+        limit_n: 30,
       });
 
       if (searchError) throw searchError;
-      setResults((data as CatalogItem[]) || []);
+      setSearchResults((data as CatalogItem[]) || []);
     } catch (e) {
       console.error('Search error:', e);
       setError('Search failed. Try again.');
@@ -188,11 +231,104 @@ export default function AddItemScreen() {
     }
   };
 
-  const showPopular = !query.trim();
-  const listData = showPopular ? popular : results;
-  const isEmpty = !loading && !popularLoading && listData.length === 0;
+  // Determine what to show
+  const isSearching = query.trim().length > 0;
+  const listData = isSearching ? searchResults : browseItems;
+  const showEmptyState = !loading && !browseLoading && listData.length === 0;
 
-  const headerTitle = useMemo(() => (showPopular ? 'Popular' : 'Results'), [showPopular]);
+  const renderItem = ({ item }: { item: CatalogItem }) => (
+    <Pressable style={styles.resultRow} onPress={() => openConfirm(item)}>
+      {item.image_url_thumb ? (
+        <Image source={{ uri: item.image_url_thumb }} style={styles.resultImage} />
+      ) : (
+        <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
+          <Text style={styles.resultImagePlaceholderText}>
+            {item.display_name.charAt(0)}
+          </Text>
+        </View>
+      )}
+      <View style={styles.resultInfo}>
+        <Text style={styles.resultName} numberOfLines={2}>
+          {item.display_name}
+        </Text>
+        <Text style={styles.resultMeta} numberOfLines={1}>
+          {item.style_code}
+        </Text>
+      </View>
+      <Text style={styles.resultArrow}>›</Text>
+    </Pressable>
+  );
+
+  const renderHeader = () => (
+    <View style={styles.stickyHeader}>
+      {/* Search */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchInputWrapper}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            ref={searchInputRef}
+            style={styles.searchInput}
+            placeholder="Search by name or style code"
+            placeholderTextColor={theme.textTertiary}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {query.length > 0 && (
+            <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
+              <Text style={styles.clearButtonText}>✕</Text>
+            </Pressable>
+          )}
+        </View>
+        {loading && <ActivityIndicator style={styles.searchSpinner} size="small" color={theme.accent} />}
+      </View>
+
+      {/* Brand Filter Chips */}
+      {!isSearching && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterChipsContainer}
+          style={styles.filterChipsScroll}
+        >
+          {BRAND_FILTERS.map((brand) => {
+            const isActive = brandFilter === brand;
+            return (
+              <Pressable
+                key={brand}
+                style={[styles.filterChip, isActive && styles.filterChipActive]}
+                onPress={() => handleBrandChange(brand)}
+              >
+                <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                  {brand}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {/* Section Header */}
+      <View style={styles.listHeader}>
+        <Text style={styles.listHeaderText}>
+          {isSearching ? 'Search Results' : brandFilter === 'All' ? 'Browse All' : brandFilter}
+        </Text>
+        {(browseLoading || loading) && <ActivityIndicator size="small" color={theme.accent} />}
+      </View>
+    </View>
+  );
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.loadingMore}>
+        <ActivityIndicator size="small" color={theme.accent} />
+        <Text style={styles.loadingMoreText}>Loading more...</Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -200,6 +336,7 @@ export default function AddItemScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
+        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Add Item</Text>
           <Pressable style={styles.closeButton} onPress={() => router.back()}>
@@ -207,63 +344,40 @@ export default function AddItemScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.searchSection}>
-          <TextInput
-            ref={searchInputRef}
-            style={styles.searchInput}
-            placeholder="Search by name or style code"
-            placeholderTextColor={theme.textSecondary}
-            value={query}
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-          />
-          {loading && <ActivityIndicator style={styles.searchSpinner} size="small" color={theme.accent} />}
-        </View>
-
-        <View style={styles.listHeader}>
-          <Text style={styles.listHeaderText}>{headerTitle}</Text>
-          {popularLoading && <ActivityIndicator size="small" color={theme.accent} />}
-        </View>
-
-        {isEmpty ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No matches found</Text>
-            <Text style={styles.emptySubtitle}>Not finding it? Request it</Text>
+        {showEmptyState ? (
+          <View style={styles.emptyWrapper}>
+            {renderHeader()}
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>
+                {isSearching ? 'No matches found' : 'No items available'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {isSearching ? 'Try a different search term' : 'Check back later'}
+              </Text>
+            </View>
           </View>
         ) : (
           <FlatList
             data={listData}
             keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            ListHeaderComponent={renderHeader}
+            ListFooterComponent={renderFooter}
+            stickyHeaderIndices={[0]}
             contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
-              <Pressable style={styles.resultRow} onPress={() => openConfirm(item)}>
-                {item.image_url_thumb ? (
-                  <Image source={{ uri: item.image_url_thumb }} style={styles.resultImage} />
-                ) : (
-                  <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
-                    <Text style={styles.resultImagePlaceholderText}>
-                      {item.display_name.charAt(0)}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.resultInfo}>
-                  <Text style={styles.resultName} numberOfLines={1}>
-                    {item.display_name}
-                  </Text>
-                  <Text style={styles.resultMeta} numberOfLines={1}>
-                    {item.style_code}
-                  </Text>
-                </View>
-              </Pressable>
-            )}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.3}
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={20}
+            maxToRenderPerBatch={20}
+            windowSize={10}
           />
         )}
 
         {error && <Text style={styles.errorText}>{error}</Text>}
       </KeyboardAvoidingView>
 
+      {/* Confirm Modal */}
       <Modal
         visible={showConfirm}
         transparent
@@ -271,7 +385,10 @@ export default function AddItemScreen() {
         onRequestClose={closeConfirm}
       >
         <Pressable style={styles.modalOverlay} onPress={closeConfirm}>
-          <View style={styles.modalContent}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            {selectedItem?.image_url_thumb && (
+              <Image source={{ uri: selectedItem.image_url_thumb }} style={styles.modalImage} />
+            )}
             <Text style={styles.modalTitle}>{selectedItem?.display_name}</Text>
             <Text style={styles.modalSubtitle}>{selectedItem?.style_code}</Text>
 
@@ -279,7 +396,7 @@ export default function AddItemScreen() {
               <Text style={styles.modalLabel}>Size (optional)</Text>
               <TextInput
                 style={styles.modalInput}
-                placeholder="Size"
+                placeholder="e.g., 10, 10.5, M, L"
                 placeholderTextColor={theme.textTertiary}
                 value={sizeInput}
                 onChangeText={setSizeInput}
@@ -348,7 +465,7 @@ export default function AddItemScreen() {
                 {submitting ? 'Adding...' : 'Add to Wallet'}
               </Text>
             </Pressable>
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
     </SafeAreaView>
@@ -369,6 +486,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
   headerTitle: {
     fontFamily: fonts.heading,
@@ -387,31 +506,81 @@ const styles = StyleSheet.create({
     color: theme.textSecondary,
     fontSize: 14,
   },
+  stickyHeader: {
+    backgroundColor: theme.background,
+    paddingBottom: 8,
+  },
   searchSection: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  searchInput: {
+  searchInputWrapper: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: theme.card,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: theme.border,
+  },
+  searchIcon: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
     color: theme.textPrimary,
     fontSize: 16,
     fontFamily: fonts.body,
   },
+  clearButton: {
+    padding: 4,
+  },
+  clearButtonText: {
+    color: theme.textSecondary,
+    fontSize: 12,
+  },
   searchSpinner: {
     marginLeft: 8,
   },
+  filterChipsScroll: {
+    maxHeight: 44,
+  },
+  filterChipsContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  filterChipActive: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  filterChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textSecondary,
+  },
+  filterChipTextActive: {
+    color: theme.textInverse,
+  },
   listHeader: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingTop: 8,
+    paddingBottom: 4,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -424,30 +593,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   resultRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: theme.borderLight,
   },
   resultImage: {
     width: 64,
     height: 64,
-    borderRadius: 12,
+    borderRadius: 10,
     marginRight: 14,
-    backgroundColor: theme.backgroundSecondary,
+    backgroundColor: '#FFF',
   },
   resultImagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: theme.backgroundSecondary,
   },
   resultImagePlaceholderText: {
     color: theme.textSecondary,
     fontWeight: '600',
+    fontSize: 20,
   },
   resultInfo: {
     flex: 1,
@@ -457,6 +628,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.textPrimary,
     fontFamily: fonts.body,
+    lineHeight: 20,
   },
   resultMeta: {
     fontSize: 13,
@@ -464,17 +636,37 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontFamily: fonts.body,
   },
+  resultArrow: {
+    fontSize: 20,
+    color: theme.textTertiary,
+    marginLeft: 8,
+  },
+  emptyWrapper: {
+    flex: 1,
+  },
   emptyState: {
     paddingHorizontal: 16,
-    paddingTop: 32,
+    paddingTop: 48,
+    alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: theme.textPrimary,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   emptySubtitle: {
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
+  loadingMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  loadingMoreText: {
     fontSize: 13,
     color: theme.textSecondary,
   },
@@ -488,48 +680,61 @@ const styles = StyleSheet.create({
     color: theme.error,
     fontSize: 12,
     marginBottom: 8,
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: theme.card,
     padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+  },
+  modalImage: {
+    width: 120,
+    height: 80,
+    borderRadius: 12,
+    alignSelf: 'center',
+    marginBottom: 12,
+    backgroundColor: '#FFF',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: theme.textPrimary,
+    textAlign: 'center',
   },
   modalSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: theme.textSecondary,
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   modalSection: {
-    marginBottom: 14,
+    marginBottom: 16,
   },
   modalLabel: {
     fontSize: 12,
     fontWeight: '600',
     color: theme.textSecondary,
-    marginBottom: 6,
+    marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   modalInput: {
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     color: theme.textPrimary,
     backgroundColor: theme.backgroundSecondary,
+    fontSize: 16,
   },
   optionRow: {
     flexDirection: 'row',
@@ -537,9 +742,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   optionChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.backgroundSecondary,
@@ -549,7 +754,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.accentLight,
   },
   optionChipText: {
-    fontSize: 12,
+    fontSize: 14,
     color: theme.textSecondary,
     fontWeight: '600',
   },
@@ -557,9 +762,9 @@ const styles = StyleSheet.create({
     color: theme.textPrimary,
   },
   submitButton: {
-    backgroundColor: theme.textPrimary,
-    paddingVertical: 14,
-    borderRadius: 12,
+    backgroundColor: theme.accent,
+    paddingVertical: 16,
+    borderRadius: 14,
     alignItems: 'center',
     marginTop: 8,
   },
@@ -567,11 +772,11 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   submitButtonText: {
-    color: '#FFF',
+    color: theme.textInverse,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 16,
   },
   submitButtonTextDisabled: {
-    color: '#FFF',
+    color: theme.textInverse,
   },
 });

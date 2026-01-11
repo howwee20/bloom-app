@@ -25,6 +25,7 @@ function loadEnvFile(filePath) {
   });
 }
 
+loadEnvFile(path.resolve(__dirname, '../price-worker/.env'));
 loadEnvFile(path.resolve(__dirname, '../.env'));
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;

@@ -43,6 +43,7 @@
     "@types/react": "~19.1.0",
     "react-test-renderer": "19.1.0",
     "serve": "^14.2.0",
+    "sneaks-api": "^1.2.3",
     "typescript": "~5.9.2"
   },
   "private": true

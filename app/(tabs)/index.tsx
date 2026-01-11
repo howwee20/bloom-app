@@ -529,6 +529,41 @@ export default function HomeScreen() {
     }
   };
 
+  // Handle token removal
+  const handleRemoveToken = async (token: Token) => {
+    const doRemove = async () => {
+      try {
+        // First delete any related token_transfers
+        await supabase
+          .from('token_transfers')
+          .delete()
+          .eq('token_id', token.id);
+
+        // Then delete the token
+        const { error } = await supabase
+          .from('tokens')
+          .delete()
+          .eq('id', token.id);
+
+        if (error) throw error;
+
+        showAlert('Removed', 'Item removed from portfolio.');
+        fetchPortfolio();
+      } catch (e: any) {
+        showAlert('Error', e.message || 'Failed to remove item.');
+      }
+    };
+
+    showAlert(
+      'Remove from Portfolio?',
+      `Remove "${token.product_name}" from your portfolio? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: doRemove },
+      ]
+    );
+  };
+
   // Render token card - brokerage style with P&L
   const renderTokenCard = ({ item }: { item: Token }) => {
     const showImage = item.product_image_url && !failedImages.has(item.id);
@@ -547,6 +582,8 @@ export default function HomeScreen() {
       <Pressable
         style={[styles.assetCard, isBloom && styles.assetCardBloom]}
         onPress={() => router.push(`/token/${item.id}`)}
+        onLongPress={() => handleRemoveToken(item)}
+        delayLongPress={500}
       >
         <View style={[styles.cardImageContainer, isBloom && styles.cardImageContainerBloom]}>
           {showImage ? (
@@ -601,6 +638,34 @@ export default function HomeScreen() {
     );
   };
 
+  // Handle asset removal (legacy)
+  const handleRemoveAsset = async (asset: Asset) => {
+    const doRemove = async () => {
+      try {
+        const { error } = await supabase
+          .from('assets')
+          .delete()
+          .eq('id', asset.id);
+
+        if (error) throw error;
+
+        showAlert('Removed', 'Item removed from portfolio.');
+        fetchPortfolio();
+      } catch (e: any) {
+        showAlert('Error', e.message || 'Failed to remove item.');
+      }
+    };
+
+    showAlert(
+      'Remove from Portfolio?',
+      `Remove "${asset.name}" from your portfolio? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: doRemove },
+      ]
+    );
+  };
+
   // Legacy: Render asset card - brokerage style with P&L
   const renderAssetCard = ({ item }: { item: Asset }) => {
     const showImage = item.image_url && !failedImages.has(item.id);
@@ -614,7 +679,12 @@ export default function HomeScreen() {
     const metaLine = metaParts.length ? metaParts.join(' · ') : '—';
 
     return (
-      <Pressable style={styles.assetCard} onPress={() => router.push(`/asset/${item.id}`)}>
+      <Pressable
+        style={styles.assetCard}
+        onPress={() => router.push(`/asset/${item.id}`)}
+        onLongPress={() => handleRemoveAsset(item)}
+        delayLongPress={500}
+      >
         <View style={styles.cardImageContainer}>
           {showImage ? (
             <Image
