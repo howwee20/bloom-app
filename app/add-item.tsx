@@ -19,7 +19,7 @@ import { theme, fonts } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './_layout';
 
-type CatalogLocation = 'home' | 'bloom' | 'watchlist';
+type CatalogLocation = 'home' | 'watchlist';
 type CatalogCondition = 'new' | 'worn' | 'used';
 type BrandFilter = 'All' | 'Jordan' | 'Nike' | 'adidas' | 'New Balance' | 'Other';
 
@@ -47,7 +47,6 @@ const CONDITION_OPTIONS: Array<{ value: CatalogCondition; label: string }> = [
 
 const LOCATION_OPTIONS: Array<{ value: CatalogLocation; label: string }> = [
   { value: 'home', label: 'Home' },
-  { value: 'bloom', label: 'Bloom' },
   { value: 'watchlist', label: 'Watchlist' },
 ];
 
