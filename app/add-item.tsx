@@ -237,25 +237,26 @@ export default function AddItemScreen() {
   const showEmptyState = !loading && !browseLoading && listData.length === 0;
 
   const renderItem = ({ item }: { item: CatalogItem }) => (
-    <Pressable style={styles.resultRow} onPress={() => openConfirm(item)}>
-      {item.image_url_thumb ? (
-        <Image source={{ uri: item.image_url_thumb }} style={styles.resultImage} />
-      ) : (
-        <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
-          <Text style={styles.resultImagePlaceholderText}>
-            {item.display_name.charAt(0)}
-          </Text>
-        </View>
-      )}
-      <View style={styles.resultInfo}>
-        <Text style={styles.resultName} numberOfLines={2}>
+    <Pressable style={styles.tokenCard} onPress={() => openConfirm(item)}>
+      <View style={styles.cardImageContainer}>
+        {item.image_url_thumb ? (
+          <Image source={{ uri: item.image_url_thumb }} style={styles.cardImage} resizeMode="contain" />
+        ) : (
+          <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+            <Text style={styles.cardImagePlaceholderText}>
+              {item.display_name.charAt(0)}
+            </Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardName} numberOfLines={2}>
           {item.display_name}
         </Text>
-        <Text style={styles.resultMeta} numberOfLines={1}>
+        <Text style={styles.cardMeta} numberOfLines={1}>
           {item.style_code}
         </Text>
       </View>
-      <Text style={styles.resultArrow}>›</Text>
     </Pressable>
   );
 
@@ -363,7 +364,8 @@ export default function AddItemScreen() {
             renderItem={renderItem}
             ListHeaderComponent={renderHeader}
             ListFooterComponent={renderFooter}
-            stickyHeaderIndices={[0]}
+            numColumns={2}
+            columnWrapperStyle={styles.gridRow}
             contentContainerStyle={styles.listContent}
             onEndReached={loadMore}
             onEndReachedThreshold={0.3}
@@ -593,53 +595,57 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   listContent: {
+    paddingHorizontal: 12,
     paddingBottom: 100,
   },
-  resultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.borderLight,
+  gridRow: {
+    justifyContent: 'space-between',
   },
-  resultImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    marginRight: 14,
+  tokenCard: {
+    width: '47%',
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardImageContainer: {
     backgroundColor: '#FFF',
+    padding: 8,
   },
-  resultImagePlaceholder: {
+  cardImage: {
+    width: '100%',
+    aspectRatio: 1.3,
+  },
+  cardImagePlaceholder: {
+    backgroundColor: '#F5F5F5',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.backgroundSecondary,
   },
-  resultImagePlaceholderText: {
-    color: theme.textSecondary,
-    fontWeight: '600',
-    fontSize: 20,
+  cardImagePlaceholderText: {
+    fontFamily: fonts.heading,
+    fontSize: 24,
+    color: theme.accent,
   },
-  resultInfo: {
-    flex: 1,
+  cardInfo: {
+    padding: 12,
   },
-  resultName: {
-    fontSize: 15,
+  cardName: {
+    fontSize: 13,
     fontWeight: '600',
     color: theme.textPrimary,
-    fontFamily: fonts.body,
-    lineHeight: 20,
+    marginBottom: 4,
+    lineHeight: 17,
   },
-  resultMeta: {
-    fontSize: 13,
+  cardMeta: {
+    fontSize: 11,
     color: theme.textSecondary,
-    marginTop: 4,
-    fontFamily: fonts.body,
-  },
-  resultArrow: {
-    fontSize: 20,
-    color: theme.textTertiary,
-    marginLeft: 8,
   },
   emptyWrapper: {
     flex: 1,
