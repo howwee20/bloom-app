@@ -46,8 +46,7 @@ export default function LoginScreen() {
     >
       <View style={styles.formContainer}>
         <Text style={styles.header}>Bloom</Text>
-        <Text style={styles.title}>LOG II</Text>
-        
+
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -114,14 +113,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 40,
     letterSpacing: 2,
-  },
-  title: {
-    fontFamily: fonts.heading,
-    fontSize: 24,
-    fontWeight: '400',
-    marginBottom: 40,
-    textAlign: 'center',
-    letterSpacing: 1,
   },
   input: {
     backgroundColor: '#f0f0f0',
