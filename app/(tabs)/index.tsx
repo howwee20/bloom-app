@@ -43,7 +43,7 @@ const showAlert = (title: string, message: string, buttons?: Array<{text: string
 };
 
 // Filter types for custody
-type CustodyFilter = 'all' | 'bloom' | 'home';
+type CustodyFilter = 'all' | 'bloom' | 'home' | 'watchlist';
 const PRICE_FRESHNESS_MINUTES = 15;
 const PRICE_STALE_HOURS = 24;
 
@@ -99,6 +99,7 @@ interface Asset {
   last_price_checked_at?: string | null;
   last_price_updated_at?: string | null;
   updated_at_pricing?: string | null;
+  location?: 'home' | 'watchlist' | 'bloom';
 }
 
 interface PortfolioSummary {
@@ -711,19 +712,32 @@ export default function HomeScreen() {
   // Filter tokens by custody type
   const filteredTokens = tokens.filter(token => {
     if (custodyFilter === 'all') return true;
+    if (custodyFilter === 'watchlist') return false; // tokens don't have watchlist
     return token.custody_type === custodyFilter;
   });
 
-  // Count by custody type
+  // Filter assets by location
+  const filteredAssets = ownedAssets.filter(asset => {
+    if (custodyFilter === 'all') return true;
+    if (custodyFilter === 'bloom') return false; // assets are never bloom custody
+    const assetLocation = asset.location || 'home'; // default to home if not set
+    return assetLocation === custodyFilter;
+  });
+
+  // Count by custody type (tokens + assets)
   const bloomCount = tokens.filter(t => t.custody_type === 'bloom').length;
-  const homeCount = tokens.filter(t => t.custody_type === 'home').length;
+  const homeCount = tokens.filter(t => t.custody_type === 'home').length
+    + ownedAssets.filter(a => (a.location || 'home') === 'home').length;
+  const watchlistCount = ownedAssets.filter(a => a.location === 'watchlist').length;
   const allCount = tokens.length + ownedAssets.length;
 
   // Calculate filtered totals (based on current filter)
+  const filteredAssetsValue = filteredAssets.reduce((sum, a) => sum + (a.current_price || 0), 0);
+  const filteredAssetsPnl = filteredAssets.reduce((sum, a) => sum + (a.pnl_dollars || 0), 0);
   const filteredTotalValue = filteredTokens.reduce((sum, t) => sum + (t.current_value || 0), 0)
-    + (custodyFilter === 'all' ? (summary?.total_value || 0) : 0);
+    + filteredAssetsValue;
   const filteredTotalPnl = filteredTokens.reduce((sum, t) => sum + (t.pnl_dollars || 0), 0)
-    + (custodyFilter === 'all' ? (summary?.total_pnl_dollars || 0) : 0);
+    + filteredAssetsPnl;
   const hasItems = tokens.length > 0 || ownedAssets.length > 0;
 
   const totalPnlColor = filteredTotalPnl === 0
@@ -814,6 +828,7 @@ export default function HomeScreen() {
             <Text style={styles.filterDropdownText}>
               {custodyFilter === 'all' ? `All (${allCount})` :
                custodyFilter === 'bloom' ? `Bloom (${bloomCount})` :
+               custodyFilter === 'watchlist' ? `Watchlist (${watchlistCount})` :
                `Home (${homeCount})`}
             </Text>
             <Text style={styles.filterDropdownArrow}>
@@ -844,6 +859,14 @@ export default function HomeScreen() {
               >
                 <Text style={[styles.filterDropdownOptionText, custodyFilter === 'home' && styles.filterDropdownOptionTextActive]}>
                   Home ({homeCount})
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.filterDropdownOption, custodyFilter === 'watchlist' && styles.filterDropdownOptionActive]}
+                onPress={() => { setCustodyFilter('watchlist'); setShowFilterDropdown(false); }}
+              >
+                <Text style={[styles.filterDropdownOptionText, custodyFilter === 'watchlist' && styles.filterDropdownOptionTextActive]}>
+                  Watchlist ({watchlistCount})
                 </Text>
               </Pressable>
             </View>
@@ -946,7 +969,7 @@ export default function HomeScreen() {
           renderEmptyState()
         ) : (
           <FlatList
-            data={custodyFilter === 'all' ? [...filteredTokens, ...ownedAssets] : filteredTokens as any[]}
+            data={[...filteredTokens, ...filteredAssets] as any[]}
             extraData={custodyFilter}
             renderItem={({ item }) => {
               // Check if it's a token (has custody_type) or legacy asset
