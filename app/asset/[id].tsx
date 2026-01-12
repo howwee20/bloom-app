@@ -514,32 +514,30 @@ export default function AssetDetailScreen() {
             <Text style={styles.heroName}>{asset.name}</Text>
             {asset.stockx_sku && <Text style={styles.heroMeta}>{asset.stockx_sku}</Text>}
             <View style={styles.statusRow}>
-              <View
-                style={[
-                  styles.statusBadge,
-                  isOwned && asset.location === 'bloom' && styles.statusBadgeBloom,
-                  isOwned && asset.location === 'home' && styles.statusBadgeHome,
-                  isOwned && asset.location === 'watchlist' && styles.statusBadgeWatchlist,
-                ]}
-              >
-                <Text
+              {isOwned && (
+                <View
                   style={[
-                    styles.statusBadgeText,
-                    isOwned && asset.location === 'bloom' && styles.statusBadgeTextBloom,
-                    isOwned && asset.location === 'watchlist' && styles.statusBadgeTextWatchlist,
+                    styles.statusBadge,
+                    asset.location === 'bloom' && styles.statusBadgeBloom,
+                    asset.location === 'home' && styles.statusBadgeHome,
+                    asset.location === 'watchlist' && styles.statusBadgeWatchlist,
                   ]}
                 >
-                  {isOwned
-                    ? asset.location === 'bloom'
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      asset.location === 'bloom' && styles.statusBadgeTextBloom,
+                      asset.location === 'watchlist' && styles.statusBadgeTextWatchlist,
+                    ]}
+                  >
+                    {asset.location === 'bloom'
                       ? 'IN BLOOM'
                       : asset.location === 'watchlist'
                         ? 'WATCHLIST'
-                        : 'AT HOME'
-                    : asset.custody_status === 'in_vault'
-                      ? 'INSTANT'
-                      : 'AVAILABLE'}
-                </Text>
-              </View>
+                        : 'AT HOME'}
+                  </Text>
+                </View>
+              )}
               {pricingUpdatedAt && (
                 <Text style={styles.updatedLabel}>Updated {formatTimeAgo(pricingUpdatedAt)}</Text>
               )}
@@ -584,14 +582,11 @@ export default function AssetDetailScreen() {
           />
         )}
 
-        {/* Size & Location/Delivery Info */}
+        {/* Size & Location Info */}
         <View style={styles.infoRow}>
           <Text style={styles.infoText}>
-            Size {hasFixedSize ? asset.size : selectedSize || '—'} · {
-              isOwned
-                ? (asset.location === 'bloom' ? 'Bloom Custody' : asset.location === 'watchlist' ? 'Watchlist' : 'Home')
-                : (asset.custody_status === 'in_vault' ? 'Instant transfer' : 'Ships to Bloom')
-            }
+            Size {hasFixedSize ? asset.size : selectedSize || '—'}
+            {isOwned && ` · ${asset.location === 'bloom' ? 'Bloom Custody' : asset.location === 'watchlist' ? 'Watchlist' : 'Home'}`}
           </Text>
         </View>
 
@@ -622,13 +617,13 @@ export default function AssetDetailScreen() {
           </View>
         )}
 
-        {/* About Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.sectionBody}>
-            {asset.description || 'No description available yet.'}
-          </Text>
-        </View>
+        {/* About Section - only show if description exists */}
+        {asset.description && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About</Text>
+            <Text style={styles.sectionBody}>{asset.description}</Text>
+          </View>
+        )}
 
         {/* Facts Grid */}
         <View style={styles.section}>

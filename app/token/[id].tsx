@@ -739,12 +739,13 @@ export default function TokenDetailScreen() {
           onEditCostBasis={() => setShowCostBasisModal(true)}
         />
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.sectionBody}>
-            {assetDetails?.description || 'No description available yet.'}
-          </Text>
-        </View>
+        {/* About Section - only show if description exists */}
+        {assetDetails?.description && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About</Text>
+            <Text style={styles.sectionBody}>{assetDetails.description}</Text>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Facts</Text>
@@ -767,7 +768,7 @@ export default function TokenDetailScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Action Buttons */}
+      {/* Action Buttons - State-Driven */}
       <View style={styles.actionContainer}>
         {/* Listed status info */}
         {isListed && (
@@ -775,20 +776,36 @@ export default function TokenDetailScreen() {
             <Text style={styles.listedLabel}>Listed for {formatPrice(token.listing_price)}</Text>
           </View>
         )}
-        {/* Primary: Sell button - always show */}
-        <Pressable style={styles.actionButton} onPress={() => setShowSellSheet(true)}>
-          <Text style={styles.actionButtonText}>Sell</Text>
-        </Pressable>
-        {isHomeCustody && isInCustody && (
-          <Pressable style={styles.secondaryButton} onPress={handleSendToBloom}>
-            <Text style={styles.secondaryButtonText}>Send to Bloom</Text>
-          </Pressable>
+
+        {/* WATCHLIST: Buy + Set Price Alert */}
+        {statusLabel === 'WATCHLIST' ? (
+          <>
+            <Pressable style={styles.actionButton} onPress={() => setShowMarketSheet(true)}>
+              <Text style={styles.actionButtonText}>Buy</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => setShowAlertModal(true)}>
+              <Text style={styles.secondaryButtonText}>Set Price Alert</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            {/* OWNED: Sell + custody-specific action */}
+            <Pressable style={styles.actionButton} onPress={() => setShowSellSheet(true)}>
+              <Text style={styles.actionButtonText}>Sell</Text>
+            </Pressable>
+            {isHomeCustody && isInCustody && (
+              <Pressable style={styles.secondaryButton} onPress={handleSendToBloom}>
+                <Text style={styles.secondaryButtonText}>Send to Bloom</Text>
+              </Pressable>
+            )}
+            {isBloomCustody && isInCustody && (
+              <Pressable style={styles.secondaryButton} onPress={handleRedeem}>
+                <Text style={styles.secondaryButtonText}>Ship to Me</Text>
+              </Pressable>
+            )}
+          </>
         )}
-        {isBloomCustody && isInCustody && (
-          <Pressable style={styles.secondaryButton} onPress={handleRedeem}>
-            <Text style={styles.secondaryButtonText}>Ship to Me</Text>
-          </Pressable>
-        )}
+
         <Pressable style={styles.tertiaryButton} onPress={() => setShowMarketSheet(true)}>
           <Text style={styles.tertiaryButtonText}>View marketplaces</Text>
         </Pressable>
