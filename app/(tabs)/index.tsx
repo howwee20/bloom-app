@@ -8,6 +8,7 @@ import {
   AppStateStatus,
   FlatList,
   Image,
+  LayoutAnimation,
   Linking,
   Modal,
   Platform,
@@ -18,9 +19,16 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fonts, theme } from '../../constants/Colors';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
 
@@ -180,6 +188,22 @@ export default function HomeScreen() {
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const [now, setNow] = useState(Date.now());
   const [isFocused, setIsFocused] = useState(true);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+
+  // Restore header collapse preference from storage
+  useEffect(() => {
+    AsyncStorage.getItem('headerCollapsed').then(val => {
+      if (val === 'true') setIsHeaderCollapsed(true);
+    });
+  }, []);
+
+  // Toggle header with animation
+  const toggleHeader = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const newState = !isHeaderCollapsed;
+    setIsHeaderCollapsed(newState);
+    AsyncStorage.setItem('headerCollapsed', String(newState));
+  };
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -803,100 +827,124 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* White header area */}
-      <View style={styles.headerArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, styles.headerTitleAccent]}>Bloom</Text>
-          <View style={styles.headerRight}>
-            <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
-              <View style={styles.profileIcon}>
-                <Text style={styles.profileIconText}>
-                  {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
-                </Text>
-              </View>
-            </Pressable>
+      {/* Collapsible Header */}
+      {isHeaderCollapsed ? (
+        // Collapsed: compact sticky bar
+        <View style={styles.headerAreaCollapsed}>
+          <Text style={styles.headerTitleCollapsed}>Bloom</Text>
+          <View style={styles.collapsedCenter}>
+            <Text style={styles.valueAmountCollapsed}>
+              {formatPrice(filteredTotalValue)}
+            </Text>
+            {hasItems && filteredTotalPnl !== 0 && (
+              <Text style={[styles.pnlCollapsed, { color: totalPnlColor }]}>
+                ({formatPnL(filteredTotalPnl)})
+              </Text>
+            )}
           </View>
-        </View>
-
-        {/* Portfolio Value */}
-        <View style={styles.valueSection}>
-          <Text style={styles.valueAmount}>{formatPrice(filteredTotalValue)}</Text>
-        {hasItems && filteredTotalPnl !== 0 && (
-          <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
-            {formatPnL(filteredTotalPnl)} all time
-          </Text>
-        )}
-        <View style={styles.updatedRow}>
-          <Text style={[styles.updatedText, !pricingFresh && styles.updatedTextPaused]}>
-            {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
-          </Text>
-          {!pricingFresh && lastUpdatedLabel && (
-            <Text style={styles.updatedText}> · Last update {lastUpdatedLabel}</Text>
-          )}
-          {!pricingFresh && !lastUpdatedLabel && (
-            <Text style={styles.updatedText}> · No successful updates yet</Text>
-          )}
-          {pricingFresh && updateDelayed && <Text style={styles.updatedText}> · Update delayed</Text>}
-        </View>
-      </View>
-
-      {/* Filter Dropdown */}
-      {hasItems && (
-        <View style={styles.filterContainer}>
-          <Pressable
-            style={styles.filterDropdownTrigger}
-            onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-          >
-            <Text style={styles.filterDropdownText}>
-              {custodyFilter === 'all' ? `All (${allCount})` :
-               custodyFilter === 'bloom' ? `Bloom (${bloomCount})` :
-               custodyFilter === 'watchlist' ? `Watchlist (${watchlistCount})` :
-               `Home (${homeCount})`}
-            </Text>
-            <Text style={styles.filterDropdownArrow}>
-              {showFilterDropdown ? '▲' : '▼'}
-            </Text>
+          <Pressable onPress={toggleHeader} style={styles.collapseToggle}>
+            <Text style={styles.collapseChevron}>▼</Text>
           </Pressable>
-          {showFilterDropdown && (
-            <View style={styles.filterDropdownOptions}>
+        </View>
+      ) : (
+        // Expanded: hero header
+        <View style={styles.headerArea}>
+          {/* Header row with collapse toggle */}
+          <View style={styles.header}>
+            <Text style={[styles.headerTitle, styles.headerTitleAccent]}>Bloom</Text>
+            <View style={styles.headerRight}>
+              <Pressable onPress={toggleHeader} style={styles.collapseToggle}>
+                <Text style={styles.collapseChevron}>▲</Text>
+              </Pressable>
+              <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
+                <View style={styles.profileIcon}>
+                  <Text style={styles.profileIconText}>
+                    {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Portfolio Value */}
+          <View style={styles.valueSection}>
+            <Text style={styles.valueAmount}>{formatPrice(filteredTotalValue)}</Text>
+            {hasItems && filteredTotalPnl !== 0 && (
+              <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
+                {formatPnL(filteredTotalPnl)} all time
+              </Text>
+            )}
+            <View style={styles.updatedRow}>
+              <Text style={[styles.updatedText, !pricingFresh && styles.updatedTextPaused]}>
+                {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
+              </Text>
+              {!pricingFresh && lastUpdatedLabel && (
+                <Text style={styles.updatedText}> · Last update {lastUpdatedLabel}</Text>
+              )}
+              {!pricingFresh && !lastUpdatedLabel && (
+                <Text style={styles.updatedText}> · No successful updates yet</Text>
+              )}
+              {pricingFresh && updateDelayed && <Text style={styles.updatedText}> · Update delayed</Text>}
+            </View>
+          </View>
+
+          {/* Filter Dropdown */}
+          {hasItems && (
+            <View style={styles.filterContainer}>
               <Pressable
-                style={[styles.filterDropdownOption, custodyFilter === 'all' && styles.filterDropdownOptionActive]}
-                onPress={() => { setCustodyFilter('all'); setShowFilterDropdown(false); }}
+                style={styles.filterDropdownTrigger}
+                onPress={() => setShowFilterDropdown(!showFilterDropdown)}
               >
-                <Text style={[styles.filterDropdownOptionText, custodyFilter === 'all' && styles.filterDropdownOptionTextActive]}>
-                  All ({allCount})
+                <Text style={styles.filterDropdownText}>
+                  {custodyFilter === 'all' ? `All (${allCount})` :
+                   custodyFilter === 'bloom' ? `Bloom (${bloomCount})` :
+                   custodyFilter === 'watchlist' ? `Watchlist (${watchlistCount})` :
+                   `Home (${homeCount})`}
+                </Text>
+                <Text style={styles.filterDropdownArrow}>
+                  {showFilterDropdown ? '▲' : '▼'}
                 </Text>
               </Pressable>
-              <Pressable
-                style={[styles.filterDropdownOption, custodyFilter === 'bloom' && styles.filterDropdownOptionActive]}
-                onPress={() => { setCustodyFilter('bloom'); setShowFilterDropdown(false); }}
-              >
-                <Text style={[styles.filterDropdownOptionText, custodyFilter === 'bloom' && styles.filterDropdownOptionTextActive]}>
-                  Bloom ({bloomCount})
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.filterDropdownOption, custodyFilter === 'home' && styles.filterDropdownOptionActive]}
-                onPress={() => { setCustodyFilter('home'); setShowFilterDropdown(false); }}
-              >
-                <Text style={[styles.filterDropdownOptionText, custodyFilter === 'home' && styles.filterDropdownOptionTextActive]}>
-                  Home ({homeCount})
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.filterDropdownOption, custodyFilter === 'watchlist' && styles.filterDropdownOptionActive]}
-                onPress={() => { setCustodyFilter('watchlist'); setShowFilterDropdown(false); }}
-              >
-                <Text style={[styles.filterDropdownOptionText, custodyFilter === 'watchlist' && styles.filterDropdownOptionTextActive]}>
-                  Watchlist ({watchlistCount})
-                </Text>
-              </Pressable>
+              {showFilterDropdown && (
+                <View style={styles.filterDropdownOptions}>
+                  <Pressable
+                    style={[styles.filterDropdownOption, custodyFilter === 'all' && styles.filterDropdownOptionActive]}
+                    onPress={() => { setCustodyFilter('all'); setShowFilterDropdown(false); }}
+                  >
+                    <Text style={[styles.filterDropdownOptionText, custodyFilter === 'all' && styles.filterDropdownOptionTextActive]}>
+                      All ({allCount})
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.filterDropdownOption, custodyFilter === 'bloom' && styles.filterDropdownOptionActive]}
+                    onPress={() => { setCustodyFilter('bloom'); setShowFilterDropdown(false); }}
+                  >
+                    <Text style={[styles.filterDropdownOptionText, custodyFilter === 'bloom' && styles.filterDropdownOptionTextActive]}>
+                      Bloom ({bloomCount})
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.filterDropdownOption, custodyFilter === 'home' && styles.filterDropdownOptionActive]}
+                    onPress={() => { setCustodyFilter('home'); setShowFilterDropdown(false); }}
+                  >
+                    <Text style={[styles.filterDropdownOptionText, custodyFilter === 'home' && styles.filterDropdownOptionTextActive]}>
+                      Home ({homeCount})
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.filterDropdownOption, custodyFilter === 'watchlist' && styles.filterDropdownOptionActive]}
+                    onPress={() => { setCustodyFilter('watchlist'); setShowFilterDropdown(false); }}
+                  >
+                    <Text style={[styles.filterDropdownOptionText, custodyFilter === 'watchlist' && styles.filterDropdownOptionTextActive]}>
+                      Watchlist ({watchlistCount})
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           )}
         </View>
       )}
-      </View>
 
       {/* Assets */}
       <View style={styles.assetsSection}>
@@ -1333,6 +1381,48 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+  },
+  headerAreaCollapsed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  headerTitleCollapsed: {
+    fontFamily: fonts.heading,
+    fontSize: 16,
+    color: theme.accent,
+  },
+  collapsedCenter: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  valueAmountCollapsed: {
+    fontFamily: fonts.heading,
+    fontSize: 22,
+    color: theme.textPrimary,
+    letterSpacing: -0.5,
+  },
+  pnlCollapsed: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  collapseToggle: {
+    padding: 8,
+  },
+  collapseChevron: {
+    fontSize: 12,
+    color: theme.textSecondary,
   },
   header: {
     flexDirection: 'row',

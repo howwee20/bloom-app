@@ -1,6 +1,6 @@
 // Token Detail Screen - Ownership-first model with status-specific views
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -38,6 +38,9 @@ const showAlert = (title: string, message: string, buttons?: Array<{text: string
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
 import { theme, fonts } from '../../constants/Colors';
+import CostBasisEditor from '../../components/CostBasisEditor';
+import PositionCard from '../../components/PositionCard';
+import PriceChart, { PricePoint, RangeOption } from '../../components/PriceChart';
 
 interface TokenDetail {
   id: string;
@@ -76,6 +79,28 @@ interface TokenDetail {
   redemption_tracking_carrier: string | null;
 }
 
+interface AssetDetails {
+  id: string;
+  name: string | null;
+  description: string | null;
+  brand: string | null;
+  category: string | null;
+  stockx_sku: string | null;
+  price_source: string | null;
+}
+
+interface TokenAttributes {
+  condition?: string | null;
+  brand?: string | null;
+}
+
+const PRICE_RANGES: RangeOption[] = [
+  { label: '7D', days: 7 },
+  { label: '30D', days: 30 },
+  { label: '90D', days: 90 },
+  { label: 'ALL', days: 'all' },
+];
+
 export default function TokenDetailScreen() {
   const { id, sell } = useLocalSearchParams<{ id: string; sell?: string }>();
   const { session } = useAuth();
@@ -91,8 +116,12 @@ export default function TokenDetailScreen() {
   const [alertType, setAlertType] = useState<'above' | 'below'>('above');
   const [alertThreshold, setAlertThreshold] = useState('');
   const [showCostBasisModal, setShowCostBasisModal] = useState(false);
-  const [costBasisInput, setCostBasisInput] = useState('');
   const [showSellSheet, setShowSellSheet] = useState(false);
+  const [showMarketSheet, setShowMarketSheet] = useState(false);
+  const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
+  const [selectedRange, setSelectedRange] = useState<RangeOption>(PRICE_RANGES[0]);
+  const [assetDetails, setAssetDetails] = useState<AssetDetails | null>(null);
+  const [tokenAttributes, setTokenAttributes] = useState<TokenAttributes | null>(null);
 
   const fetchToken = useCallback(async () => {
     if (!id || !session) return;
@@ -111,11 +140,77 @@ export default function TokenDetailScreen() {
     }
   }, [id, session]);
 
+  const fetchAssetDetails = useCallback(async (assetId: string) => {
+    const { data, error } = await supabase
+      .from('assets')
+      .select('id, name, description, brand, category, stockx_sku, price_source')
+      .eq('id', assetId)
+      .maybeSingle();
+
+    if (!error && data) {
+      setAssetDetails(data as AssetDetails);
+    } else {
+      setAssetDetails(null);
+    }
+  }, []);
+
+  const fetchTokenAttributes = useCallback(async (tokenId: string) => {
+    const { data, error } = await supabase
+      .from('tokens')
+      .select('attributes')
+      .eq('id', tokenId)
+      .maybeSingle();
+
+    if (!error && data?.attributes) {
+      setTokenAttributes(data.attributes as TokenAttributes);
+    } else {
+      setTokenAttributes(null);
+    }
+  }, []);
+
+  const fetchPriceHistory = useCallback(async (assetId: string, range: RangeOption) => {
+    const days = range.days === 'all' ? 3650 : range.days;
+    const { data, error } = await supabase
+      .rpc('get_price_history_for_chart', { p_asset_id: assetId, p_days: days });
+
+    if (!error && data) {
+      const parsed = data.map((point: { price: number | string; recorded_at: string }) => ({
+        price: Number(point.price),
+        recorded_at: point.recorded_at,
+      }));
+      setPriceHistory(parsed);
+    } else {
+      setPriceHistory([]);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchToken();
     }, [fetchToken])
   );
+
+  useEffect(() => {
+    if (token?.matched_asset_id) {
+      fetchAssetDetails(token.matched_asset_id);
+    } else {
+      setAssetDetails(null);
+    }
+  }, [token?.matched_asset_id, fetchAssetDetails]);
+
+  useEffect(() => {
+    if (token?.matched_asset_id) {
+      fetchPriceHistory(token.matched_asset_id, selectedRange);
+    } else {
+      setPriceHistory([]);
+    }
+  }, [token?.matched_asset_id, fetchPriceHistory, selectedRange]);
+
+  useEffect(() => {
+    if (token?.id) {
+      fetchTokenAttributes(token.id);
+    }
+  }, [token?.id, fetchTokenAttributes]);
 
   const formatPrice = (price: number | null | undefined) => {
     if (price === null || price === undefined || price === 0) return '—';
@@ -124,15 +219,6 @@ export default function TokenDetailScreen() {
       currency: 'USD',
       minimumFractionDigits: 2,
     }).format(price);
-  };
-
-  // Build ticker from sku + size
-  const getTicker = () => {
-    if (!token) return '';
-    const parts = [];
-    if (token.sku) parts.push(token.sku);
-    if (token.size) parts.push(token.size);
-    return parts.join(' · ');
   };
 
   // Build sell URL for marketplace
@@ -145,12 +231,6 @@ export default function TokenDetailScreen() {
       case 'ebay': return `https://www.ebay.com/sch/i.html?_nkw=${query}`;
       default: return `https://www.google.com/search?q=${query}`;
     }
-  };
-
-  const formatPnL = (value: number | null) => {
-    if (value === null) return '--';
-    const sign = value >= 0 ? '+' : '';
-    return `${sign}${formatPrice(value)}`;
   };
 
   const formatTimeAgo = (dateString?: string | null) => {
@@ -167,6 +247,36 @@ export default function TokenDetailScreen() {
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
   };
+
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const rangeChange = useMemo(() => {
+    if (priceHistory.length < 2) return null;
+    const first = priceHistory[0]?.price ?? 0;
+    const last = priceHistory[priceHistory.length - 1]?.price ?? 0;
+    const delta = last - first;
+    const percent = first > 0 ? (delta / first) * 100 : null;
+    return { delta, percent };
+  }, [priceHistory]);
+
+  const dayChange = useMemo(() => {
+    if (priceHistory.length < 2) return { delta: null, percent: null };
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const recent = priceHistory.filter(
+      (point) => new Date(point.recorded_at).getTime() >= cutoff
+    );
+    if (recent.length < 2) return { delta: null, percent: null };
+    const first = recent[0]?.price ?? 0;
+    const last = recent[recent.length - 1]?.price ?? 0;
+    const delta = last - first;
+    const percent = first > 0 ? (delta / first) * 100 : null;
+    return { delta, percent };
+  }, [priceHistory]);
 
   const hasValue = token?.current_value !== null && token?.current_value !== undefined;
   const cashOutEstimate = token && hasValue
@@ -305,6 +415,13 @@ export default function TokenDetailScreen() {
     );
   };
 
+  const handleSendToBloom = () => {
+    showAlert(
+      'Send to Bloom',
+      'To move this item into Bloom custody, ship it directly from the source to Bloom. We will add the official flow here.',
+    );
+  };
+
   const handleSaveAlert = async () => {
     if (!token || !session) return;
     if (!token.matched_asset_id) {
@@ -337,10 +454,10 @@ export default function TokenDetailScreen() {
     }
   };
 
-  const handleSaveCostBasis = async () => {
+  const handleSaveCostBasis = async (value: string) => {
     if (!token || !session) return;
 
-    const costBasis = parseFloat(costBasisInput);
+    const costBasis = parseFloat(value);
     if (Number.isNaN(costBasis) || costBasis < 0) {
       showAlert('Invalid amount', 'Enter a valid dollar amount.');
       return;
@@ -353,9 +470,25 @@ export default function TokenDetailScreen() {
         .eq('id', token.id);
 
       if (error) throw error;
+      const updatedPnl =
+        token.current_value && costBasis > 0
+          ? token.current_value - costBasis
+          : null;
+      const updatedPercent =
+        token.current_value && costBasis > 0
+          ? ((token.current_value - costBasis) / costBasis) * 100
+          : null;
+      setToken((prev) =>
+        prev
+          ? {
+              ...prev,
+              purchase_price: costBasis,
+              pnl_dollars: updatedPnl,
+              pnl_percent: updatedPercent,
+            }
+          : prev
+      );
       setShowCostBasisModal(false);
-      setCostBasisInput('');
-      fetchToken(); // Refresh to show updated P&L
       showAlert('Cost basis updated', 'Your P&L will now reflect this purchase price.');
     } catch (e: any) {
       showAlert('Failed to update', e.message || 'Please try again.');
@@ -399,15 +532,22 @@ export default function TokenDetailScreen() {
   };
 
   // Status helpers
-  const isAcquiring = token?.status === 'acquiring';
   const isInCustody = token?.status === 'in_custody';
   const isListed = token?.status === 'listed';
-  const isInCustodyOrListed = isInCustody || isListed;
-  const isRedeeming = token?.status === 'redeeming' || token?.status === 'shipped';
-  const isRedeemed = token?.status === 'redeemed';
-  const isShippingToBloom = token?.status === 'shipping_to_bloom';
+  const isInTransit =
+    token?.status === 'shipping_to_bloom' ||
+    token?.status === 'redeeming' ||
+    token?.status === 'shipped';
   const isBloomCustody = token?.custody_type === 'bloom';
   const isHomeCustody = token?.custody_type === 'home';
+
+  const statusLabel = isInTransit
+    ? 'IN TRANSIT'
+    : isBloomCustody
+      ? 'IN BLOOM'
+      : isHomeCustody
+        ? 'AT HOME'
+        : 'WATCHLIST';
 
   useEffect(() => {
     if (!token || sell !== '1' || sellTriggered) return;
@@ -454,9 +594,31 @@ export default function TokenDetailScreen() {
     );
   }
 
-  const pnlColor = token.pnl_dollars === null
-    ? theme.textSecondary
-    : token.pnl_dollars >= 0 ? theme.success : theme.error;
+  const updatedLabel = formatTimeAgo(token.last_price_updated_at || token.last_price_checked_at);
+  const conditionLabel = tokenAttributes?.condition ? `Condition: ${tokenAttributes.condition}` : null;
+  const metaLine = [token.sku, token.size ? `Size ${token.size}` : null, conditionLabel]
+    .filter(Boolean)
+    .join(' · ');
+  const priceLabel =
+    hasValue && token.current_value && token.current_value > 0
+      ? formatPrice(token.current_value)
+      : token.match_status === 'pending'
+        ? 'Needs match'
+        : 'Updating...';
+  const changeLabel = rangeChange
+    ? `${rangeChange.delta >= 0 ? '+' : ''}${formatPrice(rangeChange.delta)} (${rangeChange.percent !== null ? `${rangeChange.percent >= 0 ? '+' : ''}${rangeChange.percent.toFixed(2)}%` : '--'})`
+    : null;
+  const acquiredLabel = formatDate(token.purchase_date);
+  const factItems = [
+    { label: 'Brand', value: assetDetails?.brand },
+    { label: 'Category', value: assetDetails?.category },
+    { label: 'Style Code', value: token.sku || assetDetails?.stockx_sku },
+    { label: 'Size', value: token.size },
+    { label: 'Condition', value: tokenAttributes?.condition },
+    { label: 'Custody', value: statusLabel },
+    { label: 'Acquired', value: acquiredLabel },
+    { label: 'Token ID', value: token.id },
+  ].filter((item) => item.value);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -465,7 +627,7 @@ export default function TokenDetailScreen() {
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
-        <Text style={styles.headerTicker} numberOfLines={1}>{getTicker()}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>{token.product_name}</Text>
         <Pressable style={styles.moreButton} onPress={() => setShowMoreMenu(true)}>
           <Text style={styles.moreButtonText}>•••</Text>
         </Pressable>
@@ -476,139 +638,112 @@ export default function TokenDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Image */}
-        <View style={styles.imageContainer}>
-          {token.product_image_url && !imageError ? (
-            <Image
-              source={{ uri: token.product_image_url }}
-              style={styles.productImage}
-              resizeMode="contain"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <View style={[styles.productImage, styles.placeholderImage]}>
-              <Text style={styles.placeholderText}>{token.product_name.charAt(0)}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Price Hero + Badge */}
-        <View style={styles.priceHero}>
-          <Text style={styles.productName}>{token.product_name}</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceValue}>
-              {hasValue && token.current_value && token.current_value > 0
-                ? formatPrice(token.current_value)
-                : token.match_status === 'pending' ? 'Needs match' : 'Updating...'}
-            </Text>
-            {/* State Badge - Truth only */}
-            <View style={[
-              styles.stateBadge,
-              isBloomCustody && styles.stateBadgeBloom,
-              isHomeCustody && styles.stateBadgeHome,
-              isShippingToBloom && styles.stateBadgeShipping
-            ]}>
-              <Text style={[
-                styles.stateBadgeText,
-                isBloomCustody && styles.stateBadgeTextBloom
-              ]}>
-                {isShippingToBloom ? 'SHIPPING' : isBloomCustody ? 'BLOOM' : 'HOME'}
-              </Text>
-            </View>
+        <View style={styles.heroRow}>
+          <View style={styles.heroImage}>
+            {token.product_image_url && !imageError ? (
+              <Image
+                source={{ uri: token.product_image_url }}
+                style={styles.heroImageAsset}
+                resizeMode="contain"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <View style={[styles.heroImageAsset, styles.placeholderImage]}>
+                <Text style={styles.placeholderText}>{token.product_name.charAt(0)}</Text>
+              </View>
+            )}
           </View>
-          {/* P&L Delta */}
-          {hasValue && token.pnl_dollars !== null && (
-            <Text style={[styles.pnlDelta, { color: pnlColor }]}>
-              {formatPnL(token.pnl_dollars)} ({token.pnl_percent?.toFixed(1)}%)
-            </Text>
-          )}
-        </View>
-
-        {/* Position Grid (2x2) */}
-        <View style={styles.positionGrid}>
-          <View style={styles.positionRow}>
-            <View style={styles.positionCell}>
-              <Text style={styles.positionLabel}>Market Value</Text>
-              <Text style={styles.positionValue}>{formatPrice(token.current_value)}</Text>
-            </View>
-            <View style={styles.positionCell}>
-              <Text style={styles.positionLabel}>Cost Basis</Text>
-              {token.purchase_price && token.purchase_price > 0 ? (
-                <Pressable onPress={() => {
-                  setCostBasisInput(token.purchase_price.toString());
-                  setShowCostBasisModal(true);
-                }}>
-                  <Text style={styles.positionValue}>{formatPrice(token.purchase_price)}</Text>
-                  <Text style={styles.positionEdit}>Edit</Text>
-                </Pressable>
-              ) : (
-                <Pressable onPress={() => {
-                  setCostBasisInput('');
-                  setShowCostBasisModal(true);
-                }}>
-                  <Text style={styles.positionValueAdd}>Add</Text>
-                </Pressable>
-              )}
-            </View>
-          </View>
-          <View style={styles.positionRow}>
-            <View style={styles.positionCell}>
-              <Text style={styles.positionLabel}>Total P&L</Text>
-              <Text style={[styles.positionValue, token.pnl_dollars !== null && { color: pnlColor }]}>
-                {token.pnl_dollars !== null ? formatPnL(token.pnl_dollars) : '—'}
-              </Text>
-            </View>
-            <View style={styles.positionCell}>
-              <Text style={styles.positionLabel}>Size</Text>
-              <Text style={styles.positionValue}>{token.size}</Text>
+          <View style={styles.heroInfo}>
+            <Text style={styles.assetName}>{token.product_name}</Text>
+            {metaLine ? <Text style={styles.assetMeta}>{metaLine}</Text> : null}
+            <View style={styles.statusRow}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  statusLabel === 'IN BLOOM' && styles.statusBadgeBloom,
+                  statusLabel === 'AT HOME' && styles.statusBadgeHome,
+                  statusLabel === 'IN TRANSIT' && styles.statusBadgeTransit,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusBadgeText,
+                    statusLabel === 'IN BLOOM' && styles.statusBadgeTextBloom,
+                  ]}
+                >
+                  {statusLabel}
+                </Text>
+              </View>
+              {updatedLabel ? (
+                <Text style={styles.updatedLabel}>Updated {updatedLabel}</Text>
+              ) : null}
             </View>
           </View>
         </View>
 
-        {/* Asset Facts */}
-        <View style={styles.factsSection}>
-          <View style={styles.factRow}>
-            <Text style={styles.factLabel}>Style Code</Text>
-            <Text style={styles.factValue}>{token.sku || '—'}</Text>
+        <View style={styles.priceStrip}>
+          <View style={styles.priceMainRow}>
+            <Text style={styles.priceValue}>{priceLabel}</Text>
+            {changeLabel ? (
+              <View
+                style={[
+                  styles.changePill,
+                  rangeChange && rangeChange.delta >= 0 ? styles.changeUp : styles.changeDown,
+                ]}
+              >
+                <Text style={styles.changeText}>{changeLabel}</Text>
+              </View>
+            ) : null}
           </View>
-          {/* Status notes */}
-          {isAcquiring && (
-            <View style={styles.factRow}>
-              <Text style={styles.factLabel}>Status</Text>
-              <Text style={styles.factValue}>Arriving at Bloom in 5-7 days</Text>
-            </View>
-          )}
-          {isShippingToBloom && token.vault_location && (
-            <View style={styles.factRow}>
-              <Text style={styles.factLabel}>Shipping Code</Text>
-              <Text style={[styles.factValue, { color: theme.accent }]}>{token.vault_location}</Text>
-            </View>
-          )}
-          {isRedeeming && (
-            <View style={styles.factRow}>
-              <Text style={styles.factLabel}>Status</Text>
-              <Text style={styles.factValue}>
-                {token.status === 'shipped' ? 'Shipped to you' : 'Preparing for shipment'}
-              </Text>
-            </View>
-          )}
+          <Text style={styles.priceSubLabel}>
+            Market price{assetDetails?.price_source ? ` · ${assetDetails.price_source}` : ''}
+          </Text>
         </View>
 
-        {/* Tracking Info (for shipped) */}
-        {token.status === 'shipped' && token.redemption_tracking_number && (
+        <PriceChart
+          data={priceHistory}
+          ranges={PRICE_RANGES}
+          selectedRange={selectedRange}
+          onRangeChange={setSelectedRange}
+        />
+
+        <PositionCard
+          marketValue={token.current_value}
+          costBasis={token.purchase_price}
+          pnlDollars={token.pnl_dollars}
+          pnlPercent={token.pnl_percent}
+          dayChangeDollars={dayChange.delta}
+          dayChangePercent={dayChange.percent}
+          formatPrice={formatPrice}
+          onEditCostBasis={() => setShowCostBasisModal(true)}
+        />
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.sectionBody}>
+            {assetDetails?.description || 'No description available yet.'}
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Facts</Text>
+          <View style={styles.factsGrid}>
+            {factItems.map((item) => (
+              <View key={item.label} style={styles.factCell}>
+                <Text style={styles.factLabel}>{item.label}</Text>
+                <Text style={styles.factValue}>{item.value as string}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {token.status === 'shipped' && token.redemption_tracking_number ? (
           <View style={styles.trackingSection}>
             <Text style={styles.trackingNumber}>
               {token.redemption_tracking_carrier}: {token.redemption_tracking_number}
             </Text>
           </View>
-        )}
-
-        {/* Metadata Footer */}
-        {(token.last_price_checked_at || token.last_price_updated_at) && (
-          <Text style={styles.metadataFooter}>
-            Market data updated {formatTimeAgo(token.last_price_checked_at || token.last_price_updated_at)}
-          </Text>
-        )}
+        ) : null}
       </ScrollView>
 
       {/* Action Buttons */}
@@ -623,12 +758,19 @@ export default function TokenDetailScreen() {
         <Pressable style={styles.actionButton} onPress={() => setShowSellSheet(true)}>
           <Text style={styles.actionButtonText}>Sell</Text>
         </Pressable>
-        {/* Secondary: Ship to Me for Bloom custody */}
+        {isHomeCustody && isInCustody && (
+          <Pressable style={styles.secondaryButton} onPress={handleSendToBloom}>
+            <Text style={styles.secondaryButtonText}>Send to Bloom</Text>
+          </Pressable>
+        )}
         {isBloomCustody && isInCustody && (
           <Pressable style={styles.secondaryButton} onPress={handleRedeem}>
             <Text style={styles.secondaryButtonText}>Ship to Me</Text>
           </Pressable>
         )}
+        <Pressable style={styles.tertiaryButton} onPress={() => setShowMarketSheet(true)}>
+          <Text style={styles.tertiaryButtonText}>View marketplaces</Text>
+        </Pressable>
       </View>
 
       {/* Sell Routing Sheet */}
@@ -675,6 +817,41 @@ export default function TokenDetailScreen() {
             ))}
 
             <Pressable style={styles.modalCancel} onPress={() => setShowSellSheet(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Marketplaces Sheet */}
+      <Modal
+        visible={showMarketSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMarketSheet(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowMarketSheet(false)}>
+          <View style={styles.sellSheetContent}>
+            <Text style={styles.modalTitle}>Marketplaces</Text>
+            <Text style={styles.sellSheetSubtitle}>
+              {token.product_name} · Size {token.size}
+            </Text>
+
+            {['stockx', 'goat', 'ebay'].map((marketplace) => (
+              <Pressable
+                key={marketplace}
+                style={styles.sellOption}
+                onPress={() => {
+                  Linking.openURL(buildMarketplaceUrl(marketplace));
+                  setShowMarketSheet(false);
+                }}
+              >
+                <Text style={styles.sellOptionTitle}>{marketplace.toUpperCase()}</Text>
+                <Text style={styles.sellOptionDesc}>View recent listings</Text>
+              </Pressable>
+            ))}
+
+            <Pressable style={styles.modalCancel} onPress={() => setShowMarketSheet(false)}>
               <Text style={styles.modalCancelText}>Cancel</Text>
             </Pressable>
           </View>
@@ -825,53 +1002,12 @@ export default function TokenDetailScreen() {
         </Pressable>
       </Modal>
 
-      {/* Cost Basis Modal */}
-      <Modal
+      <CostBasisEditor
         visible={showCostBasisModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCostBasisModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>What did you pay?</Text>
-              <Pressable onPress={() => setShowCostBasisModal(false)}>
-                <Text style={styles.modalClose}>Cancel</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.modalBody}>
-              <View style={styles.priceInputWrapper}>
-                <Text style={styles.priceCurrency}>$</Text>
-                <TextInput
-                  style={styles.priceInput}
-                  value={costBasisInput}
-                  onChangeText={setCostBasisInput}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
-                  placeholderTextColor={theme.textTertiary}
-                  autoFocus
-                />
-              </View>
-
-              <Text style={styles.feeNote}>
-                This sets your cost basis for P&L calculation
-              </Text>
-
-              <Pressable
-                style={styles.modalButton}
-                onPress={handleSaveCostBasis}
-              >
-                <Text style={styles.modalButtonText}>Save</Text>
-              </Pressable>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        initialValue={token.purchase_price}
+        onClose={() => setShowCostBasisModal(false)}
+        onSave={handleSaveCostBasis}
+      />
     </SafeAreaView>
   );
 }
@@ -926,6 +1062,149 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 180,
   },
+  heroRow: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  heroImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 14,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroImageAsset: {
+    width: '100%',
+    height: '100%',
+  },
+  heroInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  assetName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  assetMeta: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    marginTop: 4,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: theme.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  statusBadgeBloom: {
+    backgroundColor: 'rgba(245, 166, 35, 0.2)',
+    borderColor: '#F5A623',
+  },
+  statusBadgeHome: {
+    backgroundColor: theme.backgroundSecondary,
+  },
+  statusBadgeTransit: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderColor: '#3B82F6',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    letterSpacing: 0.4,
+  },
+  statusBadgeTextBloom: {
+    color: '#F5A623',
+  },
+  updatedLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+  },
+  priceStrip: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  priceMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  changePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  changeUp: {
+    backgroundColor: theme.successBg,
+  },
+  changeDown: {
+    backgroundColor: theme.errorBg,
+  },
+  changeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  priceSubLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 6,
+  },
+  section: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  sectionTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 14,
+    color: theme.textPrimary,
+    marginBottom: 8,
+  },
+  sectionBody: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    lineHeight: 20,
+  },
+  factsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  factCell: {
+    width: '47%',
+  },
+  factLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  factValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -960,7 +1239,7 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     fontFamily: fonts.heading,
-    fontSize: 64,
+    fontSize: 32,
     color: theme.accent,
   },
   productInfo: {
@@ -1081,6 +1360,15 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: theme.textPrimary,
+  },
+  tertiaryButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  tertiaryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textSecondary,
   },
   listedInfo: {
     alignItems: 'center',
