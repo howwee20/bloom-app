@@ -314,7 +314,9 @@ export default function HomeScreen() {
     fetchPortfolio();
   }, [fetchPortfolio]);
 
-  const formatPrice = (price: number) => {
+  // For market prices - shows "Updating..." when price is unavailable
+  const formatPrice = (price: number | null | undefined) => {
+    if (price === null || price === undefined || price === 0) return 'Updating...';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -322,10 +324,24 @@ export default function HomeScreen() {
     }).format(price);
   };
 
+  // For calculated values (fees, payouts) - always shows currency
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(value);
+  };
+
   const formatPnL = (value: number | null) => {
-    if (value === null) return '--';
+    if (value === null || value === 0) return '--';
     const sign = value >= 0 ? '+' : '';
-    return `${sign}${formatPrice(value)}`;
+    const formatted = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(value);
+    return `${sign}${formatted}`;
   };
 
   // Get status config for token
@@ -1168,15 +1184,15 @@ export default function HomeScreen() {
                     </View>
                     <View style={styles.sellOptionRow}>
                       <Text style={styles.sellOptionLabel}>Fees</Text>
-                      <Text style={styles.sellOptionValue}>-{formatPrice(option.feeEstimate)}</Text>
+                      <Text style={styles.sellOptionValue}>-{formatCurrency(option.feeEstimate)}</Text>
                     </View>
                     <View style={styles.sellOptionRow}>
                       <Text style={styles.sellOptionLabel}>Shipping</Text>
-                      <Text style={styles.sellOptionValue}>-{formatPrice(option.shipping)}</Text>
+                      <Text style={styles.sellOptionValue}>-{formatCurrency(option.shipping)}</Text>
                     </View>
                     <View style={styles.sellOptionRow}>
                       <Text style={styles.sellOptionLabelStrong}>Net payout</Text>
-                      <Text style={styles.sellOptionValueStrong}>{formatPrice(option.net)}</Text>
+                      <Text style={styles.sellOptionValueStrong}>{formatCurrency(option.net)}</Text>
                     </View>
                     <Pressable
                       style={styles.sellOptionButton}
