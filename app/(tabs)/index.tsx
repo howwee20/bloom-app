@@ -161,10 +161,7 @@ export default function HomeScreen() {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [showBuyIntent, setShowBuyIntent] = useState(false);
-  const [showRouteHome, setShowRouteHome] = useState(false);
-  const [routeHomeQuery, setRouteHomeQuery] = useState('');
-  const [routeHomeSize, setRouteHomeSize] = useState('');
+  // Buy Intent and Route Home modals removed - Buy button now navigates to /buy
   const [showSellModal, setShowSellModal] = useState(false);
   const [showSellOptions, setShowSellOptions] = useState(false);
   const [selectedSellItem, setSelectedSellItem] = useState<SellItem | null>(null);
@@ -405,31 +402,7 @@ export default function HomeScreen() {
     }
   };
 
-  const buildRouteHomeQuery = () => {
-    if (!routeHomeQuery.trim()) return '';
-    const sizePart = routeHomeSize.trim() ? ` ${routeHomeSize.trim()}` : '';
-    return `${routeHomeQuery.trim()}${sizePart}`;
-  };
-
-  const buildMarketplaceUrlForQuery = (marketplace: string, query: string) => {
-    const encoded = encodeURIComponent(query);
-    switch (marketplace) {
-      case 'stockx':
-        return `https://stockx.com/search?s=${encoded}`;
-      case 'goat':
-        return `https://www.goat.com/search?query=${encoded}`;
-      case 'ebay':
-        return `https://www.ebay.com/sch/i.html?_nkw=${encoded}`;
-      default:
-        return `https://www.google.com/search?q=${encoded}`;
-    }
-  };
-
-  const closeRouteHome = () => {
-    setShowRouteHome(false);
-    setRouteHomeQuery('');
-    setRouteHomeSize('');
-  };
+  // Route Home helper functions removed - now handled in /buy screen
 
   const marketplaceOptions = selectedSellItem
     ? [
@@ -729,7 +702,7 @@ export default function HomeScreen() {
       <Text style={styles.emptySubtitle}>
         Start building your collection
       </Text>
-      <Pressable style={styles.emptyButton} onPress={() => setShowBuyIntent(true)}>
+      <Pressable style={styles.emptyButton} onPress={() => router.push('/buy')}>
         <Text style={styles.emptyButtonText}>Start buying</Text>
       </Pressable>
     </View>
@@ -882,7 +855,7 @@ export default function HomeScreen() {
       {/* Assets */}
       <View style={styles.assetsSection}>
         <View style={styles.actionRow}>
-          <Pressable style={styles.actionPrimary} onPress={() => setShowBuyIntent(true)}>
+          <Pressable style={styles.actionPrimary} onPress={() => router.push('/buy')}>
             <Text style={styles.actionPrimaryText}>Buy</Text>
           </Pressable>
           <Pressable
@@ -999,112 +972,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Buy Intent Modal */}
-      <Modal
-        visible={showBuyIntent}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowBuyIntent(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowBuyIntent(false)}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Buy</Text>
-            <Text style={styles.intentSubtitle}>Choose your intent</Text>
-
-            <Pressable
-              style={styles.intentOption}
-              onPress={() => {
-                setShowBuyIntent(false);
-                setShowRouteHome(true);
-              }}
-            >
-              <Text style={styles.intentOptionTitle}>Route Home</Text>
-              <Text style={styles.intentOptionDesc}>Best all-in price across marketplaces</Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.intentOption, styles.intentOptionPrimary]}
-              onPress={() => {
-                setShowBuyIntent(false);
-                router.push({ pathname: '/(tabs)/exchange', params: { filter: 'acquire' } });
-              }}
-            >
-              <Text style={styles.intentOptionTitle}>Ship to Bloom</Text>
-              <Text style={styles.intentOptionDesc}>Bloom custody, verified on arrival</Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.intentOption, styles.intentOptionSecondary]}
-              onPress={() => {
-                setShowBuyIntent(false);
-                router.push({ pathname: '/(tabs)/exchange', params: { filter: 'instant' } });
-              }}
-            >
-              <Text style={styles.intentOptionTitle}>Instant Transfer</Text>
-              <Text style={styles.intentOptionDesc}>Bloom custody only</Text>
-            </Pressable>
-
-            <Pressable style={styles.modalCancel} onPress={() => setShowBuyIntent(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Route Home Modal */}
-      <Modal
-        visible={showRouteHome}
-        transparent
-        animationType="slide"
-        onRequestClose={closeRouteHome}
-      >
-        <Pressable style={styles.modalOverlay} onPress={closeRouteHome}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Route Home</Text>
-            <Text style={styles.intentSubtitle}>Find the best price, then checkout off Bloom</Text>
-
-            <View style={styles.routeHomeInputCard}>
-              <TextInput
-                style={styles.routeHomeInput}
-                placeholder="What are you buying?"
-                placeholderTextColor={theme.textTertiary}
-                value={routeHomeQuery}
-                onChangeText={setRouteHomeQuery}
-              />
-              <TextInput
-                style={styles.routeHomeInput}
-                placeholder="Size (optional)"
-                placeholderTextColor={theme.textTertiary}
-                value={routeHomeSize}
-                onChangeText={setRouteHomeSize}
-              />
-            </View>
-
-            {['stockx', 'goat', 'ebay'].map((marketplace) => (
-              <Pressable
-                key={marketplace}
-                style={styles.routeOption}
-                onPress={() => {
-                  const query = buildRouteHomeQuery();
-                  if (!query) {
-                    showAlert('Add a product', 'Enter a product name to continue.');
-                    return;
-                  }
-                  Linking.openURL(buildMarketplaceUrlForQuery(marketplace, query));
-                  closeRouteHome();
-                }}
-              >
-                <Text style={styles.routeOptionTitle}>{marketplace.toUpperCase()}</Text>
-                <Text style={styles.routeOptionDesc}>Open search and checkout</Text>
-              </Pressable>
-            ))}
-
-            <Pressable style={styles.modalCancel} onPress={closeRouteHome}>
-              <Text style={styles.modalCancelText}>Close</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
+      {/* Buy Intent Modal and Route Home Modal removed - now navigating to /buy */}
 
       {/* Sell Modal */}
       <Modal

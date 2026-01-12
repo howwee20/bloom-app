@@ -48,6 +48,7 @@ interface Asset {
   price_change: number | null;
   price_change_percent: number | null;
   custody_status: 'in_vault' | 'available_to_acquire' | null;
+  location: 'home' | 'bloom' | 'watchlist' | null;
 }
 
 interface PricePoint {
@@ -423,10 +424,42 @@ export default function AssetDetailScreen() {
       if (error) throw error;
       setShowAlertModal(false);
       setAlertThreshold('');
-      Alert.alert('Alert set', 'We’ll notify you when the price hits your target.');
+      Alert.alert('Alert set', "We'll notify you when the price hits your target.");
     } catch (e: any) {
       Alert.alert('Failed to set alert', e.message || 'Please try again.');
     }
+  };
+
+  const handleRemove = () => {
+    if (!asset || !session) return;
+
+    Alert.alert(
+      'Remove from Portfolio',
+      `Are you sure you want to remove ${asset.name} from your portfolio?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('assets')
+                .delete()
+                .eq('id', asset.id)
+                .eq('owner_id', session.user.id);
+
+              if (error) throw error;
+
+              router.back();
+            } catch (e: any) {
+              console.error('Remove failed:', e);
+              Alert.alert('Remove failed', e.message || 'Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -508,10 +541,14 @@ export default function AssetDetailScreen() {
           </View>
         )}
 
-        {/* Size & Delivery Info */}
+        {/* Size & Location/Delivery Info */}
         <View style={styles.infoRow}>
           <Text style={styles.infoText}>
-            Size {hasFixedSize ? asset.size : selectedSize || '—'} · {asset.custody_status === 'in_vault' ? 'Instant transfer' : 'Ships to Bloom'}
+            Size {hasFixedSize ? asset.size : selectedSize || '—'} · {
+              isOwned
+                ? (asset.location === 'bloom' ? 'Bloom Custody' : asset.location === 'watchlist' ? 'Watchlist' : 'Home')
+                : (asset.custody_status === 'in_vault' ? 'Instant transfer' : 'Ships to Bloom')
+            }
           </Text>
         </View>
 
@@ -754,6 +791,17 @@ export default function AssetDetailScreen() {
                 }}
               >
                 <Text style={styles.menuItemText}>Set price alert</Text>
+              </Pressable>
+            )}
+            {isOwned && (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMoreMenu(false);
+                  handleRemove();
+                }}
+              >
+                <Text style={[styles.menuItemText, styles.menuItemTextDestructive]}>Remove from Portfolio</Text>
               </Pressable>
             )}
             <Pressable style={styles.menuItem} onPress={() => setShowMoreMenu(false)}>
@@ -1061,6 +1109,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: theme.textPrimary,
+  },
+  menuItemTextDestructive: {
+    color: theme.error,
   },
   modalOverlay: {
     flex: 1,
