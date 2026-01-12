@@ -5,6 +5,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -91,6 +92,7 @@ export default function TokenDetailScreen() {
   const [alertThreshold, setAlertThreshold] = useState('');
   const [showCostBasisModal, setShowCostBasisModal] = useState(false);
   const [costBasisInput, setCostBasisInput] = useState('');
+  const [showSellSheet, setShowSellSheet] = useState(false);
 
   const fetchToken = useCallback(async () => {
     if (!id || !session) return;
@@ -115,12 +117,34 @@ export default function TokenDetailScreen() {
     }, [fetchToken])
   );
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number | null | undefined) => {
+    if (price === null || price === undefined || price === 0) return '—';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
     }).format(price);
+  };
+
+  // Build ticker from sku + size
+  const getTicker = () => {
+    if (!token) return '';
+    const parts = [];
+    if (token.sku) parts.push(token.sku);
+    if (token.size) parts.push(token.size);
+    return parts.join(' · ');
+  };
+
+  // Build sell URL for marketplace
+  const buildMarketplaceUrl = (marketplace: string) => {
+    const searchQuery = token ? `${token.product_name} ${token.size}` : '';
+    const query = encodeURIComponent(searchQuery);
+    switch (marketplace) {
+      case 'stockx': return `https://stockx.com/search?s=${query}`;
+      case 'goat': return `https://www.goat.com/search?query=${query}`;
+      case 'ebay': return `https://www.ebay.com/sch/i.html?_nkw=${query}`;
+      default: return `https://www.google.com/search?q=${query}`;
+    }
   };
 
   const formatPnL = (value: number | null) => {
@@ -436,12 +460,12 @@ export default function TokenDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header with Ticker */}
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>{token.product_name}</Text>
+        <Text style={styles.headerTicker} numberOfLines={1}>{getTicker()}</Text>
         <Pressable style={styles.moreButton} onPress={() => setShowMoreMenu(true)}>
           <Text style={styles.moreButtonText}>•••</Text>
         </Pressable>
@@ -468,65 +492,105 @@ export default function TokenDetailScreen() {
           )}
         </View>
 
-        {/* Product Info */}
-        <View style={styles.productInfo}>
+        {/* Price Hero + Badge */}
+        <View style={styles.priceHero}>
           <Text style={styles.productName}>{token.product_name}</Text>
-          <Text style={styles.productMeta}>Size {token.size}</Text>
-          {/* Custody Badge */}
-          <View style={[styles.custodyBadge, isHomeCustody && !isShippingToBloom && styles.custodyBadgeHome, isShippingToBloom && styles.custodyBadgeShipping]}>
-            <Text style={styles.custodyBadgeText}>
-              {isShippingToBloom ? 'SHIPPING TO BLOOM' : isBloomCustody ? 'BLOOM' : 'HOME'}
+          <View style={styles.priceRow}>
+            <Text style={styles.priceValue}>
+              {hasValue && token.current_value && token.current_value > 0
+                ? formatPrice(token.current_value)
+                : token.match_status === 'pending' ? 'Needs match' : 'Updating...'}
             </Text>
+            {/* State Badge - Truth only */}
+            <View style={[
+              styles.stateBadge,
+              isBloomCustody && styles.stateBadgeBloom,
+              isHomeCustody && styles.stateBadgeHome,
+              isShippingToBloom && styles.stateBadgeShipping
+            ]}>
+              <Text style={[
+                styles.stateBadgeText,
+                isBloomCustody && styles.stateBadgeTextBloom
+              ]}>
+                {isShippingToBloom ? 'SHIPPING' : isBloomCustody ? 'BLOOM' : 'HOME'}
+              </Text>
+            </View>
+          </View>
+          {/* P&L Delta */}
+          {hasValue && token.pnl_dollars !== null && (
+            <Text style={[styles.pnlDelta, { color: pnlColor }]}>
+              {formatPnL(token.pnl_dollars)} ({token.pnl_percent?.toFixed(1)}%)
+            </Text>
+          )}
+        </View>
+
+        {/* Position Grid (2x2) */}
+        <View style={styles.positionGrid}>
+          <View style={styles.positionRow}>
+            <View style={styles.positionCell}>
+              <Text style={styles.positionLabel}>Market Value</Text>
+              <Text style={styles.positionValue}>{formatPrice(token.current_value)}</Text>
+            </View>
+            <View style={styles.positionCell}>
+              <Text style={styles.positionLabel}>Cost Basis</Text>
+              {token.purchase_price && token.purchase_price > 0 ? (
+                <Pressable onPress={() => {
+                  setCostBasisInput(token.purchase_price.toString());
+                  setShowCostBasisModal(true);
+                }}>
+                  <Text style={styles.positionValue}>{formatPrice(token.purchase_price)}</Text>
+                  <Text style={styles.positionEdit}>Edit</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => {
+                  setCostBasisInput('');
+                  setShowCostBasisModal(true);
+                }}>
+                  <Text style={styles.positionValueAdd}>Add</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+          <View style={styles.positionRow}>
+            <View style={styles.positionCell}>
+              <Text style={styles.positionLabel}>Total P&L</Text>
+              <Text style={[styles.positionValue, token.pnl_dollars !== null && { color: pnlColor }]}>
+                {token.pnl_dollars !== null ? formatPnL(token.pnl_dollars) : '—'}
+              </Text>
+            </View>
+            <View style={styles.positionCell}>
+              <Text style={styles.positionLabel}>Size</Text>
+              <Text style={styles.positionValue}>{token.size}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Value Section - Shows bid/ask spread for active tokens */}
-        <View style={styles.valueSection}>
-          <Text style={styles.valueLabel}>Market Value</Text>
-          <Text style={styles.valueAmount}>
-            {hasValue ? formatPrice(token.current_value) : 'Needs match'}
-          </Text>
-          {isInCustodyOrListed && hasValue && token.pnl_dollars !== null && (
-            <Pressable onPress={() => {
-              setCostBasisInput(token.purchase_price ? token.purchase_price.toString() : '');
-              setShowCostBasisModal(true);
-            }}>
-              <Text style={[styles.pnlText, { color: pnlColor }]}>
-                {formatPnL(token.pnl_dollars)} since purchase
-              </Text>
-              <Text style={styles.costBasisLink}>Paid {formatPrice(token.purchase_price)} · Edit</Text>
-            </Pressable>
-          )}
-          {isInCustodyOrListed && hasValue && token.pnl_dollars === null && (
-            <Pressable onPress={() => {
-              setCostBasisInput('');
-              setShowCostBasisModal(true);
-            }}>
-              <Text style={styles.addCostBasisCta}>Add what you paid</Text>
-            </Pressable>
-          )}
-          {(token.last_price_checked_at || token.last_price_updated_at) && (
-            <Text style={styles.updatedText}>
-              Updated {formatTimeAgo(token.last_price_checked_at || token.last_price_updated_at)}
-            </Text>
-          )}
-
+        {/* Asset Facts */}
+        <View style={styles.factsSection}>
+          <View style={styles.factRow}>
+            <Text style={styles.factLabel}>Style Code</Text>
+            <Text style={styles.factValue}>{token.sku || '—'}</Text>
+          </View>
+          {/* Status notes */}
           {isAcquiring && (
-            <Text style={styles.statusNote}>Arriving at Bloom in 5-7 days</Text>
+            <View style={styles.factRow}>
+              <Text style={styles.factLabel}>Status</Text>
+              <Text style={styles.factValue}>Arriving at Bloom in 5-7 days</Text>
+            </View>
           )}
-          {isShippingToBloom && (
-            <Text style={styles.statusNote}>Ship to Bloom to enable instant transfer</Text>
+          {isShippingToBloom && token.vault_location && (
+            <View style={styles.factRow}>
+              <Text style={styles.factLabel}>Shipping Code</Text>
+              <Text style={[styles.factValue, { color: theme.accent }]}>{token.vault_location}</Text>
+            </View>
           )}
           {isRedeeming && (
-            <Text style={styles.statusNote}>
-              {token.status === 'shipped' ? 'Shipped to you' : 'Preparing for shipment'}
-            </Text>
-          )}
-          {isRedeemed && (
-            <Text style={styles.statusNote}>In your possession</Text>
-          )}
-          {token.match_status === 'pending' && (
-            <Text style={styles.statusNote}>Needs match to enable pricing</Text>
+            <View style={styles.factRow}>
+              <Text style={styles.factLabel}>Status</Text>
+              <Text style={styles.factValue}>
+                {token.status === 'shipped' ? 'Shipped to you' : 'Preparing for shipment'}
+              </Text>
+            </View>
           )}
         </View>
 
@@ -538,36 +602,84 @@ export default function TokenDetailScreen() {
             </Text>
           </View>
         )}
+
+        {/* Metadata Footer */}
+        {(token.last_price_checked_at || token.last_price_updated_at) && (
+          <Text style={styles.metadataFooter}>
+            Market data updated {formatTimeAgo(token.last_price_checked_at || token.last_price_updated_at)}
+          </Text>
+        )}
       </ScrollView>
 
       {/* Action Buttons */}
       <View style={styles.actionContainer}>
-        {/* Shipping to Bloom - Show shipping code and waiting message */}
-        {isShippingToBloom && token.vault_location && (
-          <View style={styles.shippingInfo}>
-            <Text style={styles.shippingInfoLabel}>Your Shipping Code</Text>
-            <Text style={styles.shippingInfoCode}>{token.vault_location}</Text>
-            <Text style={styles.shippingInfoNote}>Include this code inside the box</Text>
+        {/* Listed status info */}
+        {isListed && (
+          <View style={styles.listedInfo}>
+            <Text style={styles.listedLabel}>Listed for {formatPrice(token.listing_price)}</Text>
           </View>
         )}
-        {/* In Custody - Show Sell button (routing is invisible to user) */}
-        {isInCustody && (
-          <>
-            {isBloomCustody && (
-              <Pressable style={styles.actionButton} onPress={handleRedeem}>
-                <Text style={styles.actionButtonText}>Ship to Me</Text>
-              </Pressable>
-            )}
-          </>
-        )}
-        {isListed && (
-          <>
-            <View style={styles.listedInfo}>
-              <Text style={styles.listedLabel}>Listed for {formatPrice(token.listing_price || 0)}</Text>
-            </View>
-          </>
+        {/* Primary: Sell button - always show */}
+        <Pressable style={styles.actionButton} onPress={() => setShowSellSheet(true)}>
+          <Text style={styles.actionButtonText}>Sell</Text>
+        </Pressable>
+        {/* Secondary: Ship to Me for Bloom custody */}
+        {isBloomCustody && isInCustody && (
+          <Pressable style={styles.secondaryButton} onPress={handleRedeem}>
+            <Text style={styles.secondaryButtonText}>Ship to Me</Text>
+          </Pressable>
         )}
       </View>
+
+      {/* Sell Routing Sheet */}
+      <Modal
+        visible={showSellSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSellSheet(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowSellSheet(false)}>
+          <View style={styles.sellSheetContent}>
+            <Text style={styles.modalTitle}>Sell Options</Text>
+            <Text style={styles.sellSheetSubtitle}>
+              {token.product_name} · Size {token.size}
+            </Text>
+
+            {/* Bloom Exchange option for eligible items */}
+            {isBloomCustody && token.is_exchange_eligible && (
+              <Pressable
+                style={[styles.sellOption, styles.sellOptionHighlight]}
+                onPress={() => {
+                  setShowSellSheet(false);
+                  handleListForSale();
+                }}
+              >
+                <Text style={styles.sellOptionTitle}>Bloom Exchange</Text>
+                <Text style={styles.sellOptionDesc}>Instant transfer, lowest fees</Text>
+              </Pressable>
+            )}
+
+            {/* External marketplaces */}
+            {['stockx', 'goat', 'ebay'].map((marketplace) => (
+              <Pressable
+                key={marketplace}
+                style={styles.sellOption}
+                onPress={() => {
+                  Linking.openURL(buildMarketplaceUrl(marketplace));
+                  setShowSellSheet(false);
+                }}
+              >
+                <Text style={styles.sellOptionTitle}>{marketplace.toUpperCase()}</Text>
+                <Text style={styles.sellOptionDesc}>Open and list there</Text>
+              </Pressable>
+            ))}
+
+            <Pressable style={styles.modalCancel} onPress={() => setShowSellSheet(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Listing Modal */}
       <Modal
@@ -1160,6 +1272,171 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     fontSize: 15,
+    color: theme.textSecondary,
+  },
+  // New position page styles
+  headerTicker: {
+    fontFamily: fonts.heading,
+    fontSize: 13,
+    color: theme.textSecondary,
+    flex: 1,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  priceHero: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  priceValue: {
+    fontFamily: fonts.heading,
+    fontSize: 36,
+    color: theme.textPrimary,
+    letterSpacing: -1,
+  },
+  stateBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  stateBadgeBloom: {
+    backgroundColor: 'rgba(245, 166, 35, 0.2)',
+    borderColor: '#F5A623',
+  },
+  stateBadgeHome: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: theme.border,
+  },
+  stateBadgeShipping: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderColor: '#3B82F6',
+  },
+  stateBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    letterSpacing: 0.5,
+  },
+  stateBadgeTextBloom: {
+    color: '#F5A623',
+  },
+  pnlDelta: {
+    fontSize: 15,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  positionGrid: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  positionRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  positionCell: {
+    flex: 1,
+    padding: 16,
+    borderRightWidth: 1,
+    borderRightColor: theme.border,
+  },
+  positionLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  positionValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  positionEdit: {
+    fontSize: 12,
+    color: theme.accent,
+    marginTop: 2,
+  },
+  positionValueAdd: {
+    fontSize: 16,
+    color: theme.accent,
+    fontWeight: '600',
+  },
+  factsSection: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  factRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  factLabel: {
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
+  factValue: {
+    fontSize: 14,
+    color: theme.textPrimary,
+    fontWeight: '500',
+  },
+  metadataFooter: {
+    fontSize: 12,
+    color: theme.textTertiary,
+    textAlign: 'center',
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  sellSheetContent: {
+    backgroundColor: theme.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  sellSheetSubtitle: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  sellOption: {
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  sellOptionHighlight: {
+    backgroundColor: 'rgba(245, 166, 35, 0.1)',
+    borderColor: '#F5A623',
+  },
+  sellOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 2,
+  },
+  sellOptionDesc: {
+    fontSize: 13,
     color: theme.textSecondary,
   },
 });
