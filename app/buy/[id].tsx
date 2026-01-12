@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -182,7 +182,9 @@ export default function BuyDetailScreen() {
   const canContinue = selectedSize !== null;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={styles.container}>
       {/* Floating Back Button */}
       <Pressable style={styles.floatingBack} onPress={() => router.back()}>
         <Text style={styles.floatingBackText}>←</Text>
@@ -362,6 +364,7 @@ export default function BuyDetailScreen() {
         </Pressable>
       </Modal>
     </SafeAreaView>
+    </>
   );
 }
 
