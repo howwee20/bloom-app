@@ -666,10 +666,8 @@ export default function HomeScreen() {
     const pnlColor = getPnlColor(item.pnl_dollars);
     const pricingTimestamp = item.updated_at_pricing || item.last_price_checked_at || item.last_price_updated_at || item.last_price_update;
     const isPriceStale = isTimestampStale(pricingTimestamp);
-    const metaParts = [];
-    if (item.size) metaParts.push(`Size ${item.size}`);
-    if (item.stockx_sku) metaParts.push(item.stockx_sku);
-    const metaLine = metaParts.length ? metaParts.join(' · ') : '—';
+    // Size only - no style code on cards (keep clean like Robinhood)
+    const sizeLine = item.size ? `Size ${item.size}` : null;
 
     return (
       <Pressable
@@ -703,17 +701,14 @@ export default function HomeScreen() {
           )}
           <View style={styles.cardPnlRow}>
             {pnlStr ? (
-              <View style={styles.assetMetaStack}>
-                <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
-                {item.stockx_sku && <Text style={styles.cardMeta}>{item.stockx_sku}</Text>}
-              </View>
+              <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
             ) : (
-              <View style={styles.assetMetaStack}>
-                <Text style={styles.cardMetaCta}>Add what you paid</Text>
-                <Text style={styles.cardMeta}>{metaLine}</Text>
-              </View>
+              <Text style={styles.cardMetaCta}>Add what you paid</Text>
             )}
           </View>
+          {sizeLine && !pnlStr && (
+            <Text style={styles.cardMeta}>{sizeLine}</Text>
+          )}
         </View>
         {/* Custody label */}
         <View style={[styles.custodyLabel, item.location === 'watchlist' ? styles.custodyLabelWatchlist : styles.custodyLabelHome]}>
