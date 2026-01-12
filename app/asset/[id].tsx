@@ -1,12 +1,10 @@
 // Asset Detail Screen (Coinbase Style with Price Chart)
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
-  Dimensions,
   Image,
-  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -21,14 +19,23 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
 import { theme, fonts } from '../../constants/Colors';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
+import CostBasisEditor from '../../components/CostBasisEditor';
+import PositionCard from '../../components/PositionCard';
+import PriceChart, { RangeOption } from '../../components/PriceChart';
 
 // Available shoe sizes
 const AVAILABLE_SIZES = ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13'];
 
 // Staleness threshold (4 hours in minutes)
 const STALE_MINUTES = 240;
+
+// Price chart range options
+const PRICE_RANGES: RangeOption[] = [
+  { label: '7D', days: 7 },
+  { label: '30D', days: 30 },
+  { label: '90D', days: 90 },
+  { label: 'ALL', days: 'all' },
+];
 
 interface Asset {
   id: string;
@@ -88,7 +95,7 @@ export default function AssetDetailScreen() {
   const [alertType, setAlertType] = useState<'above' | 'below'>('above');
   const [alertThreshold, setAlertThreshold] = useState('');
   const [showCostBasisModal, setShowCostBasisModal] = useState(false);
-  const [costBasisInput, setCostBasisInput] = useState('');
+  const [selectedRange, setSelectedRange] = useState<RangeOption>(PRICE_RANGES[0]);
 
   useEffect(() => {
     const fetchAsset = async () => {
@@ -128,14 +135,7 @@ export default function AssetDetailScreen() {
           }
         }
 
-        // Fetch price history for chart
-        const { data: historyData } = await supabase
-          .rpc('get_price_history_for_chart', { p_asset_id: id, p_days: 7 });
-
-        if (historyData) {
-          setPriceHistory(historyData);
-        }
-      } catch (e) {
+        } catch (e) {
         console.error('Error fetching asset:', e);
       } finally {
         setLoading(false);
@@ -145,7 +145,37 @@ export default function AssetDetailScreen() {
     fetchAsset();
   }, [id]);
 
-  const formatPrice = (price: number) => {
+  // Fetch price history based on selected range
+  useEffect(() => {
+    const fetchPriceHistory = async () => {
+      if (!id) return;
+      const days = selectedRange.days === 'all' ? 3650 : selectedRange.days;
+      const { data: historyData } = await supabase.rpc('get_price_history_for_chart', {
+        p_asset_id: id,
+        p_days: days,
+      });
+      if (historyData) {
+        setPriceHistory(historyData);
+      }
+    };
+    fetchPriceHistory();
+  }, [id, selectedRange]);
+
+  // Calculate day change from price history
+  const dayChange = useMemo(() => {
+    if (priceHistory.length < 2) return { delta: null, percent: null };
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const recent = priceHistory.filter((p) => new Date(p.recorded_at).getTime() >= cutoff);
+    if (recent.length < 2) return { delta: null, percent: null };
+    const first = recent[0]?.price ?? 0;
+    const last = recent[recent.length - 1]?.price ?? 0;
+    const delta = last - first;
+    const percent = first > 0 ? (delta / first) * 100 : null;
+    return { delta, percent };
+  }, [priceHistory]);
+
+  const formatPrice = (price: number | null | undefined) => {
+    if (price === null || price === undefined) return '—';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -178,77 +208,6 @@ export default function AssetDetailScreen() {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
-  };
-
-  // Simple SVG-like line chart using View components
-  const renderPriceChart = () => {
-    if (priceHistory.length < 2) return null;
-
-    const prices = priceHistory.map(p => p.price);
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const range = max - min || 1;
-
-    const chartWidth = SCREEN_WIDTH - 32;
-    const chartHeight = 80;
-    const isUp = prices[prices.length - 1] >= prices[0];
-    const lineColor = isUp ? theme.success : theme.error;
-
-    // Create points for the chart
-    const points = prices.map((price, index) => ({
-      x: (index / (prices.length - 1)) * chartWidth,
-      y: chartHeight - ((price - min) / range) * chartHeight,
-    }));
-
-    return (
-      <View style={styles.chartContainer}>
-        <View style={[styles.chart, { width: chartWidth, height: chartHeight }]}>
-          {/* Render line segments */}
-          {points.slice(0, -1).map((point, index) => {
-            const nextPoint = points[index + 1];
-            const dx = nextPoint.x - point.x;
-            const dy = nextPoint.y - point.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.chartLine,
-                  {
-                    width: length,
-                    backgroundColor: lineColor,
-                    left: point.x,
-                    top: point.y,
-                    transform: [{ rotate: `${angle}deg` }],
-                    transformOrigin: 'left center',
-                  },
-                ]}
-              />
-            );
-          })}
-
-          {/* Current price dot */}
-          <View
-            style={[
-              styles.chartDot,
-              {
-                backgroundColor: lineColor,
-                left: points[points.length - 1].x - 4,
-                top: points[points.length - 1].y - 4,
-              },
-            ]}
-          />
-        </View>
-
-        {/* Chart labels */}
-        <View style={styles.chartLabels}>
-          <Text style={styles.chartLabel}>7d ago</Text>
-          <Text style={styles.chartLabel}>Now</Text>
-        </View>
-      </View>
-    );
   };
 
   const isOwned = asset?.owner_id === session?.user?.id;
@@ -435,10 +394,10 @@ export default function AssetDetailScreen() {
     }
   };
 
-  const handleSaveCostBasis = async () => {
+  const handleSaveCostBasis = async (value: string) => {
     if (!asset || !session) return;
 
-    const costBasis = parseFloat(costBasisInput);
+    const costBasis = parseFloat(value);
     if (Number.isNaN(costBasis) || costBasis < 0) {
       Alert.alert('Invalid amount', 'Enter a valid dollar amount.');
       return;
@@ -452,7 +411,6 @@ export default function AssetDetailScreen() {
 
       if (error) throw error;
       setShowCostBasisModal(false);
-      setCostBasisInput('');
       // Update local state
       setAsset({ ...asset, purchase_price: costBasis });
       Alert.alert('Cost basis updated', 'Your P&L will now reflect this purchase price.');
@@ -536,60 +494,94 @@ export default function AssetDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Image */}
-        {asset.image_url && !imageError ? (
-          <Image
-            source={{ uri: asset.image_url }}
-            style={styles.assetImage}
-            resizeMode="contain"
-            onError={() => setImageError(true)}
-          />
-        ) : (
-          <View style={[styles.assetImage, styles.placeholderImage]}>
-            <Text style={styles.placeholderText}>{asset.name.charAt(0)}</Text>
+        {/* Hero Row */}
+        <View style={styles.heroRow}>
+          <View style={styles.heroImage}>
+            {asset.image_url && !imageError ? (
+              <Image
+                source={{ uri: asset.image_url }}
+                style={styles.heroImageAsset}
+                resizeMode="contain"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <View style={[styles.heroImageAsset, styles.heroPlaceholder]}>
+                <Text style={styles.heroPlaceholderText}>{asset.name.charAt(0)}</Text>
+              </View>
+            )}
           </View>
-        )}
+          <View style={styles.heroInfo}>
+            <Text style={styles.heroName}>{asset.name}</Text>
+            {asset.stockx_sku && <Text style={styles.heroMeta}>{asset.stockx_sku}</Text>}
+            <View style={styles.statusRow}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  isOwned && asset.location === 'bloom' && styles.statusBadgeBloom,
+                  isOwned && asset.location === 'home' && styles.statusBadgeHome,
+                  isOwned && asset.location === 'watchlist' && styles.statusBadgeWatchlist,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusBadgeText,
+                    isOwned && asset.location === 'bloom' && styles.statusBadgeTextBloom,
+                    isOwned && asset.location === 'watchlist' && styles.statusBadgeTextWatchlist,
+                  ]}
+                >
+                  {isOwned
+                    ? asset.location === 'bloom'
+                      ? 'IN BLOOM'
+                      : asset.location === 'watchlist'
+                        ? 'WATCHLIST'
+                        : 'AT HOME'
+                    : asset.custody_status === 'in_vault'
+                      ? 'INSTANT'
+                      : 'AVAILABLE'}
+                </Text>
+              </View>
+              {pricingUpdatedAt && (
+                <Text style={styles.updatedLabel}>Updated {formatTimeAgo(pricingUpdatedAt)}</Text>
+              )}
+            </View>
+          </View>
+        </View>
 
-        {/* Price Section - Hero */}
-        <View style={styles.priceSection}>
-          <Text style={styles.priceValue}>{formatPrice(asset.price)}</Text>
-          {hasChange && (
-            <Text style={[styles.changeDetail, { color: changeColor }]}>
-              {isPositive ? '▲' : '▼'} {formatPriceChange(asset.price_change)} ({formatPercentChange(asset.price_change_percent)}) today
-            </Text>
-          )}
-          {pricingUpdatedAt && (
-            <Text style={styles.updatedText}>
-              Updated {formatTimeAgo(pricingUpdatedAt)}
-            </Text>
-          )}
-          {/* Cost Basis / P&L for owned assets */}
-          {isOwned && asset.purchase_price !== null && (
-            <Pressable onPress={() => {
-              setCostBasisInput(asset.purchase_price?.toString() || '');
-              setShowCostBasisModal(true);
-            }}>
-              <Text style={[styles.changeDetail, { color: (asset.price - asset.purchase_price) >= 0 ? theme.success : theme.error }]}>
-                {(asset.price - asset.purchase_price) >= 0 ? '+' : ''}{formatPrice(asset.price - asset.purchase_price)} all time
-              </Text>
-              <Text style={styles.costBasisLink}>Paid {formatPrice(asset.purchase_price)} · Edit</Text>
-            </Pressable>
-          )}
-          {isOwned && asset.purchase_price === null && (
-            <Pressable onPress={() => {
-              setCostBasisInput('');
-              setShowCostBasisModal(true);
-            }}>
-              <Text style={styles.addCostBasisCta}>Add what you paid</Text>
-            </Pressable>
-          )}
+        {/* Price Strip */}
+        <View style={styles.priceStrip}>
+          <View style={styles.priceMainRow}>
+            <Text style={styles.priceValueLarge}>{formatPrice(asset.price)}</Text>
+            {hasChange && (
+              <View style={[styles.changePill, isPositive ? styles.changeUp : styles.changeDown]}>
+                <Text style={styles.changeText}>
+                  {formatPriceChange(asset.price_change)} ({formatPercentChange(asset.price_change_percent)})
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.priceSubLabel}>Market price (best)</Text>
         </View>
 
         {/* Price Chart */}
-        {priceHistory.length >= 2 && (
-          <View style={styles.chartSection}>
-            {renderPriceChart()}
-          </View>
+        <PriceChart
+          data={priceHistory}
+          ranges={PRICE_RANGES}
+          selectedRange={selectedRange}
+          onRangeChange={setSelectedRange}
+        />
+
+        {/* Position Card for owned assets */}
+        {isOwned && (
+          <PositionCard
+            marketValue={asset.price}
+            costBasis={asset.purchase_price}
+            pnlDollars={asset.purchase_price ? asset.price - asset.purchase_price : null}
+            pnlPercent={asset.purchase_price ? ((asset.price - asset.purchase_price) / asset.purchase_price) * 100 : null}
+            dayChangeDollars={dayChange.delta}
+            dayChangePercent={dayChange.percent}
+            formatPrice={formatPrice}
+            onEditCostBasis={() => setShowCostBasisModal(true)}
+          />
         )}
 
         {/* Size & Location/Delivery Info */}
@@ -629,6 +621,57 @@ export default function AssetDetailScreen() {
             </View>
           </View>
         )}
+
+        {/* About Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.sectionBody}>
+            {asset.description || 'No description available yet.'}
+          </Text>
+        </View>
+
+        {/* Facts Grid */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Facts</Text>
+          <View style={styles.factsGrid}>
+            {asset.category && (
+              <View style={styles.factCell}>
+                <Text style={styles.factLabel}>Category</Text>
+                <Text style={styles.factValue}>{asset.category}</Text>
+              </View>
+            )}
+            {asset.stockx_sku && (
+              <View style={styles.factCell}>
+                <Text style={styles.factLabel}>Style Code</Text>
+                <Text style={styles.factValue}>{asset.stockx_sku}</Text>
+              </View>
+            )}
+            {(hasFixedSize || selectedSize) && (
+              <View style={styles.factCell}>
+                <Text style={styles.factLabel}>Size</Text>
+                <Text style={styles.factValue}>{hasFixedSize ? asset.size : selectedSize}</Text>
+              </View>
+            )}
+            <View style={styles.factCell}>
+              <Text style={styles.factLabel}>Location</Text>
+              <Text style={styles.factValue}>
+                {isOwned
+                  ? asset.location === 'bloom'
+                    ? 'Bloom Custody'
+                    : asset.location === 'watchlist'
+                      ? 'Watchlist'
+                      : 'At Home'
+                  : asset.custody_status === 'in_vault'
+                    ? 'Bloom Vault'
+                    : 'Available'}
+              </Text>
+            </View>
+            <View style={styles.factCell}>
+              <Text style={styles.factLabel}>Asset ID</Text>
+              <Text style={styles.factValue}>{asset.id}</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Action Button */}
@@ -911,43 +954,13 @@ export default function AssetDetailScreen() {
         </Pressable>
       </Modal>
 
-      {/* Cost Basis Modal */}
-      <Modal
+      {/* Cost Basis Editor */}
+      <CostBasisEditor
         visible={showCostBasisModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCostBasisModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>What did you pay?</Text>
-            <View style={styles.alertInputRow}>
-              <Text style={styles.alertCurrency}>$</Text>
-              <TextInput
-                style={styles.alertInput}
-                value={costBasisInput}
-                onChangeText={setCostBasisInput}
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-                placeholderTextColor={theme.textTertiary}
-                autoFocus
-              />
-            </View>
-            <Text style={styles.costBasisNote}>
-              This sets your cost basis for P&L calculation
-            </Text>
-            <Pressable style={styles.modalButton} onPress={handleSaveCostBasis}>
-              <Text style={styles.modalButtonText}>Save</Text>
-            </Pressable>
-            <Pressable style={styles.modalCancel} onPress={() => setShowCostBasisModal(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        initialValue={asset?.purchase_price ?? null}
+        onClose={() => setShowCostBasisModal(false)}
+        onSave={handleSaveCostBasis}
+      />
     </SafeAreaView>
   );
 }
@@ -1001,7 +1014,173 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: 180,
+  },
+  // Hero layout styles
+  heroRow: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  heroImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 14,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroImageAsset: {
+    width: '100%',
+    height: '100%',
+  },
+  heroPlaceholder: {
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroPlaceholderText: {
+    fontFamily: fonts.heading,
+    fontSize: 32,
+    color: theme.accent,
+  },
+  heroInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  heroName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  heroMeta: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    marginTop: 4,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: theme.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  statusBadgeBloom: {
+    backgroundColor: 'rgba(245, 166, 35, 0.2)',
+    borderColor: '#F5A623',
+  },
+  statusBadgeHome: {
+    backgroundColor: theme.backgroundSecondary,
+  },
+  statusBadgeWatchlist: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderColor: '#3B82F6',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    letterSpacing: 0.4,
+  },
+  statusBadgeTextBloom: {
+    color: '#F5A623',
+  },
+  statusBadgeTextWatchlist: {
+    color: '#3B82F6',
+  },
+  updatedLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+  },
+  // Price strip styles
+  priceStrip: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  priceMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  priceValueLarge: {
+    fontFamily: fonts.heading,
+    fontSize: 36,
+    color: theme.textPrimary,
+    letterSpacing: -1,
+  },
+  changePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  changeUp: {
+    backgroundColor: theme.successBg,
+  },
+  changeDown: {
+    backgroundColor: theme.errorBg,
+  },
+  changeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  priceSubLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 6,
+  },
+  // Section styles
+  section: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  sectionTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 14,
+    color: theme.textPrimary,
+    marginBottom: 8,
+  },
+  sectionBody: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    lineHeight: 20,
+  },
+  // Facts grid styles
+  factsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  factCell: {
+    width: '47%',
+  },
+  factLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  factValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textPrimary,
   },
   assetImage: {
     width: '100%',
@@ -1017,44 +1196,6 @@ const styles = StyleSheet.create({
     fontSize: 64,
     color: theme.accent,
   },
-  priceSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  priceValue: {
-    fontFamily: fonts.heading,
-    fontSize: 40,
-    color: theme.textPrimary,
-    letterSpacing: -0.5,
-  },
-  changeDetail: {
-    fontSize: 15,
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  updatedText: {
-    fontSize: 12,
-    color: theme.textSecondary,
-    marginTop: 6,
-  },
-  costBasisLink: {
-    fontSize: 12,
-    color: theme.textSecondary,
-    marginTop: 2,
-  },
-  addCostBasisCta: {
-    fontSize: 14,
-    color: theme.accent,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  costBasisNote: {
-    fontSize: 13,
-    color: theme.textSecondary,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
   infoRow: {
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -1063,36 +1204,6 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 15,
     color: theme.textSecondary,
-  },
-  chartSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  chartContainer: {
-    marginTop: 12,
-  },
-  chart: {
-    position: 'relative',
-  },
-  chartLine: {
-    position: 'absolute',
-    height: 2,
-    borderRadius: 1,
-  },
-  chartDot: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  chartLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  chartLabel: {
-    fontSize: 11,
-    color: theme.textTertiary,
   },
   sizeSection: {
     paddingHorizontal: 16,
