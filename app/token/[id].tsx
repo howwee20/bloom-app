@@ -87,6 +87,13 @@ interface AssetDetails {
   category: string | null;
   stockx_sku: string | null;
   price_source: string | null;
+  catalog_item?: {
+    brand: string | null;
+    model: string | null;
+    colorway_name: string | null;
+    style_code: string | null;
+    release_year: number | null;
+  } | null;
 }
 
 interface TokenAttributes {
@@ -143,7 +150,7 @@ export default function TokenDetailScreen() {
   const fetchAssetDetails = useCallback(async (assetId: string) => {
     const { data, error } = await supabase
       .from('assets')
-      .select('id, name, description, brand, category, stockx_sku, price_source')
+      .select('id, name, description, brand, category, stockx_sku, price_source, catalog_item:catalog_items (brand, model, colorway_name, style_code, release_year)')
       .eq('id', assetId)
       .maybeSingle();
 
@@ -214,6 +221,15 @@ export default function TokenDetailScreen() {
 
   const formatPrice = (price: number | null | undefined) => {
     if (price === null || price === undefined || price === 0) return '—';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(price);
+  };
+
+  const formatMoneyValue = (price: number | null | undefined) => {
+    if (price === null || price === undefined) return '—';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -536,6 +552,7 @@ export default function TokenDetailScreen() {
   const isListed = token?.status === 'listed';
   const isInTransit =
     token?.status === 'shipping_to_bloom' ||
+    token?.status === 'acquiring' ||
     token?.status === 'redeeming' ||
     token?.status === 'shipped';
   const isBloomCustody = token?.custody_type === 'bloom';
@@ -595,6 +612,7 @@ export default function TokenDetailScreen() {
   }
 
   const updatedLabel = formatTimeAgo(token.last_price_updated_at || token.last_price_checked_at);
+  const catalogItem = assetDetails?.catalog_item;
   const conditionLabel = tokenAttributes?.condition ? `Condition: ${tokenAttributes.condition}` : null;
   const metaLine = [token.sku, token.size ? `Size ${token.size}` : null, conditionLabel]
     .filter(Boolean)
@@ -606,13 +624,16 @@ export default function TokenDetailScreen() {
         ? 'Needs match'
         : 'Updating...';
   const changeLabel = rangeChange
-    ? `${rangeChange.delta >= 0 ? '+' : ''}${formatPrice(rangeChange.delta)} (${rangeChange.percent !== null ? `${rangeChange.percent >= 0 ? '+' : ''}${rangeChange.percent.toFixed(2)}%` : '--'})`
+    ? `${rangeChange.delta >= 0 ? '+' : ''}${formatMoneyValue(rangeChange.delta)} (${rangeChange.percent !== null ? `${rangeChange.percent >= 0 ? '+' : ''}${rangeChange.percent.toFixed(2)}%` : '--'})`
     : null;
   const acquiredLabel = formatDate(token.purchase_date);
   const factItems = [
-    { label: 'Brand', value: assetDetails?.brand },
+    { label: 'Brand', value: catalogItem?.brand || assetDetails?.brand || tokenAttributes?.brand },
+    { label: 'Model', value: catalogItem?.model },
+    { label: 'Colorway', value: catalogItem?.colorway_name },
+    { label: 'Release Year', value: catalogItem?.release_year?.toString() },
     { label: 'Category', value: assetDetails?.category },
-    { label: 'Style Code', value: token.sku || assetDetails?.stockx_sku },
+    { label: 'Style Code', value: catalogItem?.style_code || token.sku || assetDetails?.stockx_sku },
     { label: 'Size', value: token.size },
     { label: 'Condition', value: tokenAttributes?.condition },
     { label: 'Custody', value: statusLabel },
@@ -696,7 +717,7 @@ export default function TokenDetailScreen() {
             ) : null}
           </View>
           <Text style={styles.priceSubLabel}>
-            Market price{assetDetails?.price_source ? ` · ${assetDetails.price_source}` : ''}
+            Market price (best){assetDetails?.price_source ? ` · ${assetDetails.price_source}` : ''}
           </Text>
         </View>
 
@@ -714,7 +735,7 @@ export default function TokenDetailScreen() {
           pnlPercent={token.pnl_percent}
           dayChangeDollars={dayChange.delta}
           dayChangePercent={dayChange.percent}
-          formatPrice={formatPrice}
+          formatPrice={formatMoneyValue}
           onEditCostBasis={() => setShowCostBasisModal(true)}
         />
 
@@ -731,7 +752,7 @@ export default function TokenDetailScreen() {
             {factItems.map((item) => (
               <View key={item.label} style={styles.factCell}>
                 <Text style={styles.factLabel}>{item.label}</Text>
-                <Text style={styles.factValue}>{item.value as string}</Text>
+                <Text style={styles.factValue}>{String(item.value)}</Text>
               </View>
             ))}
           </View>
@@ -1662,34 +1683,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.accent,
     fontWeight: '600',
-  },
-  factsSection: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-  },
-  factRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  factLabel: {
-    fontSize: 14,
-    color: theme.textSecondary,
-  },
-  factValue: {
-    fontSize: 14,
-    color: theme.textPrimary,
-    fontWeight: '500',
-  },
-  metadataFooter: {
-    fontSize: 12,
-    color: theme.textTertiary,
-    textAlign: 'center',
-    marginTop: 24,
-    marginBottom: 16,
   },
   sellSheetContent: {
     backgroundColor: theme.card,

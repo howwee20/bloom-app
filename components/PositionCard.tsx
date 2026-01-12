@@ -58,9 +58,11 @@ export default function PositionCard({
               <Text style={styles.editLink}>{costBasis ? 'Edit' : 'Add'}</Text>
             </Pressable>
           </View>
-          <Text style={styles.value}>
-            {costBasis && costBasis > 0 ? formatPrice(costBasis) : '—'}
-          </Text>
+          {costBasis && costBasis > 0 ? (
+            <Text style={styles.value}>{formatPrice(costBasis)}</Text>
+          ) : (
+            <Text style={styles.valueAdd}>Add cost basis</Text>
+          )}
         </View>
       </View>
       <View style={styles.row}>
@@ -115,6 +117,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: theme.textPrimary,
+  },
+  valueAdd: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.accent,
   },
   editLink: {
     fontSize: 12,
