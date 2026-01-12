@@ -4,6 +4,7 @@ import { StyleSheet, Text, View, Pressable, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './_layout';
+import { theme, fonts } from '../constants/Colors';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: theme.background,
   },
   header: {
     flexDirection: 'row',
@@ -67,7 +68,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1A1A1A',
+    borderBottomColor: theme.border,
   },
   backButton: {
     width: 40,
@@ -77,12 +78,12 @@ const styles = StyleSheet.create({
   },
   backArrow: {
     fontSize: 24,
-    color: '#FFD7B5',
+    color: theme.accent,
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#FFF',
+    color: theme.textPrimary,
   },
   headerSpacer: {
     width: 40,
@@ -98,25 +99,27 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#666',
+    color: theme.textSecondary,
     letterSpacing: 0.5,
     marginBottom: 8,
   },
   emailText: {
     fontSize: 17,
-    color: '#FFF',
+    color: theme.textPrimary,
   },
   logoutButton: {
     marginHorizontal: 16,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: theme.card,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
     paddingVertical: 16,
     alignItems: 'center',
   },
   logoutText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: theme.error,
   },
   menuItem: {
     flexDirection: 'row',
@@ -124,7 +127,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginHorizontal: 16,
     marginBottom: 16,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 16,
@@ -132,10 +137,10 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 17,
     fontWeight: '500',
-    color: '#FFF',
+    color: theme.textPrimary,
   },
   menuItemArrow: {
     fontSize: 17,
-    color: '#666',
+    color: theme.textSecondary,
   },
 });
