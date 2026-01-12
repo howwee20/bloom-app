@@ -263,13 +263,10 @@ export default function BuyBrowseScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Buy</Text>
-          <Pressable style={styles.closeButton} onPress={() => router.back()}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </Pressable>
-        </View>
+        {/* Floating Close Button */}
+        <Pressable style={styles.floatingClose} onPress={() => router.back()}>
+          <Text style={styles.floatingCloseText}>✕</Text>
+        </Pressable>
 
         {showEmptyState ? (
           <View style={styles.emptyWrapper}>
@@ -316,31 +313,22 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  headerTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 20,
-    color: theme.textPrimary,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  floatingClose: {
+    position: 'absolute',
+    top: 8,
+    right: 16,
+    zIndex: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.backgroundSecondary,
   },
-  closeButtonText: {
-    color: theme.textSecondary,
-    fontSize: 14,
+  floatingCloseText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   stickyHeader: {
     backgroundColor: theme.background,

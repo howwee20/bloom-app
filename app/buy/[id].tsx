@@ -183,14 +183,10 @@ export default function BuyDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backArrow}>←</Text>
-        </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>{name}</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      {/* Floating Back Button */}
+      <Pressable style={styles.floatingBack} onPress={() => router.back()}>
+        <Text style={styles.floatingBackText}>←</Text>
+      </Pressable>
 
       <ScrollView
         style={styles.scrollView}
@@ -374,34 +370,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  backButton: {
+  floatingBack: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    zIndex: 10,
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backArrow: {
-    fontSize: 24,
-    color: theme.accent,
-  },
-  headerTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 14,
-    color: theme.textPrimary,
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
+  floatingBackText: {
+    color: '#FFF',
+    fontSize: 22,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
