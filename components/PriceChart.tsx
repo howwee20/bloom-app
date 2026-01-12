@@ -71,8 +71,11 @@ export default function PriceChart({
       </View>
 
       {data.length < 2 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No history yet — collecting price data</Text>
+        <View style={[styles.chart, { width: chartWidth, height: chartHeight }]}>
+          <View style={[styles.skeletonLine, { top: chartHeight * 0.2 }]} />
+          <View style={[styles.skeletonLine, { top: chartHeight * 0.5 }]} />
+          <View style={[styles.skeletonLine, { top: chartHeight * 0.78 }]} />
+          <Text style={styles.collectingText}>Collecting price data</Text>
         </View>
       ) : (
         <View style={[styles.chart, { width: chartWidth, height: chartHeight }]}>
@@ -158,6 +161,22 @@ const styles = StyleSheet.create({
   chart: {
     alignSelf: 'center',
   },
+  skeletonLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: theme.border,
+    borderRadius: 2,
+  },
+  collectingText: {
+    position: 'absolute',
+    bottom: -22,
+    width: '100%',
+    textAlign: 'center',
+    fontSize: 12,
+    color: theme.textSecondary,
+  },
   chartLine: {
     position: 'absolute',
     height: 2,
@@ -181,13 +200,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.textTertiary,
     fontFamily: fonts.body,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: theme.textSecondary,
   },
 });

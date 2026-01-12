@@ -39,8 +39,9 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
 import { theme, fonts } from '../../constants/Colors';
 import CostBasisEditor from '../../components/CostBasisEditor';
-import PositionCard from '../../components/PositionCard';
+import OwnedPosition from '../../components/OwnedPosition';
 import PriceChart, { PricePoint, RangeOption } from '../../components/PriceChart';
+import StatsRow from '../../components/StatsRow';
 
 interface TokenDetail {
   id: string;
@@ -108,6 +109,8 @@ const PRICE_RANGES: RangeOption[] = [
   { label: 'ALL', days: 'all' },
 ];
 
+const SIZE_OPTIONS = ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13'];
+
 export default function TokenDetailScreen() {
   const { id, sell } = useLocalSearchParams<{ id: string; sell?: string }>();
   const { session } = useAuth();
@@ -126,9 +129,11 @@ export default function TokenDetailScreen() {
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showMarketSheet, setShowMarketSheet] = useState(false);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
+  const [statsHistory, setStatsHistory] = useState<PricePoint[]>([]);
   const [selectedRange, setSelectedRange] = useState<RangeOption>(PRICE_RANGES[0]);
   const [assetDetails, setAssetDetails] = useState<AssetDetails | null>(null);
   const [tokenAttributes, setTokenAttributes] = useState<TokenAttributes | null>(null);
+  const [marketplaceSize, setMarketplaceSize] = useState('');
 
   const fetchToken = useCallback(async () => {
     if (!id || !session) return;
@@ -176,18 +181,47 @@ export default function TokenDetailScreen() {
   }, []);
 
   const fetchPriceHistory = useCallback(async (assetId: string, range: RangeOption) => {
-    const days = range.days === 'all' ? 3650 : range.days;
-    const { data, error } = await supabase
-      .rpc('get_price_history_for_chart', { p_asset_id: assetId, p_days: days });
+    const query = supabase
+      .from('asset_price_points')
+      .select('price, ts')
+      .eq('asset_id', assetId)
+      .order('ts', { ascending: true });
+
+    if (range.days !== 'all') {
+      const start = new Date(Date.now() - range.days * 24 * 60 * 60 * 1000).toISOString();
+      query.gte('ts', start);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
-      const parsed = data.map((point: { price: number | string; recorded_at: string }) => ({
+      const parsed = data.map((point: { price: number | string; ts: string }) => ({
         price: Number(point.price),
-        recorded_at: point.recorded_at,
+        recorded_at: point.ts,
       }));
       setPriceHistory(parsed);
     } else {
       setPriceHistory([]);
+    }
+  }, []);
+
+  const fetchStatsHistory = useCallback(async (assetId: string) => {
+    const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('asset_price_points')
+      .select('price, ts')
+      .eq('asset_id', assetId)
+      .gte('ts', start)
+      .order('ts', { ascending: true });
+
+    if (!error && data) {
+      const parsed = data.map((point: { price: number | string; ts: string }) => ({
+        price: Number(point.price),
+        recorded_at: point.ts,
+      }));
+      setStatsHistory(parsed);
+    } else {
+      setStatsHistory([]);
     }
   }, []);
 
@@ -200,10 +234,12 @@ export default function TokenDetailScreen() {
   useEffect(() => {
     if (token?.matched_asset_id) {
       fetchAssetDetails(token.matched_asset_id);
+      fetchStatsHistory(token.matched_asset_id);
     } else {
       setAssetDetails(null);
+      setStatsHistory([]);
     }
-  }, [token?.matched_asset_id, fetchAssetDetails]);
+  }, [token?.matched_asset_id, fetchAssetDetails, fetchStatsHistory]);
 
   useEffect(() => {
     if (token?.matched_asset_id) {
@@ -218,6 +254,10 @@ export default function TokenDetailScreen() {
       fetchTokenAttributes(token.id);
     }
   }, [token?.id, fetchTokenAttributes]);
+
+  useEffect(() => {
+    setMarketplaceSize(token?.size || '');
+  }, [token?.size]);
 
   const formatPrice = (price: number | null | undefined) => {
     if (price === null || price === undefined || price === 0) return '—';
@@ -237,9 +277,18 @@ export default function TokenDetailScreen() {
     }).format(price);
   };
 
+  const formatChange = (delta: number | null, percent: number | null) => {
+    if (delta === null) return '—';
+    const sign = delta >= 0 ? '+' : '';
+    const percentLabel =
+      percent === null ? '--' : `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
+    return `${sign}${formatMoneyValue(delta)} (${percentLabel})`;
+  };
+
   // Build sell URL for marketplace
   const buildMarketplaceUrl = (marketplace: string) => {
-    const searchQuery = token ? `${token.product_name} ${token.size}` : '';
+    const size = token?.size || marketplaceSize;
+    const searchQuery = token ? `${token.product_name} ${size || ''}`.trim() : '';
     const query = encodeURIComponent(searchQuery);
     switch (marketplace) {
       case 'stockx': return `https://stockx.com/search?s=${query}`;
@@ -264,13 +313,6 @@ export default function TokenDetailScreen() {
     return `${diffDays}d ago`;
   };
 
-  const formatDate = (dateString?: string | null) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return null;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
   const rangeChange = useMemo(() => {
     if (priceHistory.length < 2) return null;
     const first = priceHistory[0]?.price ?? 0;
@@ -281,9 +323,9 @@ export default function TokenDetailScreen() {
   }, [priceHistory]);
 
   const dayChange = useMemo(() => {
-    if (priceHistory.length < 2) return { delta: null, percent: null };
+    if (statsHistory.length < 2) return { delta: null, percent: null };
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    const recent = priceHistory.filter(
+    const recent = statsHistory.filter(
       (point) => new Date(point.recorded_at).getTime() >= cutoff
     );
     if (recent.length < 2) return { delta: null, percent: null };
@@ -292,7 +334,25 @@ export default function TokenDetailScreen() {
     const delta = last - first;
     const percent = first > 0 ? (delta / first) * 100 : null;
     return { delta, percent };
-  }, [priceHistory]);
+  }, [statsHistory]);
+
+  const statsChange7d = useMemo(() => {
+    if (statsHistory.length < 2) return { delta: null, percent: null };
+    const first = statsHistory[0]?.price ?? 0;
+    const last = statsHistory[statsHistory.length - 1]?.price ?? 0;
+    const delta = last - first;
+    const percent = first > 0 ? (delta / first) * 100 : null;
+    return { delta, percent };
+  }, [statsHistory]);
+
+  const rangeHighLow = useMemo(() => {
+    if (statsHistory.length < 2) return null;
+    const prices = statsHistory.map((point) => point.price);
+    return {
+      high: Math.max(...prices),
+      low: Math.min(...prices),
+    };
+  }, [statsHistory]);
 
   const hasValue = token?.current_value !== null && token?.current_value !== undefined;
   const cashOutEstimate = token && hasValue
@@ -550,21 +610,14 @@ export default function TokenDetailScreen() {
   // Status helpers
   const isInCustody = token?.status === 'in_custody';
   const isListed = token?.status === 'listed';
-  const isInTransit =
-    token?.status === 'shipping_to_bloom' ||
-    token?.status === 'acquiring' ||
-    token?.status === 'redeeming' ||
-    token?.status === 'shipped';
   const isBloomCustody = token?.custody_type === 'bloom';
   const isHomeCustody = token?.custody_type === 'home';
 
-  const statusLabel = isInTransit
-    ? 'IN TRANSIT'
-    : isBloomCustody
-      ? 'IN BLOOM'
-      : isHomeCustody
-        ? 'AT HOME'
-        : 'WATCHLIST';
+  const statusLabel = isBloomCustody
+    ? 'IN BLOOM'
+    : isHomeCustody
+      ? 'AT HOME'
+      : 'WATCHLIST';
 
   useEffect(() => {
     if (!token || sell !== '1' || sellTriggered) return;
@@ -619,27 +672,34 @@ export default function TokenDetailScreen() {
     .join(' · ');
   const priceLabel =
     hasValue && token.current_value && token.current_value > 0
-      ? formatPrice(token.current_value)
+      ? formatMoneyValue(token.current_value)
       : token.match_status === 'pending'
         ? 'Needs match'
         : 'Updating...';
   const changeLabel = rangeChange
-    ? `${rangeChange.delta >= 0 ? '+' : ''}${formatMoneyValue(rangeChange.delta)} (${rangeChange.percent !== null ? `${rangeChange.percent >= 0 ? '+' : ''}${rangeChange.percent.toFixed(2)}%` : '--'})`
+    ? formatChange(rangeChange.delta, rangeChange.percent)
     : null;
-  const acquiredLabel = formatDate(token.purchase_date);
+  const bestPriceLabel =
+    assetDetails?.price_source && hasValue
+      ? `Best price: ${formatMoneyValue(token.current_value)} on ${assetDetails.price_source}`
+      : null;
+  const statsItems = [
+    { label: 'Market Value', value: formatMoneyValue(token.current_value) },
+    { label: 'Day Change', value: formatChange(dayChange.delta, dayChange.percent) },
+    { label: '7D Change', value: formatChange(statsChange7d.delta, statsChange7d.percent) },
+    {
+      label: 'Range High/Low',
+      value: rangeHighLow
+        ? `${formatMoneyValue(rangeHighLow.high)} / ${formatMoneyValue(rangeHighLow.low)}`
+        : '—',
+    },
+  ];
   const factItems = [
-    { label: 'Brand', value: catalogItem?.brand || assetDetails?.brand || tokenAttributes?.brand },
-    { label: 'Model', value: catalogItem?.model },
-    { label: 'Colorway', value: catalogItem?.colorway_name },
-    { label: 'Release Year', value: catalogItem?.release_year?.toString() },
-    { label: 'Category', value: assetDetails?.category },
-    { label: 'Style Code', value: catalogItem?.style_code || token.sku || assetDetails?.stockx_sku },
-    { label: 'Size', value: token.size },
-    { label: 'Condition', value: tokenAttributes?.condition },
-    { label: 'Custody', value: statusLabel },
-    { label: 'Acquired', value: acquiredLabel },
-    { label: 'Token ID', value: token.id },
-  ].filter((item) => item.value);
+    { label: 'Style Code', value: catalogItem?.style_code || token.sku || assetDetails?.stockx_sku || '—' },
+    { label: 'Size', value: token.size || '—' },
+    { label: 'Brand', value: catalogItem?.brand || assetDetails?.brand || tokenAttributes?.brand || '—' },
+    { label: 'Colorway', value: catalogItem?.colorway_name || '—' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -683,7 +743,6 @@ export default function TokenDetailScreen() {
                   styles.statusBadge,
                   statusLabel === 'IN BLOOM' && styles.statusBadgeBloom,
                   statusLabel === 'AT HOME' && styles.statusBadgeHome,
-                  statusLabel === 'IN TRANSIT' && styles.statusBadgeTransit,
                 ]}
               >
                 <Text
@@ -719,6 +778,9 @@ export default function TokenDetailScreen() {
           <Text style={styles.priceSubLabel}>
             Market price (best){assetDetails?.price_source ? ` · ${assetDetails.price_source}` : ''}
           </Text>
+          {bestPriceLabel ? (
+            <Text style={styles.bestPriceLabel}>{bestPriceLabel}</Text>
+          ) : null}
         </View>
 
         <PriceChart
@@ -727,25 +789,25 @@ export default function TokenDetailScreen() {
           selectedRange={selectedRange}
           onRangeChange={setSelectedRange}
         />
+        <StatsRow stats={statsItems} />
 
-        <PositionCard
-          marketValue={token.current_value}
-          costBasis={token.purchase_price}
-          pnlDollars={token.pnl_dollars}
-          pnlPercent={token.pnl_percent}
-          dayChangeDollars={dayChange.delta}
-          dayChangePercent={dayChange.percent}
-          formatPrice={formatMoneyValue}
-          onEditCostBasis={() => setShowCostBasisModal(true)}
-        />
+        {(isHomeCustody || isBloomCustody) && (
+          <OwnedPosition
+            costBasis={token.purchase_price}
+            pnlDollars={token.pnl_dollars}
+            pnlPercent={token.pnl_percent}
+            formatPrice={formatMoneyValue}
+            onEditCostBasis={() => setShowCostBasisModal(true)}
+          />
+        )}
 
         {/* About Section - only show if description exists */}
-        {assetDetails?.description && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.sectionBody}>{assetDetails.description}</Text>
-          </View>
-        )}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.sectionBody}>
+            {assetDetails?.description || 'Price tracking active.'}
+          </Text>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Facts</Text>
@@ -822,8 +884,35 @@ export default function TokenDetailScreen() {
           <View style={styles.sellSheetContent}>
             <Text style={styles.modalTitle}>Sell Options</Text>
             <Text style={styles.sellSheetSubtitle}>
-              {token.product_name} · Size {token.size}
+              {token.product_name} · Size {token.size || marketplaceSize || '—'}
             </Text>
+
+            {!token.size && (
+              <View style={styles.marketSizeSection}>
+                <Text style={styles.marketSizeLabel}>Select size</Text>
+                <View style={styles.marketSizeGrid}>
+                  {SIZE_OPTIONS.map((size) => (
+                    <Pressable
+                      key={size}
+                      style={[
+                        styles.marketSizeChip,
+                        marketplaceSize === size && styles.marketSizeChipActive,
+                      ]}
+                      onPress={() => setMarketplaceSize(size)}
+                    >
+                      <Text
+                        style={[
+                          styles.marketSizeChipText,
+                          marketplaceSize === size && styles.marketSizeChipTextActive,
+                        ]}
+                      >
+                        {size}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Bloom Exchange option for eligible items */}
             {isBloomCustody && token.is_exchange_eligible && (
@@ -843,11 +932,16 @@ export default function TokenDetailScreen() {
             {['stockx', 'goat', 'ebay'].map((marketplace) => (
               <Pressable
                 key={marketplace}
-                style={styles.sellOption}
+                style={[
+                  styles.sellOption,
+                  !token.size && !marketplaceSize && styles.sellOptionDisabled,
+                ]}
                 onPress={() => {
+                  if (!token.size && !marketplaceSize) return;
                   Linking.openURL(buildMarketplaceUrl(marketplace));
                   setShowSellSheet(false);
                 }}
+                disabled={!token.size && !marketplaceSize}
               >
                 <Text style={styles.sellOptionTitle}>{marketplace.toUpperCase()}</Text>
                 <Text style={styles.sellOptionDesc}>Open and list there</Text>
@@ -872,17 +966,49 @@ export default function TokenDetailScreen() {
           <View style={styles.sellSheetContent}>
             <Text style={styles.modalTitle}>Marketplaces</Text>
             <Text style={styles.sellSheetSubtitle}>
-              {token.product_name} · Size {token.size}
+              {token.product_name} · Size {token.size || marketplaceSize || '—'}
             </Text>
+
+            {!token.size && (
+              <View style={styles.marketSizeSection}>
+                <Text style={styles.marketSizeLabel}>Select size</Text>
+                <View style={styles.marketSizeGrid}>
+                  {SIZE_OPTIONS.map((size) => (
+                    <Pressable
+                      key={size}
+                      style={[
+                        styles.marketSizeChip,
+                        marketplaceSize === size && styles.marketSizeChipActive,
+                      ]}
+                      onPress={() => setMarketplaceSize(size)}
+                    >
+                      <Text
+                        style={[
+                          styles.marketSizeChipText,
+                          marketplaceSize === size && styles.marketSizeChipTextActive,
+                        ]}
+                      >
+                        {size}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {['stockx', 'goat', 'ebay'].map((marketplace) => (
               <Pressable
                 key={marketplace}
-                style={styles.sellOption}
+                style={[
+                  styles.sellOption,
+                  !token.size && !marketplaceSize && styles.sellOptionDisabled,
+                ]}
                 onPress={() => {
+                  if (!token.size && !marketplaceSize) return;
                   Linking.openURL(buildMarketplaceUrl(marketplace));
                   setShowMarketSheet(false);
                 }}
+                disabled={!token.size && !marketplaceSize}
               >
                 <Text style={styles.sellOptionTitle}>{marketplace.toUpperCase()}</Text>
                 <Text style={styles.sellOptionDesc}>View recent listings</Text>
@@ -1157,10 +1283,6 @@ const styles = StyleSheet.create({
   statusBadgeHome: {
     backgroundColor: theme.backgroundSecondary,
   },
-  statusBadgeTransit: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderColor: '#3B82F6',
-  },
   statusBadgeText: {
     fontSize: 11,
     fontWeight: '700',
@@ -1204,6 +1326,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.textSecondary,
     marginTop: 6,
+  },
+  bestPriceLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 4,
   },
   section: {
     marginHorizontal: 16,
@@ -1715,6 +1842,43 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 20,
   },
+  marketSizeSection: {
+    marginBottom: 12,
+  },
+  marketSizeLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    textAlign: 'center',
+  },
+  marketSizeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  marketSizeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: theme.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  marketSizeChipActive: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  marketSizeChipText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    fontWeight: '600',
+  },
+  marketSizeChipTextActive: {
+    color: theme.textInverse,
+  },
   sellOption: {
     backgroundColor: theme.backgroundSecondary,
     borderRadius: 12,
@@ -1722,6 +1886,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: theme.border,
+  },
+  sellOptionDisabled: {
+    opacity: 0.5,
   },
   sellOptionHighlight: {
     backgroundColor: 'rgba(245, 166, 35, 0.1)',

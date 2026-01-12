@@ -20,8 +20,9 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
 import { theme, fonts } from '../../constants/Colors';
 import CostBasisEditor from '../../components/CostBasisEditor';
-import PositionCard from '../../components/PositionCard';
-import PriceChart, { RangeOption } from '../../components/PriceChart';
+import OwnedPosition from '../../components/OwnedPosition';
+import PriceChart, { PricePoint, RangeOption } from '../../components/PriceChart';
+import StatsRow from '../../components/StatsRow';
 
 // Available shoe sizes
 const AVAILABLE_SIZES = ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13'];
@@ -48,6 +49,7 @@ interface Asset {
   description: string | null;
   provenance: string | null;
   category: string | null;
+  brand: string | null;
   stockx_sku: string | null;
   last_price_update: string | null;
   last_price_checked_at: string | null;
@@ -61,9 +63,10 @@ interface Asset {
   purchase_price: number | null;
 }
 
-interface PricePoint {
-  price: number;
-  recorded_at: string;
+interface CatalogDetails {
+  brand: string | null;
+  colorway_name: string | null;
+  style_code: string | null;
 }
 
 interface ExchangeListing {
@@ -80,6 +83,9 @@ export default function AssetDetailScreen() {
   const { session } = useAuth();
   const [asset, setAsset] = useState<Asset | null>(null);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
+  const [statsHistory, setStatsHistory] = useState<PricePoint[]>([]);
+  const [catalogDetails, setCatalogDetails] = useState<CatalogDetails | null>(null);
+  const [priceSource, setPriceSource] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [selling, setSelling] = useState(false);
@@ -96,6 +102,68 @@ export default function AssetDetailScreen() {
   const [alertThreshold, setAlertThreshold] = useState('');
   const [showCostBasisModal, setShowCostBasisModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState<RangeOption>(PRICE_RANGES[0]);
+
+  const loadPriceHistory = async (assetId: string, range: RangeOption) => {
+    const query = supabase
+      .from('asset_price_points')
+      .select('price, ts')
+      .eq('asset_id', assetId)
+      .order('ts', { ascending: true });
+
+    if (range.days !== 'all') {
+      const start = new Date(Date.now() - range.days * 24 * 60 * 60 * 1000).toISOString();
+      query.gte('ts', start);
+    }
+
+    const { data, error } = await query;
+    if (!error && data) {
+      setPriceHistory(
+        data.map((point: { price: number | string; ts: string }) => ({
+          price: Number(point.price),
+          recorded_at: point.ts,
+        }))
+      );
+    } else {
+      setPriceHistory([]);
+    }
+  };
+
+  const loadStatsHistory = async (assetId: string) => {
+    const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('asset_price_points')
+      .select('price, ts')
+      .eq('asset_id', assetId)
+      .gte('ts', start)
+      .order('ts', { ascending: true });
+
+    if (!error && data) {
+      setStatsHistory(
+        data.map((point: { price: number | string; ts: string }) => ({
+          price: Number(point.price),
+          recorded_at: point.ts,
+        }))
+      );
+    } else {
+      setStatsHistory([]);
+    }
+  };
+
+  const loadCatalogDetails = async (assetId: string) => {
+    const { data, error } = await supabase
+      .from('assets')
+      .select('price_source, catalog_item:catalog_items (brand, colorway_name, style_code)')
+      .eq('id', assetId)
+      .maybeSingle();
+
+    if (!error && data) {
+      setCatalogDetails((data.catalog_item as CatalogDetails) || null);
+      setPriceSource((data.price_source as string) || null);
+    } else {
+      setCatalogDetails(null);
+      setPriceSource(null);
+    }
+  };
 
   useEffect(() => {
     const fetchAsset = async () => {
@@ -135,7 +203,12 @@ export default function AssetDetailScreen() {
           }
         }
 
-        } catch (e) {
+        await Promise.all([
+          loadPriceHistory(id, selectedRange),
+          loadStatsHistory(id),
+          loadCatalogDetails(id),
+        ]);
+      } catch (e) {
         console.error('Error fetching asset:', e);
       } finally {
         setLoading(false);
@@ -145,34 +218,41 @@ export default function AssetDetailScreen() {
     fetchAsset();
   }, [id]);
 
-  // Fetch price history based on selected range
   useEffect(() => {
-    const fetchPriceHistory = async () => {
-      if (!id) return;
-      const days = selectedRange.days === 'all' ? 3650 : selectedRange.days;
-      const { data: historyData } = await supabase.rpc('get_price_history_for_chart', {
-        p_asset_id: id,
-        p_days: days,
-      });
-      if (historyData) {
-        setPriceHistory(historyData);
-      }
-    };
-    fetchPriceHistory();
+    if (!id) return;
+    loadPriceHistory(id, selectedRange);
   }, [id, selectedRange]);
 
-  // Calculate day change from price history
+  // Calculate day change from 7D stats history
   const dayChange = useMemo(() => {
-    if (priceHistory.length < 2) return { delta: null, percent: null };
+    if (statsHistory.length < 2) return { delta: null, percent: null };
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    const recent = priceHistory.filter((p) => new Date(p.recorded_at).getTime() >= cutoff);
+    const recent = statsHistory.filter((p) => new Date(p.recorded_at).getTime() >= cutoff);
     if (recent.length < 2) return { delta: null, percent: null };
     const first = recent[0]?.price ?? 0;
     const last = recent[recent.length - 1]?.price ?? 0;
     const delta = last - first;
     const percent = first > 0 ? (delta / first) * 100 : null;
     return { delta, percent };
-  }, [priceHistory]);
+  }, [statsHistory]);
+
+  const change7d = useMemo(() => {
+    if (statsHistory.length < 2) return { delta: null, percent: null };
+    const first = statsHistory[0]?.price ?? 0;
+    const last = statsHistory[statsHistory.length - 1]?.price ?? 0;
+    const delta = last - first;
+    const percent = first > 0 ? (delta / first) * 100 : null;
+    return { delta, percent };
+  }, [statsHistory]);
+
+  const rangeHighLow = useMemo(() => {
+    if (statsHistory.length < 2) return null;
+    const prices = statsHistory.map((point) => point.price);
+    return {
+      high: Math.max(...prices),
+      low: Math.min(...prices),
+    };
+  }, [statsHistory]);
 
   const formatPrice = (price: number | null | undefined) => {
     if (price === null || price === undefined) return '—';
@@ -181,6 +261,14 @@ export default function AssetDetailScreen() {
       currency: 'USD',
       minimumFractionDigits: 2,
     }).format(price);
+  };
+
+  const formatChange = (delta: number | null, percent: number | null) => {
+    if (delta === null) return '—';
+    const sign = delta >= 0 ? '+' : '';
+    const percentLabel =
+      percent === null ? '--' : `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
+    return `${sign}${formatPrice(delta)} (${percentLabel})`;
   };
 
   const formatPriceChange = (change: number | null) => {
@@ -223,6 +311,30 @@ export default function AssetDetailScreen() {
   // Check if price is stale (older than 4 hours)
   const isStale = !pricingUpdatedAt ||
     ((Date.now() - new Date(pricingUpdatedAt).getTime()) / 60000) > STALE_MINUTES;
+
+  const statusLabel = asset?.location === 'watchlist'
+    ? 'WATCHLIST'
+    : isOwned
+      ? asset?.location === 'bloom'
+        ? 'IN BLOOM'
+        : 'AT HOME'
+      : null;
+
+  const bestPriceLabel = priceSource
+    ? `Best price: ${formatPrice(asset?.price)} on ${priceSource}`
+    : null;
+
+  const statsItems = [
+    { label: 'Market Value', value: formatPrice(asset?.price) },
+    { label: 'Day Change', value: formatChange(dayChange.delta, dayChange.percent) },
+    { label: '7D Change', value: formatChange(change7d.delta, change7d.percent) },
+    {
+      label: 'Range High/Low',
+      value: rangeHighLow
+        ? `${formatPrice(rangeHighLow.high)} / ${formatPrice(rangeHighLow.low)}`
+        : '—',
+    },
+  ];
 
   const buildSearchQuery = () => {
     if (!asset) return '';
@@ -514,27 +626,23 @@ export default function AssetDetailScreen() {
             <Text style={styles.heroName}>{asset.name}</Text>
             {asset.stockx_sku && <Text style={styles.heroMeta}>{asset.stockx_sku}</Text>}
             <View style={styles.statusRow}>
-              {isOwned && (
+              {statusLabel && (
                 <View
                   style={[
                     styles.statusBadge,
-                    asset.location === 'bloom' && styles.statusBadgeBloom,
-                    asset.location === 'home' && styles.statusBadgeHome,
-                    asset.location === 'watchlist' && styles.statusBadgeWatchlist,
+                    statusLabel === 'IN BLOOM' && styles.statusBadgeBloom,
+                    statusLabel === 'AT HOME' && styles.statusBadgeHome,
+                    statusLabel === 'WATCHLIST' && styles.statusBadgeWatchlist,
                   ]}
                 >
                   <Text
                     style={[
                       styles.statusBadgeText,
-                      asset.location === 'bloom' && styles.statusBadgeTextBloom,
-                      asset.location === 'watchlist' && styles.statusBadgeTextWatchlist,
+                      statusLabel === 'IN BLOOM' && styles.statusBadgeTextBloom,
+                      statusLabel === 'WATCHLIST' && styles.statusBadgeTextWatchlist,
                     ]}
                   >
-                    {asset.location === 'bloom'
-                      ? 'IN BLOOM'
-                      : asset.location === 'watchlist'
-                        ? 'WATCHLIST'
-                        : 'AT HOME'}
+                    {statusLabel}
                   </Text>
                 </View>
               )}
@@ -558,6 +666,9 @@ export default function AssetDetailScreen() {
             )}
           </View>
           <Text style={styles.priceSubLabel}>Market price (best)</Text>
+          {bestPriceLabel ? (
+            <Text style={styles.bestPriceLabel}>{bestPriceLabel}</Text>
+          ) : null}
         </View>
 
         {/* Price Chart */}
@@ -568,15 +679,14 @@ export default function AssetDetailScreen() {
           onRangeChange={setSelectedRange}
         />
 
-        {/* Position Card for owned assets */}
+        <StatsRow stats={statsItems} />
+
+        {/* Owned Position */}
         {isOwned && (
-          <PositionCard
-            marketValue={asset.price}
+          <OwnedPosition
             costBasis={asset.purchase_price}
             pnlDollars={asset.purchase_price ? asset.price - asset.purchase_price : null}
             pnlPercent={asset.purchase_price ? ((asset.price - asset.purchase_price) / asset.purchase_price) * 100 : null}
-            dayChangeDollars={dayChange.delta}
-            dayChangePercent={dayChange.percent}
             formatPrice={formatPrice}
             onEditCostBasis={() => setShowCostBasisModal(true)}
           />
@@ -591,7 +701,7 @@ export default function AssetDetailScreen() {
         </View>
 
         {/* Size Selector */}
-        {!isOwned && isAvailable && !hasFixedSize && (
+        {!isOwned && !hasFixedSize && (
           <View style={styles.sizeSection}>
             <View style={styles.sizeGrid}>
               {AVAILABLE_SIZES.map((size) => (
@@ -617,53 +727,34 @@ export default function AssetDetailScreen() {
           </View>
         )}
 
-        {/* About Section - only show if description exists */}
-        {asset.description && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.sectionBody}>{asset.description}</Text>
-          </View>
-        )}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.sectionBody}>
+            {asset.description || 'Price tracking active.'}
+          </Text>
+        </View>
 
         {/* Facts Grid */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Facts</Text>
           <View style={styles.factsGrid}>
-            {asset.category && (
-              <View style={styles.factCell}>
-                <Text style={styles.factLabel}>Category</Text>
-                <Text style={styles.factValue}>{asset.category}</Text>
-              </View>
-            )}
-            {asset.stockx_sku && (
-              <View style={styles.factCell}>
-                <Text style={styles.factLabel}>Style Code</Text>
-                <Text style={styles.factValue}>{asset.stockx_sku}</Text>
-              </View>
-            )}
-            {(hasFixedSize || selectedSize) && (
-              <View style={styles.factCell}>
-                <Text style={styles.factLabel}>Size</Text>
-                <Text style={styles.factValue}>{hasFixedSize ? asset.size : selectedSize}</Text>
-              </View>
-            )}
             <View style={styles.factCell}>
-              <Text style={styles.factLabel}>Location</Text>
+              <Text style={styles.factLabel}>Style Code</Text>
               <Text style={styles.factValue}>
-                {isOwned
-                  ? asset.location === 'bloom'
-                    ? 'Bloom Custody'
-                    : asset.location === 'watchlist'
-                      ? 'Watchlist'
-                      : 'At Home'
-                  : asset.custody_status === 'in_vault'
-                    ? 'Bloom Vault'
-                    : 'Available'}
+                {catalogDetails?.style_code || asset.stockx_sku || '—'}
               </Text>
             </View>
             <View style={styles.factCell}>
-              <Text style={styles.factLabel}>Asset ID</Text>
-              <Text style={styles.factValue}>{asset.id}</Text>
+              <Text style={styles.factLabel}>Size</Text>
+              <Text style={styles.factValue}>{hasFixedSize ? asset.size : selectedSize || '—'}</Text>
+            </View>
+            <View style={styles.factCell}>
+              <Text style={styles.factLabel}>Brand</Text>
+              <Text style={styles.factValue}>{catalogDetails?.brand || asset.brand || '—'}</Text>
+            </View>
+            <View style={styles.factCell}>
+              <Text style={styles.factLabel}>Colorway</Text>
+              <Text style={styles.factValue}>{catalogDetails?.colorway_name || '—'}</Text>
             </View>
           </View>
         </View>
@@ -697,8 +788,14 @@ export default function AssetDetailScreen() {
 
       {!isOwned && !isAvailable && (
         <View style={styles.actionContainer}>
-          <Pressable style={styles.actionButton} onPress={() => setShowHomeBuyOptions(true)}>
-            <Text style={styles.actionButtonText}>View marketplaces</Text>
+          <Pressable
+            style={[styles.actionButton, !canBuy && styles.actionButtonDisabled]}
+            onPress={() => setShowHomeBuyOptions(true)}
+            disabled={!canBuy}
+          >
+            <Text style={[styles.actionButtonText, !canBuy && styles.actionButtonTextDisabled]}>
+              {!canBuy ? 'Select Size' : 'View marketplaces'}
+            </Text>
           </Pressable>
           <Text style={styles.unavailableNote}>No Bloom inventory yet</Text>
         </View>
@@ -1137,6 +1234,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.textSecondary,
     marginTop: 6,
+  },
+  bestPriceLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 4,
   },
   // Section styles
   section: {

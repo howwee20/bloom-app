@@ -33,6 +33,7 @@ const BATCH_LIMIT = 25;                       // Assets per run
 const API_DELAY_MS = 1200;                    // 1.2s between calls (StockX: 1/sec limit)
 const CRON_SCHEDULE = '*/5 * * * *';          // Every 5 minutes
 const MAX_RUNTIME_MS = 25_000;                // Safety cap per run
+const POINT_DEDUPE_MS = 6 * 60 * 60 * 1000;   // Insert at least every 6h if unchanged
 
 // ============================================
 // CORE: REFRESH ASSETS (with advisory lock)
@@ -225,6 +226,31 @@ async function refreshAllAssets() {
           source: 'stockx',
           created_at: now
         });
+
+        // Log asset price points (dedupe by change or 6h elapsed)
+        const { data: lastPoint } = await supabase
+          .from('asset_price_points')
+          .select('price, ts')
+          .eq('asset_id', asset.id)
+          .order('ts', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const lastPrice = lastPoint ? Number(lastPoint.price) : null;
+        const lastTs = lastPoint?.ts ? new Date(lastPoint.ts).getTime() : null;
+        const shouldInsertPoint =
+          lastPrice === null ||
+          lastPrice !== rawPrice ||
+          (lastTs !== null && Date.now() - lastTs >= POINT_DEDUPE_MS);
+
+        if (shouldInsertPoint) {
+          await supabase.from('asset_price_points').insert({
+            asset_id: asset.id,
+            price: rawPrice,
+            source: 'stockx',
+            ts: now
+          });
+        }
 
         // Update token current_values for this SKU (RAW price for wallet view)
         await supabase
