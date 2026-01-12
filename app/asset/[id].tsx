@@ -697,9 +697,10 @@ export default function AssetDetailScreen() {
 
       {!isOwned && !isAvailable && (
         <View style={styles.actionContainer}>
-          <View style={styles.unavailableBadge}>
-            <Text style={styles.unavailableText}>Currently Unavailable</Text>
-          </View>
+          <Pressable style={styles.actionButton} onPress={() => setShowHomeBuyOptions(true)}>
+            <Text style={styles.actionButtonText}>View marketplaces</Text>
+          </Pressable>
+          <Text style={styles.unavailableNote}>No Bloom inventory yet</Text>
         </View>
       )}
 
@@ -1267,16 +1268,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.success,
   },
-  unavailableBadge: {
-    backgroundColor: theme.card,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  unavailableText: {
-    fontSize: 15,
-    fontWeight: '600',
+  unavailableNote: {
+    fontSize: 13,
     color: theme.textSecondary,
+    textAlign: 'center',
   },
   staleBadge: {
     backgroundColor: theme.warningBg,
