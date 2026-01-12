@@ -6,8 +6,10 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -49,6 +51,7 @@ interface Asset {
   price_change_percent: number | null;
   custody_status: 'in_vault' | 'available_to_acquire' | null;
   location: 'home' | 'bloom' | 'watchlist' | null;
+  purchase_price: number | null;
 }
 
 interface PricePoint {
@@ -84,6 +87,8 @@ export default function AssetDetailScreen() {
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertType, setAlertType] = useState<'above' | 'below'>('above');
   const [alertThreshold, setAlertThreshold] = useState('');
+  const [showCostBasisModal, setShowCostBasisModal] = useState(false);
+  const [costBasisInput, setCostBasisInput] = useState('');
 
   useEffect(() => {
     const fetchAsset = async () => {
@@ -430,6 +435,32 @@ export default function AssetDetailScreen() {
     }
   };
 
+  const handleSaveCostBasis = async () => {
+    if (!asset || !session) return;
+
+    const costBasis = parseFloat(costBasisInput);
+    if (Number.isNaN(costBasis) || costBasis < 0) {
+      Alert.alert('Invalid amount', 'Enter a valid dollar amount.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('assets')
+        .update({ purchase_price: costBasis })
+        .eq('id', asset.id);
+
+      if (error) throw error;
+      setShowCostBasisModal(false);
+      setCostBasisInput('');
+      // Update local state
+      setAsset({ ...asset, purchase_price: costBasis });
+      Alert.alert('Cost basis updated', 'Your P&L will now reflect this purchase price.');
+    } catch (e: any) {
+      Alert.alert('Failed to update', e.message || 'Please try again.');
+    }
+  };
+
   const handleRemove = () => {
     if (!asset || !session) return;
 
@@ -531,6 +562,26 @@ export default function AssetDetailScreen() {
             <Text style={styles.updatedText}>
               Updated {formatTimeAgo(pricingUpdatedAt)}
             </Text>
+          )}
+          {/* Cost Basis / P&L for owned assets */}
+          {isOwned && asset.purchase_price !== null && (
+            <Pressable onPress={() => {
+              setCostBasisInput(asset.purchase_price?.toString() || '');
+              setShowCostBasisModal(true);
+            }}>
+              <Text style={[styles.changeDetail, { color: (asset.price - asset.purchase_price) >= 0 ? theme.success : theme.error }]}>
+                {(asset.price - asset.purchase_price) >= 0 ? '+' : ''}{formatPrice(asset.price - asset.purchase_price)} all time
+              </Text>
+              <Text style={styles.costBasisLink}>Paid {formatPrice(asset.purchase_price)} · Edit</Text>
+            </Pressable>
+          )}
+          {isOwned && asset.purchase_price === null && (
+            <Pressable onPress={() => {
+              setCostBasisInput('');
+              setShowCostBasisModal(true);
+            }}>
+              <Text style={styles.addCostBasisCta}>Add what you paid</Text>
+            </Pressable>
           )}
         </View>
 
@@ -859,6 +910,44 @@ export default function AssetDetailScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Cost Basis Modal */}
+      <Modal
+        visible={showCostBasisModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCostBasisModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>What did you pay?</Text>
+            <View style={styles.alertInputRow}>
+              <Text style={styles.alertCurrency}>$</Text>
+              <TextInput
+                style={styles.alertInput}
+                value={costBasisInput}
+                onChangeText={setCostBasisInput}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={theme.textTertiary}
+                autoFocus
+              />
+            </View>
+            <Text style={styles.costBasisNote}>
+              This sets your cost basis for P&L calculation
+            </Text>
+            <Pressable style={styles.modalButton} onPress={handleSaveCostBasis}>
+              <Text style={styles.modalButtonText}>Save</Text>
+            </Pressable>
+            <Pressable style={styles.modalCancel} onPress={() => setShowCostBasisModal(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -948,6 +1037,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.textSecondary,
     marginTop: 6,
+  },
+  costBasisLink: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 2,
+  },
+  addCostBasisCta: {
+    fontSize: 14,
+    color: theme.accent,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  costBasisNote: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    marginBottom: 16,
   },
   infoRow: {
     paddingHorizontal: 16,

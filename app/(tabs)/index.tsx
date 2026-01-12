@@ -589,18 +589,21 @@ export default function HomeScreen() {
           </Text>
           {isPriceStale && (
             <View style={styles.priceStaleBadge}>
-              <Text style={styles.priceStaleBadgeText}>Price stale</Text>
+              <Text style={styles.priceStaleBadgeText}>Updating...</Text>
             </View>
           )}
           <View style={styles.cardPnlRow}>
             {pnlStr ? (
               <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
+            ) : isPendingMatch ? (
+              <Text style={[styles.cardMeta, isBloom && styles.cardMetaBloom]}>Add details to match</Text>
             ) : (
-              <Text style={[styles.cardMeta, isBloom && styles.cardMetaBloom]}>
-                {isPendingMatch ? 'Add details to match' : `Size ${item.size}`}
-              </Text>
+              <Text style={[styles.cardMetaCta, isBloom && styles.cardMetaBloom]}>Add what you paid</Text>
             )}
           </View>
+          {item.size && !pnlStr && !isPendingMatch && (
+            <Text style={[styles.cardMeta, isBloom && styles.cardMetaBloom]}>Size {item.size}</Text>
+          )}
         </View>
         {/* Custody label */}
         <View style={[styles.custodyLabel, isBloom ? styles.custodyLabelBloom : styles.custodyLabelHome]}>
@@ -679,7 +682,7 @@ export default function HomeScreen() {
           <Text style={styles.cardPrice}>{formatPrice(item.current_price)}</Text>
           {isPriceStale && (
             <View style={styles.priceStaleBadge}>
-              <Text style={styles.priceStaleBadgeText}>Price stale</Text>
+              <Text style={styles.priceStaleBadgeText}>Updating...</Text>
             </View>
           )}
           <View style={styles.cardPnlRow}>
@@ -689,7 +692,10 @@ export default function HomeScreen() {
                 {item.stockx_sku && <Text style={styles.cardMeta}>{item.stockx_sku}</Text>}
               </View>
             ) : (
-              <Text style={styles.cardMeta}>{metaLine}</Text>
+              <View style={styles.assetMetaStack}>
+                <Text style={styles.cardMetaCta}>Add what you paid</Text>
+                <Text style={styles.cardMeta}>{metaLine}</Text>
+              </View>
             )}
           </View>
         </View>
@@ -1461,6 +1467,11 @@ const styles = StyleSheet.create({
   },
   cardMetaBloom: {
     color: 'rgba(0, 0, 0, 0.6)',
+  },
+  cardMetaCta: {
+    fontSize: 11,
+    color: theme.accent,
+    fontWeight: '600',
   },
   cardMetaRow: {
     flexDirection: 'row',

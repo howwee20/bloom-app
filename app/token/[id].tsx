@@ -89,6 +89,8 @@ export default function TokenDetailScreen() {
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertType, setAlertType] = useState<'above' | 'below'>('above');
   const [alertThreshold, setAlertThreshold] = useState('');
+  const [showCostBasisModal, setShowCostBasisModal] = useState(false);
+  const [costBasisInput, setCostBasisInput] = useState('');
 
   const fetchToken = useCallback(async () => {
     if (!id || !session) return;
@@ -305,9 +307,34 @@ export default function TokenDetailScreen() {
       if (error) throw error;
       setShowAlertModal(false);
       setAlertThreshold('');
-      showAlert('Alert set', 'We’ll notify you when the price hits your target.');
+      showAlert('Alert set', "We'll notify you when the price hits your target.");
     } catch (e: any) {
       showAlert('Failed to set alert', e.message || 'Please try again.');
+    }
+  };
+
+  const handleSaveCostBasis = async () => {
+    if (!token || !session) return;
+
+    const costBasis = parseFloat(costBasisInput);
+    if (Number.isNaN(costBasis) || costBasis < 0) {
+      showAlert('Invalid amount', 'Enter a valid dollar amount.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tokens')
+        .update({ purchase_price: costBasis })
+        .eq('id', token.id);
+
+      if (error) throw error;
+      setShowCostBasisModal(false);
+      setCostBasisInput('');
+      fetchToken(); // Refresh to show updated P&L
+      showAlert('Cost basis updated', 'Your P&L will now reflect this purchase price.');
+    } catch (e: any) {
+      showAlert('Failed to update', e.message || 'Please try again.');
     }
   };
 
@@ -459,10 +486,24 @@ export default function TokenDetailScreen() {
           <Text style={styles.valueAmount}>
             {hasValue ? formatPrice(token.current_value) : 'Needs match'}
           </Text>
-          {isInCustodyOrListed && hasValue && (
-            <Text style={[styles.pnlText, { color: pnlColor }]}>
-              {formatPnL(token.pnl_dollars)} since purchase
-            </Text>
+          {isInCustodyOrListed && hasValue && token.pnl_dollars !== null && (
+            <Pressable onPress={() => {
+              setCostBasisInput(token.purchase_price ? token.purchase_price.toString() : '');
+              setShowCostBasisModal(true);
+            }}>
+              <Text style={[styles.pnlText, { color: pnlColor }]}>
+                {formatPnL(token.pnl_dollars)} since purchase
+              </Text>
+              <Text style={styles.costBasisLink}>Paid {formatPrice(token.purchase_price)} · Edit</Text>
+            </Pressable>
+          )}
+          {isInCustodyOrListed && hasValue && token.pnl_dollars === null && (
+            <Pressable onPress={() => {
+              setCostBasisInput('');
+              setShowCostBasisModal(true);
+            }}>
+              <Text style={styles.addCostBasisCta}>Add what you paid</Text>
+            </Pressable>
           )}
           {(token.last_price_checked_at || token.last_price_updated_at) && (
             <Text style={styles.updatedText}>
@@ -671,6 +712,54 @@ export default function TokenDetailScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Cost Basis Modal */}
+      <Modal
+        visible={showCostBasisModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCostBasisModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>What did you pay?</Text>
+              <Pressable onPress={() => setShowCostBasisModal(false)}>
+                <Text style={styles.modalClose}>Cancel</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.priceInputWrapper}>
+                <Text style={styles.priceCurrency}>$</Text>
+                <TextInput
+                  style={styles.priceInput}
+                  value={costBasisInput}
+                  onChangeText={setCostBasisInput}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor={theme.textTertiary}
+                  autoFocus
+                />
+              </View>
+
+              <Text style={styles.feeNote}>
+                This sets your cost basis for P&L calculation
+              </Text>
+
+              <Pressable
+                style={styles.modalButton}
+                onPress={handleSaveCostBasis}
+              >
+                <Text style={styles.modalButtonText}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -816,6 +905,17 @@ const styles = StyleSheet.create({
   pnlText: {
     fontSize: 15,
     fontWeight: '500',
+    marginTop: 4,
+  },
+  costBasisLink: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 2,
+  },
+  addCostBasisCta: {
+    fontSize: 14,
+    color: theme.accent,
+    fontWeight: '600',
     marginTop: 4,
   },
   updatedText: {
@@ -1053,5 +1153,13 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: theme.textInverse,
+  },
+  modalCancel: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 15,
+    color: theme.textSecondary,
   },
 });
