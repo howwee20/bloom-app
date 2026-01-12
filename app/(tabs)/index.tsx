@@ -715,6 +715,12 @@ export default function HomeScreen() {
             )}
           </View>
         </View>
+        {/* Custody label */}
+        <View style={[styles.custodyLabel, item.location === 'watchlist' ? styles.custodyLabelWatchlist : styles.custodyLabelHome]}>
+          <Text style={[styles.custodyLabelText, item.location === 'watchlist' ? styles.custodyLabelTextWatchlist : styles.custodyLabelTextHome]}>
+            {item.location === 'watchlist' ? 'Watchlist' : 'Home'}
+          </Text>
+        </View>
       </Pressable>
     );
   };
@@ -1552,6 +1558,9 @@ const styles = StyleSheet.create({
   custodyLabelHome: {
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
+  custodyLabelWatchlist: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+  },
   custodyLabelText: {
     fontSize: 9,
     fontWeight: '700',
@@ -1563,6 +1572,9 @@ const styles = StyleSheet.create({
   },
   custodyLabelTextHome: {
     color: theme.textSecondary,
+  },
+  custodyLabelTextWatchlist: {
+    color: '#3B82F6',
   },
   loadingContainer: {
     paddingVertical: 40,
