@@ -8,6 +8,7 @@ interface OwnedPositionProps {
   pnlPercent: number | null;
   formatPrice: (value: number | null | undefined) => string;
   onEditCostBasis: () => void;
+  holdingDays?: number | null;
 }
 
 export default function OwnedPosition({
@@ -16,6 +17,7 @@ export default function OwnedPosition({
   pnlPercent,
   formatPrice,
   onEditCostBasis,
+  holdingDays,
 }: OwnedPositionProps) {
   const pnlColor =
     pnlDollars === null ? theme.textSecondary : pnlDollars >= 0 ? theme.success : theme.error;
@@ -42,6 +44,9 @@ export default function OwnedPosition({
       <View style={[styles.cell, styles.cellRight]}>
         <Text style={styles.label}>Unrealized P/L</Text>
         <Text style={[styles.value, { color: pnlColor }]}>{pnlLabel}</Text>
+        {holdingDays !== null && holdingDays !== undefined && (
+          <Text style={styles.holdingText}>{holdingDays} days held</Text>
+        )}
       </View>
     </View>
   );
@@ -83,6 +88,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: theme.accent,
+  },
+  holdingText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 6,
   },
   editLink: {
     fontSize: 12,

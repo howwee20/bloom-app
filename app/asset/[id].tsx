@@ -7,7 +7,6 @@ import {
   Image,
   Linking,
   Modal,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -16,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
 import { theme, fonts } from '../../constants/Colors';
@@ -37,6 +37,8 @@ const PRICE_RANGES: RangeOption[] = [
   { label: '90D', days: 90 },
   { label: 'ALL', days: 'all' },
 ];
+
+const LAST_SIZE_KEY = 'last_market_size';
 
 interface Asset {
   id: string;
@@ -102,6 +104,15 @@ export default function AssetDetailScreen() {
   const [alertThreshold, setAlertThreshold] = useState('');
   const [showCostBasisModal, setShowCostBasisModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState<RangeOption>(PRICE_RANGES[0]);
+
+  const handleSizeSelect = async (size: string) => {
+    setSelectedSize(size);
+    try {
+      await AsyncStorage.setItem(LAST_SIZE_KEY, size);
+    } catch (e) {
+      console.error('Failed to persist size', e);
+    }
+  };
 
   const loadPriceHistory = async (assetId: string, range: RangeOption) => {
     const query = supabase
@@ -223,6 +234,16 @@ export default function AssetDetailScreen() {
     loadPriceHistory(id, selectedRange);
   }, [id, selectedRange]);
 
+  useEffect(() => {
+    if (asset?.size) return;
+    if (selectedSize) return;
+    AsyncStorage.getItem(LAST_SIZE_KEY)
+      .then((value) => {
+        if (value) setSelectedSize(value);
+      })
+      .catch((e) => console.error('Failed to load size', e));
+  }, [asset?.size, selectedSize]);
+
   // Calculate day change from 7D stats history
   const dayChange = useMemo(() => {
     if (statsHistory.length < 2) return { delta: null, percent: null };
@@ -246,13 +267,13 @@ export default function AssetDetailScreen() {
   }, [statsHistory]);
 
   const rangeHighLow = useMemo(() => {
-    if (statsHistory.length < 2) return null;
-    const prices = statsHistory.map((point) => point.price);
+    if (priceHistory.length < 2) return null;
+    const prices = priceHistory.map((point) => point.price);
     return {
       high: Math.max(...prices),
       low: Math.min(...prices),
     };
-  }, [statsHistory]);
+  }, [priceHistory]);
 
   const formatPrice = (price: number | null | undefined) => {
     if (price === null || price === undefined) return '—';
@@ -323,6 +344,10 @@ export default function AssetDetailScreen() {
   const bestPriceLabel = priceSource
     ? `Best price: ${formatPrice(asset?.price)} on ${priceSource}`
     : null;
+
+  const marketplaceRows = priceSource
+    ? [{ name: priceSource, price: asset?.price }]
+    : [];
 
   const statsItems = [
     { label: 'Market Value', value: formatPrice(asset?.price) },
@@ -692,6 +717,25 @@ export default function AssetDetailScreen() {
           />
         )}
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Marketplaces</Text>
+          {marketplaceRows.length > 0 && (
+            <Text style={styles.marketSubLabel}>
+              Across {marketplaceRows.length} marketplace{marketplaceRows.length > 1 ? 's' : ''}
+            </Text>
+          )}
+          {marketplaceRows.length > 0 ? (
+            marketplaceRows.map((row) => (
+              <View key={row.name} style={styles.marketRow}>
+                <Text style={styles.marketName}>{row.name}</Text>
+                <Text style={styles.marketPrice}>{formatPrice(row.price)}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.sectionBody}>Marketplace breakdown coming soon.</Text>
+          )}
+        </View>
+
         {/* Size & Location Info */}
         <View style={styles.infoRow}>
           <Text style={styles.infoText}>
@@ -711,7 +755,7 @@ export default function AssetDetailScreen() {
                     styles.sizeButton,
                     selectedSize === size && styles.sizeButtonSelected,
                   ]}
-                  onPress={() => setSelectedSize(size)}
+                  onPress={() => handleSizeSelect(size)}
                 >
                   <Text
                     style={[
@@ -1258,6 +1302,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.textSecondary,
     lineHeight: 20,
+  },
+  marketRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  marketSubLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginBottom: 8,
+  },
+  marketName: {
+    fontSize: 14,
+    color: theme.textPrimary,
+    fontWeight: '600',
+  },
+  marketPrice: {
+    fontSize: 14,
+    color: theme.textSecondary,
   },
   // Facts grid styles
   factsGrid: {

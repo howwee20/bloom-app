@@ -405,6 +405,14 @@ export default function HomeScreen() {
     return `${dollarStr}${percentStr}`;
   };
 
+  const computePnl = (current: number | null | undefined, cost: number | null | undefined) => {
+    if (current === null || current === undefined) return null;
+    if (cost === null || cost === undefined || cost <= 0) return null;
+    const delta = current - cost;
+    const percent = cost > 0 ? (delta / cost) * 100 : null;
+    return { delta, percent };
+  };
+
   const formatRelativeTime = (date: Date) => {
     const diffMs = now - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -582,12 +590,13 @@ export default function HomeScreen() {
   const renderTokenCard = ({ item }: { item: Token }) => {
     const showImage = item.product_image_url && !failedImages.has(item.id);
     const isPendingMatch = item.match_status === 'pending' || item.current_value === null;
+    const pnlData = computePnl(item.current_value, item.purchase_price);
     const statusConfig = isPendingMatch
       ? { label: 'Needs match', color: theme.warning, icon: '●' }
       : getStatusConfig(item.status);
     const showStatusBadge = isPendingMatch || (item.status !== 'in_custody' && item.status !== undefined);
-    const pnlStr = isPendingMatch ? null : formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
-    const pnlColor = getPnlColor(item.pnl_dollars);
+    const pnlStr = isPendingMatch ? null : formatPnLWithPercent(pnlData?.delta ?? null, pnlData?.percent ?? null);
+    const pnlColor = getPnlColor(pnlData?.delta ?? null);
     const isBloom = item.custody_type === 'bloom';
     const pricingTimestamp = item.last_price_checked_at || item.last_price_updated_at || null;
     const isPriceStale = !isPendingMatch && isTimestampStale(pricingTimestamp);
@@ -624,7 +633,13 @@ export default function HomeScreen() {
           <Text style={[styles.cardName, isBloom && styles.cardNameBloom]} numberOfLines={2}>
             {item.product_name}
           </Text>
-          <Text style={[styles.cardPrice, isBloom && styles.cardPriceBloom]}>
+          <Text
+            style={[
+              styles.cardPrice,
+              isBloom && styles.cardPriceBloom,
+              isPriceStale && styles.cardPriceStale,
+            ]}
+          >
             {isPendingMatch ? 'Needs match' : formatPrice(item.current_value)}
           </Text>
           {isPriceStale && (
@@ -686,8 +701,10 @@ export default function HomeScreen() {
   // Legacy: Render asset card - brokerage style with P&L
   const renderAssetCard = ({ item }: { item: Asset }) => {
     const showImage = item.image_url && !failedImages.has(item.id);
-    const pnlStr = formatPnLWithPercent(item.pnl_dollars, item.pnl_percent);
-    const pnlColor = getPnlColor(item.pnl_dollars);
+    const isWatchlist = item.location === 'watchlist';
+    const pnlData = computePnl(item.current_price, item.entry_price);
+    const pnlStr = formatPnLWithPercent(pnlData?.delta ?? null, pnlData?.percent ?? null);
+    const pnlColor = getPnlColor(pnlData?.delta ?? null);
     const pricingTimestamp = item.updated_at_pricing || item.last_price_checked_at || item.last_price_updated_at || item.last_price_update;
     const isPriceStale = isTimestampStale(pricingTimestamp);
     // Size only - no style code on cards (keep clean like Robinhood)
@@ -717,7 +734,9 @@ export default function HomeScreen() {
 
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.cardPrice}>{formatPrice(item.current_price)}</Text>
+          <Text style={[styles.cardPrice, isPriceStale && styles.cardPriceStale]}>
+            {formatPrice(item.current_price)}
+          </Text>
           {isPriceStale && (
             <View style={styles.priceStaleBadge}>
               <Text style={styles.priceStaleBadgeText}>Updating...</Text>
@@ -727,7 +746,9 @@ export default function HomeScreen() {
             {pnlStr ? (
               <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
             ) : (
-              <Text style={styles.cardMetaCta}>Add what you paid</Text>
+              <Text style={styles.cardMetaCta}>
+                {isWatchlist ? 'Set target price' : 'Add what you paid'}
+              </Text>
             )}
           </View>
           {sizeLine && !pnlStr && (
@@ -778,18 +799,29 @@ export default function HomeScreen() {
   const watchlistCount = ownedAssets.filter(a => a.location === 'watchlist').length;
   const allCount = tokens.length + ownedAssets.length;
 
-  // Calculate filtered totals (based on current filter)
-  const filteredAssetsValue = filteredAssets.reduce((sum, a) => sum + (a.current_price || 0), 0);
-  const filteredAssetsPnl = filteredAssets.reduce((sum, a) => sum + (a.pnl_dollars || 0), 0);
-  const filteredTotalValue = filteredTokens.reduce((sum, t) => sum + (t.current_value || 0), 0)
-    + filteredAssetsValue;
-  const filteredTotalPnl = filteredTokens.reduce((sum, t) => sum + (t.pnl_dollars || 0), 0)
-    + filteredAssetsPnl;
+  const ownedAssetsOnly = ownedAssets.filter(a => (a.location || 'home') !== 'watchlist');
+  const watchlistAssets = ownedAssets.filter(a => a.location === 'watchlist');
+
+  const portfolioValue = tokens.reduce((sum, t) => sum + (t.current_value ?? 0), 0)
+    + ownedAssetsOnly.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
+
+  const portfolioPnl = tokens.reduce((sum, t) => {
+    if (t.current_value === null || t.purchase_price === null || t.purchase_price <= 0) return sum;
+    return sum + (t.current_value - t.purchase_price);
+  }, 0) + ownedAssetsOnly.reduce((sum, a) => {
+    if (a.current_price === null || a.entry_price === null || a.entry_price <= 0) return sum;
+    return sum + (a.current_price - a.entry_price);
+  }, 0);
+
+  const watchlistValue = watchlistAssets.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
+
+  const displayedTotalValue = custodyFilter === 'watchlist' ? watchlistValue : portfolioValue;
+  const displayedTotalPnl = custodyFilter === 'watchlist' ? null : portfolioPnl;
   const hasItems = tokens.length > 0 || ownedAssets.length > 0;
 
-  const totalPnlColor = filteredTotalPnl === 0
+  const totalPnlColor = !displayedTotalPnl || displayedTotalPnl === 0
     ? theme.textSecondary
-    : filteredTotalPnl >= 0 ? theme.success : theme.error;
+    : displayedTotalPnl >= 0 ? theme.success : theme.error;
 
   const sellItems: SellItem[] = [
     ...tokens
@@ -806,7 +838,7 @@ export default function HomeScreen() {
         value: token.current_value || 0,
         imageUrl: token.product_image_url,
       })),
-    ...ownedAssets.map(asset => ({
+    ...ownedAssetsOnly.map(asset => ({
       id: asset.id,
       type: 'asset' as const,
       name: asset.name,
@@ -834,11 +866,11 @@ export default function HomeScreen() {
           <Text style={styles.headerTitleCollapsed}>Bloom</Text>
           <View style={styles.collapsedCenter}>
             <Text style={styles.valueAmountCollapsed}>
-              {formatPrice(filteredTotalValue)}
+              {formatPrice(displayedTotalValue)}
             </Text>
-            {hasItems && filteredTotalPnl !== 0 && (
+            {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
               <Text style={[styles.pnlCollapsed, { color: totalPnlColor }]}>
-                ({formatPnL(filteredTotalPnl)})
+                ({formatPnL(displayedTotalPnl)})
               </Text>
             )}
           </View>
@@ -868,10 +900,10 @@ export default function HomeScreen() {
 
           {/* Portfolio Value */}
           <View style={styles.valueSection}>
-            <Text style={styles.valueAmount}>{formatPrice(filteredTotalValue)}</Text>
-            {hasItems && filteredTotalPnl !== 0 && (
+            <Text style={styles.valueAmount}>{formatPrice(displayedTotalValue)}</Text>
+            {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
               <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
-                {formatPnL(filteredTotalPnl)} all time
+                {formatPnL(displayedTotalPnl)} all time
               </Text>
             )}
             <View style={styles.updatedRow}>
@@ -1563,6 +1595,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.textPrimary,
     marginBottom: 2,
+  },
+  cardPriceStale: {
+    color: theme.textSecondary,
   },
   cardPriceBloom: {
     color: '#1A1A1A',

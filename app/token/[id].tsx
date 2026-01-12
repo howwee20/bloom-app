@@ -16,6 +16,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Web-compatible alert/confirm
 const showAlert = (title: string, message: string, buttons?: Array<{text: string, onPress?: () => void, style?: string}>) => {
@@ -110,6 +111,7 @@ const PRICE_RANGES: RangeOption[] = [
 ];
 
 const SIZE_OPTIONS = ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13'];
+const LAST_SIZE_KEY = 'last_market_size';
 
 export default function TokenDetailScreen() {
   const { id, sell } = useLocalSearchParams<{ id: string; sell?: string }>();
@@ -134,6 +136,15 @@ export default function TokenDetailScreen() {
   const [assetDetails, setAssetDetails] = useState<AssetDetails | null>(null);
   const [tokenAttributes, setTokenAttributes] = useState<TokenAttributes | null>(null);
   const [marketplaceSize, setMarketplaceSize] = useState('');
+
+  const handleMarketplaceSizeSelect = async (size: string) => {
+    setMarketplaceSize(size);
+    try {
+      await AsyncStorage.setItem(LAST_SIZE_KEY, size);
+    } catch (e) {
+      console.error('Failed to persist size', e);
+    }
+  };
 
   const fetchToken = useCallback(async () => {
     if (!id || !session) return;
@@ -256,7 +267,15 @@ export default function TokenDetailScreen() {
   }, [token?.id, fetchTokenAttributes]);
 
   useEffect(() => {
-    setMarketplaceSize(token?.size || '');
+    if (token?.size) {
+      setMarketplaceSize(token.size);
+      return;
+    }
+    AsyncStorage.getItem(LAST_SIZE_KEY)
+      .then((value) => {
+        if (value) setMarketplaceSize(value);
+      })
+      .catch((e) => console.error('Failed to load size', e));
   }, [token?.size]);
 
   const formatPrice = (price: number | null | undefined) => {
@@ -346,13 +365,13 @@ export default function TokenDetailScreen() {
   }, [statsHistory]);
 
   const rangeHighLow = useMemo(() => {
-    if (statsHistory.length < 2) return null;
-    const prices = statsHistory.map((point) => point.price);
+    if (priceHistory.length < 2) return null;
+    const prices = priceHistory.map((point) => point.price);
     return {
       high: Math.max(...prices),
       low: Math.min(...prices),
     };
-  }, [statsHistory]);
+  }, [priceHistory]);
 
   const hasValue = token?.current_value !== null && token?.current_value !== undefined;
   const cashOutEstimate = token && hasValue
@@ -683,6 +702,9 @@ export default function TokenDetailScreen() {
     assetDetails?.price_source && hasValue
       ? `Best price: ${formatMoneyValue(token.current_value)} on ${assetDetails.price_source}`
       : null;
+  const marketplaceRows = assetDetails?.price_source && hasValue
+    ? [{ name: assetDetails.price_source, price: token.current_value }]
+    : [];
   const statsItems = [
     { label: 'Market Value', value: formatMoneyValue(token.current_value) },
     { label: 'Day Change', value: formatChange(dayChange.delta, dayChange.percent) },
@@ -700,6 +722,9 @@ export default function TokenDetailScreen() {
     { label: 'Brand', value: catalogItem?.brand || assetDetails?.brand || tokenAttributes?.brand || '—' },
     { label: 'Colorway', value: catalogItem?.colorway_name || '—' },
   ];
+  const holdingDays = token.purchase_date
+    ? Math.max(0, Math.floor((Date.now() - new Date(token.purchase_date).getTime()) / 86400000))
+    : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -798,8 +823,28 @@ export default function TokenDetailScreen() {
             pnlPercent={token.pnl_percent}
             formatPrice={formatMoneyValue}
             onEditCostBasis={() => setShowCostBasisModal(true)}
+            holdingDays={holdingDays}
           />
         )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Marketplaces</Text>
+          {marketplaceRows.length > 0 && (
+            <Text style={styles.marketSubLabel}>
+              Across {marketplaceRows.length} marketplace{marketplaceRows.length > 1 ? 's' : ''}
+            </Text>
+          )}
+          {marketplaceRows.length > 0 ? (
+            marketplaceRows.map((row) => (
+              <View key={row.name} style={styles.marketRow}>
+                <Text style={styles.marketName}>{row.name}</Text>
+                <Text style={styles.marketPrice}>{formatMoneyValue(row.price)}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.sectionBody}>Marketplace breakdown coming soon.</Text>
+          )}
+        </View>
 
         {/* About Section - only show if description exists */}
         <View style={styles.section}>
@@ -898,7 +943,7 @@ export default function TokenDetailScreen() {
                         styles.marketSizeChip,
                         marketplaceSize === size && styles.marketSizeChipActive,
                       ]}
-                      onPress={() => setMarketplaceSize(size)}
+                      onPress={() => handleMarketplaceSizeSelect(size)}
                     >
                       <Text
                         style={[
@@ -980,7 +1025,7 @@ export default function TokenDetailScreen() {
                         styles.marketSizeChip,
                         marketplaceSize === size && styles.marketSizeChipActive,
                       ]}
-                      onPress={() => setMarketplaceSize(size)}
+                      onPress={() => handleMarketplaceSizeSelect(size)}
                     >
                       <Text
                         style={[
@@ -1349,6 +1394,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.textSecondary,
     lineHeight: 20,
+  },
+  marketRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  marketSubLabel: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginBottom: 8,
+  },
+  marketName: {
+    fontSize: 14,
+    color: theme.textPrimary,
+    fontWeight: '600',
+  },
+  marketPrice: {
+    fontSize: 14,
+    color: theme.textSecondary,
   },
   factsGrid: {
     flexDirection: 'row',
