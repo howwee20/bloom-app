@@ -10,6 +10,7 @@ import {
 import { Text, View } from '@/components/Themed';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
+import { fonts } from '@/constants/Colors';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -45,7 +46,7 @@ export default function LoginScreen() {
     >
       <View style={styles.formContainer}>
         <Text style={styles.header}>Bloom</Text>
-        <Text style={styles.title}>Log In</Text>
+        <Text style={styles.title}>LOG II</Text>
         
         <TextInput
           style={styles.input}
@@ -106,22 +107,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   header: {
-    fontFamily: 'ZenDots_400Regular',
+    fontFamily: fonts.heading,
     fontSize: 48,
-    fontWeight: '900',
+    fontWeight: '400',
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 40,
+    letterSpacing: 2,
   },
   title: {
-    fontFamily: 'ZenDots_400Regular',
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontFamily: fonts.heading,
+    fontSize: 24,
+    fontWeight: '400',
     marginBottom: 40,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   input: {
-    fontFamily: 'ZenDots_400Regular',
     backgroundColor: '#f0f0f0',
     padding: 15,
     borderRadius: 8,
@@ -140,13 +142,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    fontFamily: 'ZenDots_400Regular',
+    fontFamily: fonts.heading,
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   linkText: {
-    fontFamily: 'ZenDots_400Regular',
+    fontFamily: fonts.heading,
     color: '#007AFF',
     textAlign: 'center',
     marginTop: 20,
