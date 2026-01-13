@@ -279,10 +279,191 @@ Deno.serve(async (req) => {
       break
     }
 
+    case 'payment_intent.succeeded': {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent
+      const orderId = paymentIntent.metadata?.order_id
+      const orderType = paymentIntent.metadata?.order_type || 'order'
+
+      console.log(`Payment succeeded for ${orderType} ${orderId} via intent ${paymentIntent.id}`)
+
+      if (!orderId) {
+        console.log('No order_id in payment intent metadata')
+        break
+      }
+
+      if (orderType === 'order_intent') {
+        // Update order_intent with payment success
+        const { error: updateError } = await supabaseAdmin
+          .from('order_intents')
+          .update({
+            stripe_payment_intent_id: paymentIntent.id,
+            stripe_charge_status: 'succeeded',
+            paid_at: new Date().toISOString(),
+            status: 'pending', // Keep pending for manual execution
+          })
+          .eq('id', orderId)
+
+        if (updateError) {
+          console.error('Error updating order_intent:', updateError)
+        } else {
+          console.log(`Order intent ${orderId} marked as paid`)
+        }
+      } else {
+        // Update order with payment success (existing logic enhanced)
+        const { error: updateError } = await supabaseAdmin
+          .from('orders')
+          .update({
+            status: 'paid',
+            stripe_payment_intent: paymentIntent.id,
+            stripe_charge_status: 'succeeded',
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', orderId)
+
+        if (updateError) {
+          console.error('Error updating order:', updateError)
+        } else {
+          console.log(`Order ${orderId} marked as paid via webhook`)
+
+          // Get order details for token creation
+          const { data: order } = await supabaseAdmin
+            .from('orders')
+            .select(`
+              *,
+              assets:asset_id (name, stockx_sku, image_url, custody_status)
+            `)
+            .eq('id', orderId)
+            .single()
+
+          if (order && !order.token_created) {
+            // Create token (same logic as checkout.session.completed)
+            const assetCustody = (order.assets as any)?.custody_status
+            const isLaneHome = order.lane === 'a'
+            const isInstant = !isLaneHome && assetCustody === 'in_vault'
+            const tokenStatus = isInstant ? 'in_custody' : 'acquiring'
+            const exchangeEligible = !isLaneHome && isInstant
+            const custodyType = isLaneHome ? 'home' : 'bloom'
+
+            const tokenData = {
+              user_id: order.user_id,
+              order_id: order.id,
+              sku: (order.assets as any)?.stockx_sku || 'UNKNOWN',
+              product_name: (order.assets as any)?.name || 'Unknown Product',
+              size: order.size,
+              product_image_url: (order.assets as any)?.image_url,
+              purchase_price: order.amount_cents / 100,
+              purchase_date: new Date().toISOString(),
+              custody_type: custodyType,
+              is_exchange_eligible: exchangeEligible,
+              current_value: order.amount_cents / 100,
+              value_updated_at: new Date().toISOString(),
+              status: tokenStatus,
+            }
+
+            const { data: token, error: tokenError } = await supabaseAdmin
+              .from('tokens')
+              .insert(tokenData)
+              .select()
+              .single()
+
+            if (tokenError) {
+              console.error('Token creation error:', tokenError)
+            } else {
+              // Create initial transfer record
+              await supabaseAdmin
+                .from('token_transfers')
+                .insert({
+                  token_id: token.id,
+                  from_user_id: null,
+                  to_user_id: order.user_id,
+                  transfer_type: 'initial_grant',
+                  sale_price: order.amount_cents / 100,
+                })
+
+              // Mark order as token created
+              await supabaseAdmin
+                .from('orders')
+                .update({ token_created: true })
+                .eq('id', orderId)
+
+              console.log(`Token ${token.id} created for order ${orderId}`)
+            }
+          }
+        }
+      }
+      break
+    }
+
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent
-      console.log(`Payment failed for intent: ${paymentIntent.id}`)
-      // Could update order status to 'payment_failed' if needed
+      const orderId = paymentIntent.metadata?.order_id
+      const orderType = paymentIntent.metadata?.order_type || 'order'
+
+      console.log(`Payment failed for ${orderType} ${orderId} via intent ${paymentIntent.id}`)
+
+      if (orderId) {
+        if (orderType === 'order_intent') {
+          await supabaseAdmin
+            .from('order_intents')
+            .update({
+              stripe_payment_intent_id: paymentIntent.id,
+              stripe_charge_status: 'failed',
+            })
+            .eq('id', orderId)
+        } else {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              stripe_payment_intent: paymentIntent.id,
+              stripe_charge_status: 'failed',
+              status: 'payment_failed',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', orderId)
+        }
+      }
+      break
+    }
+
+    case 'payment_intent.requires_action': {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent
+      const orderId = paymentIntent.metadata?.order_id
+      const orderType = paymentIntent.metadata?.order_type || 'order'
+
+      console.log(`Payment requires action for ${orderType} ${orderId}`)
+
+      if (orderId) {
+        if (orderType === 'order_intent') {
+          await supabaseAdmin
+            .from('order_intents')
+            .update({
+              stripe_payment_intent_id: paymentIntent.id,
+              stripe_charge_status: 'requires_action',
+            })
+            .eq('id', orderId)
+        } else {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              stripe_payment_intent: paymentIntent.id,
+              stripe_charge_status: 'requires_action',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', orderId)
+        }
+      }
+      break
+    }
+
+    case 'setup_intent.succeeded': {
+      const setupIntent = event.data.object as Stripe.SetupIntent
+      const userId = setupIntent.metadata?.supabase_user_id
+
+      console.log(`SetupIntent succeeded for user ${userId}`)
+
+      // Card saving is handled by confirm-setup-intent edge function
+      // This webhook is just for logging/auditing
       break
     }
 

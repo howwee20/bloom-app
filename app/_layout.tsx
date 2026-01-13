@@ -10,6 +10,7 @@ import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { StripePaymentProvider } from '@/lib/stripe';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -111,7 +112,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ session, loading }}>
-      {children}
+      <StripePaymentProvider session={session}>
+        {children}
+      </StripePaymentProvider>
     </AuthContext.Provider>
   );
 }

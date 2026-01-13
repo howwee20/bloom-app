@@ -1,5 +1,5 @@
-// Buy Detail Screen - Wizard-of-Oz Flow
-// Single coherent flow: Size → Route → Address → Confirm
+// Buy Detail Screen - True 3-Tap Buying
+// Single coherent flow: Size → Route → Address → Confirm (instant checkout with saved card)
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -8,6 +8,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -26,8 +27,15 @@ import {
   formatPrice,
   formatPriceWithCents,
   getMarketplaceLabel,
+  formatTimeAgo,
+  triggerPriceRefresh,
   Quote,
+  Freshness,
 } from '../../lib/quote';
+import { useStripePayment, CardField } from '../../lib/stripe';
+
+// Dev mode flag (check for __DEV__ or use env)
+const DEV_MODE = __DEV__ || process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
 // Available shoe sizes
 const AVAILABLE_SIZES = ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13'];
@@ -54,6 +62,7 @@ export default function BuyDetailScreen() {
     brand: string;
   }>();
   const { session } = useAuth();
+  const { hasSavedCard, savedCard, loading: paymentLoading, initializeSetupIntent, confirmSetup, chargeCard } = useStripePayment();
 
   // State
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -64,6 +73,19 @@ export default function BuyDetailScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+
+  // Card setup modal
+  const [showAddCardModal, setShowAddCardModal] = useState(false);
+  const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
+  const [cardComplete, setCardComplete] = useState(false);
+  const [savingCard, setSavingCard] = useState(false);
+
+  // Price refresh state
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshRequestId, setLastRefreshRequestId] = useState<string | null>(null);
+
+  // Debug panel (dev only)
+  const [showDebug, setShowDebug] = useState(false);
 
   // Shipping address
   const [address, setAddress] = useState<ShippingAddress>({
@@ -121,13 +143,190 @@ export default function BuyDetailScreen() {
   const canSubmit = selectedSize && selectedRoute && quote?.available && !submitting &&
     (selectedRoute === 'bloom' || (address.name && address.line1 && address.city && address.state && address.zip));
 
-  // Submit order with Stripe payment
+  // Handle price refresh
+  const handleRefreshPrice = async () => {
+    if (!session || !style_code || refreshing) return;
+
+    setRefreshing(true);
+    try {
+      const result = await triggerPriceRefresh(style_code, session.access_token);
+
+      if (result.requestId) {
+        setLastRefreshRequestId(result.requestId);
+      }
+
+      if (result.success) {
+        // Refetch quote to get new price
+        await fetchQuote();
+      } else {
+        Alert.alert('Refresh Failed', result.error || 'Could not refresh price');
+      }
+    } catch (e) {
+      console.error('Refresh error:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Open card setup modal
+  const handleAddCard = async () => {
+    const result = await initializeSetupIntent();
+    if (result) {
+      setSetupClientSecret(result.clientSecret);
+      setShowAddCardModal(true);
+    }
+  };
+
+  // Save card after entry
+  const handleSaveCard = async () => {
+    if (!setupClientSecret || !cardComplete) return;
+    setSavingCard(true);
+    try {
+      const success = await confirmSetup(setupClientSecret);
+      if (success) {
+        setShowAddCardModal(false);
+        setSetupClientSecret(null);
+        Alert.alert('Card Saved', 'Your card has been saved for future purchases.');
+      }
+    } finally {
+      setSavingCard(false);
+    }
+  };
+
+  // Submit order with instant checkout (saved card) or fallback to Stripe redirect
   const handleSubmit = async () => {
     if (!canSubmit || !session || !quote) return;
 
+    // If no saved card, prompt to add one (for native) or fall back to Stripe checkout (web)
+    if (!hasSavedCard) {
+      if (Platform.OS === 'web') {
+        // Web: use Stripe hosted checkout
+        await handleStripeCheckout();
+      } else {
+        // Native: prompt to add card
+        Alert.alert(
+          'Add Payment Method',
+          'Add a card for instant checkout, or continue to payment page.',
+          [
+            { text: 'Add Card', onPress: handleAddCard },
+            { text: 'Continue to Payment', onPress: handleStripeCheckout },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      }
+      return;
+    }
+
+    // Has saved card - do instant checkout
     setSubmitting(true);
     try {
-      // 1. Find the asset_id that has the price for this style code
+      // 1. Create order_intent first
+      const orderData = {
+        user_id: session.user.id,
+        catalog_item_id: id || null,
+        shoe_id: style_code || '',
+        shoe_name: name || '',
+        style_code: style_code || '',
+        image_url: image_url || null,
+        size: selectedSize,
+        route: selectedRoute,
+        quoted_marketplace: quote.marketplace || 'stockx',
+        quoted_price: quote.price || null,
+        quoted_fees: quote.fees || null,
+        quoted_shipping: quote.shipping || null,
+        quoted_total: quote.total || null,
+        max_total: maxTotal,
+        shipping_address: selectedRoute === 'home' ? {
+          name: address.name.trim(),
+          line1: address.line1.trim(),
+          line2: address.line2.trim() || null,
+          city: address.city.trim(),
+          state: address.state.trim().toUpperCase(),
+          zip: address.zip.trim(),
+          country: 'US',
+          phone: address.phone.trim() || null,
+        } : null,
+        email: session.user.email || null,
+        status: 'pending',
+      };
+
+      const { data: orderIntent, error: insertError } = await supabase
+        .from('order_intents')
+        .insert(orderData)
+        .select('id')
+        .single();
+
+      if (insertError || !orderIntent) {
+        throw new Error('Failed to create order');
+      }
+
+      // 2. Charge saved card
+      const chargeResult = await chargeCard(orderIntent.id);
+
+      if (chargeResult.success) {
+        // Save address for next time
+        if (selectedRoute === 'home' && address.line1) {
+          try {
+            await supabase.rpc('save_shipping_address', {
+              p_name: address.name.trim(),
+              p_line1: address.line1.trim(),
+              p_line2: address.line2.trim() || null,
+              p_city: address.city.trim(),
+              p_state: address.state.trim().toUpperCase(),
+              p_zip: address.zip.trim(),
+              p_country: 'US',
+              p_phone: address.phone.trim() || null,
+            });
+          } catch (e) {
+            console.log('Could not save address:', e);
+          }
+        }
+
+        // Send Slack notification
+        try {
+          await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/notify-order-intent`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              order_id: orderIntent.id,
+              shoe_name: name,
+              style_code: style_code,
+              size: selectedSize,
+              route: selectedRoute,
+              quoted_total: quote.total,
+              max_total: maxTotal,
+              email: session.user.email,
+              payment_method: 'instant_checkout',
+            }),
+          });
+        } catch (slackErr) {
+          console.log('Slack notification skipped:', slackErr);
+        }
+
+        setCreatedOrderId(orderIntent.id);
+        setShowSuccess(true);
+      } else {
+        // Payment failed
+        Alert.alert('Payment Failed', chargeResult.error || 'Please try again or use a different card.');
+      }
+    } catch (e: any) {
+      console.error('Instant checkout error:', e);
+      Alert.alert('Error', e.message || 'Failed to process payment. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Fallback: Stripe hosted checkout (redirect)
+  const handleStripeCheckout = async () => {
+    if (!session || !quote || !selectedSize || !selectedRoute) return;
+
+    setSubmitting(true);
+    try {
+      // Find the asset_id that has the price for this style code
       const { data: assetData, error: assetError } = await supabase
         .from('assets')
         .select('id')
@@ -144,7 +343,7 @@ export default function BuyDetailScreen() {
         return;
       }
 
-      // 2. Call create-checkout to get Stripe session
+      // Call create-checkout to get Stripe session
       const checkoutResponse = await fetch(
         `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout`,
         {
@@ -174,7 +373,6 @@ export default function BuyDetailScreen() {
       const checkoutResult = await checkoutResponse.json();
 
       if (!checkoutResponse.ok) {
-        // If checkout fails due to staleness, fall back to order intent
         if (checkoutResult.stale) {
           console.log('Price stale, creating order intent');
           await createOrderIntent();
@@ -183,33 +381,8 @@ export default function BuyDetailScreen() {
         throw new Error(checkoutResult.error || 'Failed to create checkout');
       }
 
-      // 3. Open Stripe checkout URL
       if (checkoutResult.url) {
-        // Store the order_id for tracking
         setCreatedOrderId(checkoutResult.order_id);
-
-        // Send Slack notification
-        try {
-          await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/notify-order-intent`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              order_id: checkoutResult.order_id,
-              shoe_name: name,
-              style_code: style_code,
-              size: selectedSize,
-              route: selectedRoute,
-              quoted_total: quote.total,
-              max_total: maxTotal,
-              email: session.user.email,
-            }),
-          });
-        } catch (slackErr) {
-          console.log('Slack notification skipped:', slackErr);
-        }
 
         // Save address for next time (if ship to home)
         if (selectedRoute === 'home' && address.line1) {
@@ -229,22 +402,14 @@ export default function BuyDetailScreen() {
           }
         }
 
-        // Open Stripe checkout
         await Linking.openURL(checkoutResult.url);
 
-        // Show payment instructions
         Alert.alert(
           'Complete Payment',
           'Complete your payment in the browser to finish your order.',
           [
-            {
-              text: 'View Orders',
-              onPress: () => router.replace('/orders'),
-            },
-            {
-              text: 'OK',
-              onPress: () => router.replace('/(tabs)'),
-            },
+            { text: 'View Orders', onPress: () => router.replace('/orders') },
+            { text: 'OK', onPress: () => router.replace('/(tabs)') },
           ]
         );
       }
@@ -431,17 +596,83 @@ export default function BuyDetailScreen() {
                 <>
                   <Text style={styles.quoteLabel}>Est. Total</Text>
                   <Text style={styles.quotePrice}>{formatPrice(quote.total)}</Text>
-                  <Text style={styles.quoteMarketplace}>via {getMarketplaceLabel(quote.marketplace)}</Text>
+                  <View style={styles.quoteMeta}>
+                    <Text style={styles.quoteMarketplace}>via {getMarketplaceLabel(quote.marketplace)}</Text>
+                    {quote.freshness === 'stale' && (
+                      <View style={styles.staleBadge}>
+                        <Text style={styles.staleBadgeText}>STALE</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.quoteTimestamp}>
+                    Updated {formatTimeAgo(quote.minutesAgo)}
+                  </Text>
+                  {quote.freshness === 'stale' && (
+                    <Pressable
+                      onPress={handleRefreshPrice}
+                      style={styles.refreshButton}
+                      disabled={refreshing}
+                    >
+                      {refreshing ? (
+                        <ActivityIndicator size="small" color={theme.accent} />
+                      ) : (
+                        <Text style={styles.refreshButtonText}>Refresh Now</Text>
+                      )}
+                    </Pressable>
+                  )}
                 </>
               ) : (
                 <View style={styles.quoteUnavailable}>
-                  <Text style={styles.quoteUnavailableText}>{quote?.reasonUnavailable || 'Updating prices...'}</Text>
-                  <Pressable onPress={fetchQuote} style={styles.refreshButton}>
-                    <Text style={styles.refreshButtonText}>Refresh</Text>
+                  <Text style={styles.quoteUnavailableText}>
+                    {quote?.reasonUnavailable || 'No price available'}
+                  </Text>
+                  {quote?.minutesAgo && (
+                    <Text style={styles.quoteStaleInfo}>
+                      Last checked {formatTimeAgo(quote.minutesAgo)}
+                    </Text>
+                  )}
+                  <Pressable
+                    onPress={handleRefreshPrice}
+                    style={styles.refreshButton}
+                    disabled={refreshing}
+                  >
+                    {refreshing ? (
+                      <View style={styles.refreshingRow}>
+                        <ActivityIndicator size="small" color={theme.accent} />
+                        <Text style={styles.refreshingText}>Refreshing...</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.refreshButtonText}>Refresh Now</Text>
+                    )}
                   </Pressable>
                 </View>
               )}
             </View>
+
+            {/* Dev Debug Panel */}
+            {DEV_MODE && (
+              <Pressable
+                style={styles.debugToggle}
+                onPress={() => setShowDebug(!showDebug)}
+              >
+                <Text style={styles.debugToggleText}>
+                  {showDebug ? 'Hide Debug' : 'Show Debug'}
+                </Text>
+              </Pressable>
+            )}
+            {DEV_MODE && showDebug && (
+              <View style={styles.debugPanel}>
+                <Text style={styles.debugTitle}>Price Debug</Text>
+                <Text style={styles.debugRow}>Style: {style_code}</Text>
+                <Text style={styles.debugRow}>Freshness: {quote?.freshness || 'unknown'}</Text>
+                <Text style={styles.debugRow}>Minutes Ago: {quote?.minutesAgo ?? 'N/A'}</Text>
+                <Text style={styles.debugRow}>Available: {quote?.available ? 'Yes' : 'No'}</Text>
+                <Text style={styles.debugRow}>Price: ${quote?.price || 'N/A'}</Text>
+                <Text style={styles.debugRow}>Marketplace: {quote?.marketplace || 'N/A'}</Text>
+                <Text style={styles.debugRow}>Updated At: {quote?.updatedAt || 'N/A'}</Text>
+                <Text style={styles.debugRow}>Last Refresh ID: {lastRefreshRequestId || 'None'}</Text>
+              </View>
+            )}
 
             {/* Step 1: Size */}
             <View style={styles.section}>
@@ -622,6 +853,26 @@ export default function BuyDetailScreen() {
             )}
           </ScrollView>
 
+          {/* Payment Method Info */}
+          {hasSavedCard && savedCard && selectedRoute && canSubmit && (
+            <View style={styles.paymentMethodSection}>
+              <View style={styles.paymentMethodCard}>
+                <Text style={styles.paymentMethodLabel}>Payment</Text>
+                <View style={styles.paymentMethodRow}>
+                  <Text style={styles.paymentMethodBrand}>
+                    {savedCard.brand?.toUpperCase() || 'CARD'}
+                  </Text>
+                  <Text style={styles.paymentMethodLast4}>
+                    •••• {savedCard.last4}
+                  </Text>
+                </View>
+              </View>
+              <Pressable style={styles.changeCardButton} onPress={handleAddCard}>
+                <Text style={styles.changeCardButtonText}>Change</Text>
+              </Pressable>
+            </View>
+          )}
+
           {/* Submit Button */}
           <View style={styles.actionContainer}>
             <Pressable
@@ -641,12 +892,75 @@ export default function BuyDetailScreen() {
                     ? 'Updating prices...'
                     : selectedRoute === 'home' && (!address.name || !address.line1 || !address.city || !address.state || !address.zip)
                     ? 'Enter Address'
+                    : hasSavedCard && savedCard
+                    ? `Pay ${formatPrice(quote?.total || 0)} • •••• ${savedCard.last4}`
                     : `Confirm • Est. ${formatPrice(quote?.total || 0)}`}
                 </Text>
               )}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
+
+        {/* Add Card Modal */}
+        <Modal
+          visible={showAddCardModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowAddCardModal(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Pressable onPress={() => setShowAddCardModal(false)}>
+                <Text style={styles.modalCancel}>Cancel</Text>
+              </Pressable>
+              <Text style={styles.modalTitle}>Add Card</Text>
+              <View style={{ width: 60 }} />
+            </View>
+
+            <View style={styles.modalContent}>
+              <Text style={styles.modalSubtitle}>
+                Your card will be saved securely for future purchases.
+              </Text>
+
+              {Platform.OS !== 'web' && (
+                <View style={styles.cardFieldContainer}>
+                  <CardField
+                    postalCodeEnabled={true}
+                    placeholders={{
+                      number: '4242 4242 4242 4242',
+                    }}
+                    cardStyle={{
+                      backgroundColor: theme.card,
+                      textColor: theme.textPrimary,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      borderRadius: 12,
+                      fontSize: 16,
+                    }}
+                    style={styles.cardField}
+                    onCardChange={(cardDetails) => {
+                      setCardComplete(cardDetails.complete);
+                    }}
+                  />
+                </View>
+              )}
+
+              <Pressable
+                style={[styles.saveCardButton, !cardComplete && styles.saveCardButtonDisabled]}
+                onPress={handleSaveCard}
+                disabled={!cardComplete || savingCard}
+              >
+                {savingCard ? (
+                  <ActivityIndicator size="small" color={theme.textInverse} />
+                ) : (
+                  <Text style={[styles.saveCardButtonText, !cardComplete && styles.saveCardButtonTextDisabled]}>
+                    Save Card
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
     </>
   );
@@ -765,6 +1079,28 @@ const styles = StyleSheet.create({
   quoteMarketplace: {
     fontSize: 13,
     color: theme.textSecondary,
+  },
+  quoteMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  staleBadge: {
+    backgroundColor: theme.warning,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  staleBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: 0.5,
+  },
+  quoteTimestamp: {
+    fontSize: 11,
+    color: theme.textTertiary,
     marginTop: 4,
   },
   quoteUnavailable: {
@@ -776,18 +1112,63 @@ const styles = StyleSheet.create({
     color: theme.warning,
     fontWeight: '500',
   },
+  quoteStaleInfo: {
+    fontSize: 12,
+    color: theme.textTertiary,
+  },
   refreshButton: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     backgroundColor: theme.card,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.border,
+    minWidth: 100,
+    alignItems: 'center',
   },
   refreshButtonText: {
     fontSize: 13,
     color: theme.accent,
     fontWeight: '600',
+  },
+  refreshingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  refreshingText: {
+    fontSize: 13,
+    color: theme.textSecondary,
+  },
+  // Debug panel styles
+  debugToggle: {
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  debugToggleText: {
+    fontSize: 11,
+    color: theme.textTertiary,
+    textDecorationLine: 'underline',
+  },
+  debugPanel: {
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  debugTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 8,
+  },
+  debugRow: {
+    fontSize: 11,
+    color: '#AAA',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    marginBottom: 2,
   },
   section: {
     marginBottom: 24,
@@ -1096,6 +1477,109 @@ const styles = StyleSheet.create({
   successButtonSecondaryText: {
     fontSize: 17,
     fontWeight: '600',
+    color: theme.textSecondary,
+  },
+  // Payment method styles
+  paymentMethodSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: theme.card,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  paymentMethodCard: {
+    flex: 1,
+  },
+  paymentMethodLabel: {
+    fontSize: 11,
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  paymentMethodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  paymentMethodBrand: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  paymentMethodLast4: {
+    fontSize: 15,
+    color: theme.textPrimary,
+    fontWeight: '500',
+  },
+  changeCardButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  changeCardButtonText: {
+    fontSize: 14,
+    color: theme.accent,
+    fontWeight: '600',
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: theme.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  modalCancel: {
+    fontSize: 16,
+    color: theme.accent,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 24,
+  },
+  modalSubtitle: {
+    fontSize: 15,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  cardFieldContainer: {
+    marginBottom: 24,
+  },
+  cardField: {
+    width: '100%',
+    height: 50,
+  },
+  saveCardButton: {
+    backgroundColor: theme.accent,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveCardButtonDisabled: {
+    backgroundColor: theme.card,
+  },
+  saveCardButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: theme.textInverse,
+  },
+  saveCardButtonTextDisabled: {
     color: theme.textSecondary,
   },
 });
