@@ -1714,7 +1714,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   custodyLabelBloom: {
-    backgroundColor: theme.accent,
+    backgroundColor: '#1A1A1A',
   },
   custodyLabelHome: {
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
@@ -1729,7 +1729,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   custodyLabelTextBloom: {
-    color: theme.textInverse,
+    color: '#FFFFFF',
   },
   custodyLabelTextHome: {
     color: theme.textSecondary,

@@ -162,6 +162,8 @@ export default function RootLayout() {
           <Stack.Screen name="profile" options={{ headerShown: false }} />
           {/* Add item */}
           <Stack.Screen name="add-item" options={{ headerShown: false }} />
+          {/* Buy flow */}
+          <Stack.Screen name="buy" options={{ headerShown: false }} />
           {/* Authentication flow */}
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="signup" options={{ headerShown: false }} />
