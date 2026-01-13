@@ -877,31 +877,26 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Compact Header - Balance in row */}
+      {/* Header - Balance is the hero */}
       <View style={styles.headerArea}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerLogo}>Bloom</Text>
-          <Pressable style={styles.headerCenter} onPress={() => setShowBalanceBreakdown(true)}>
-            <View style={styles.headerBalanceRow}>
-              <Text style={styles.headerBalance}>{formatPrice(displayedTotalValue)}</Text>
-              {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-                <Text style={[styles.headerPnl, { color: totalPnlColor }]}>
-                  ({formatPnL(displayedTotalPnl)})
-                </Text>
-              )}
-            </View>
-            <Text style={styles.headerUpdated}>
-              {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
+        <Pressable style={styles.profileButtonAbsolute} onPress={() => router.push('/profile')}>
+          <View style={styles.profileIcon}>
+            <Text style={styles.profileIconText}>
+              {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
             </Text>
-          </Pressable>
-          <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
-            <View style={styles.profileIcon}>
-              <Text style={styles.profileIconText}>
-                {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
-              </Text>
-            </View>
-          </Pressable>
-        </View>
+          </View>
+        </Pressable>
+        <Pressable style={styles.balanceSection} onPress={() => setShowBalanceBreakdown(true)}>
+          <Text style={styles.balanceAmount}>{formatPrice(displayedTotalValue)}</Text>
+          {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
+            <Text style={[styles.balancePnl, { color: totalPnlColor }]}>
+              {formatPnL(displayedTotalPnl)}
+            </Text>
+          )}
+          <Text style={styles.balanceUpdated}>
+            {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
+          </Text>
+        </Pressable>
       </View>
 
       {/* Filter Tabs */}
@@ -1430,58 +1425,47 @@ const styles = StyleSheet.create({
   },
   headerArea: {
     backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    position: 'relative',
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerLogo: {
-    fontFamily: fonts.heading,
-    fontSize: 18,
-    color: theme.accent,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerBalanceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  headerBalance: {
-    fontFamily: fonts.heading,
-    fontSize: 24,
-    color: theme.textPrimary,
-    letterSpacing: -0.5,
-  },
-  headerPnl: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  headerUpdated: {
-    fontSize: 10,
-    color: theme.textTertiary,
-    marginTop: 2,
-  },
-  profileButton: {
-    padding: 4,
+  profileButtonAbsolute: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 1,
   },
   profileIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: theme.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileIconText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: theme.textInverse,
+  },
+  balanceSection: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  balanceAmount: {
+    fontFamily: fonts.heading,
+    fontSize: 42,
+    color: theme.textPrimary,
+    letterSpacing: -1,
+  },
+  balancePnl: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  balanceUpdated: {
+    fontSize: 11,
+    color: theme.textTertiary,
+    marginTop: 6,
   },
   // Filter Tabs - below header, on cream background
   filterTabs: {
