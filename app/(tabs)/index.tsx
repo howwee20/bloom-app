@@ -49,8 +49,6 @@ const showAlert = (title: string, message: string, buttons?: Array<{text: string
   }
 };
 
-// Filter types for custody
-type CustodyFilter = 'all' | 'bloom' | 'home' | 'watchlist';
 const PRICE_FRESHNESS_MINUTES = 15;
 const PRICE_STALE_HOURS = 24;
 const MARKETPLACE_LABELS: Record<string, string> = {
@@ -173,8 +171,6 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-  const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>('bloom');
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   // Buy Intent and Route Home modals removed - Buy button now navigates to /buy
   const [showSellModal, setShowSellModal] = useState(false);
   const [showSellOptions, setShowSellOptions] = useState(false);
@@ -815,35 +811,18 @@ export default function HomeScreen() {
     </View>
   );
 
-  // Filter tokens by custody type
-  const filteredTokens = tokens.filter(token => {
-    if (custodyFilter === 'all') return true;
-    if (custodyFilter === 'watchlist') return false; // tokens don't have watchlist
-    return token.custody_type === custodyFilter;
-  });
-
-  // Filter assets by location
-  const filteredAssets = ownedAssets.filter(asset => {
-    if (custodyFilter === 'all') return true;
-    if (custodyFilter === 'bloom') return false; // assets are never bloom custody
-    const assetLocation = asset.location || 'home'; // default to home if not set
-    return assetLocation === custodyFilter;
-  });
-
-  // Count by custody type (tokens + assets)
-  const bloomCount = tokens.filter(t => t.custody_type === 'bloom').length;
-  const homeCount = tokens.filter(t => t.custody_type === 'home').length
-    + ownedAssets.filter(a => (a.location || 'home') === 'home').length;
-  const watchlistCount = ownedAssets.filter(a => a.location === 'watchlist').length;
-  const allCount = tokens.length + ownedAssets.length;
+  // Show all tokens and assets (no filtering - balance is always bloom custody only)
+  const filteredTokens = tokens;
+  const filteredAssets = ownedAssets;
 
   const ownedAssetsOnly = ownedAssets.filter(a => (a.location || 'home') !== 'watchlist');
-  const watchlistAssets = ownedAssets.filter(a => a.location === 'watchlist');
 
+  // Bloom custody tokens only (for balance calculation)
   const bloomTokens = tokens.filter(t =>
     t.custody_type === 'bloom' && (t.status === 'in_custody' || t.status === 'listed')
   );
 
+  // Balance = bloom custody value only (this is THE number)
   const portfolioValue = bloomTokens.reduce((sum, t) => sum + (t.current_value ?? 0), 0);
 
   const portfolioPnl = bloomTokens.reduce((sum, t) => {
@@ -851,11 +830,10 @@ export default function HomeScreen() {
     return sum + (t.current_value - t.purchase_price);
   }, 0);
 
-  const watchlistValue = watchlistAssets.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
-
-  const displayedTotalValue = custodyFilter === 'watchlist' ? watchlistValue : portfolioValue;
-  const displayedTotalPnl = custodyFilter === 'watchlist' ? null : portfolioPnl;
-  const hasItems = displayedTotalValue > 0;
+  // Always show bloom custody value - no toggles, no options
+  const displayedTotalValue = portfolioValue;
+  const displayedTotalPnl = portfolioPnl;
+  const hasItems = tokens.length > 0 || ownedAssets.length > 0;
 
   const totalPnlColor = !displayedTotalPnl || displayedTotalPnl === 0
     ? theme.textSecondary
@@ -958,61 +936,6 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Filter Dropdown */}
-          {hasItems && (
-            <View style={styles.filterContainer}>
-              <Pressable
-                style={styles.filterDropdownTrigger}
-                onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-              >
-                <Text style={styles.filterDropdownText}>
-                  {custodyFilter === 'all' ? `All (${allCount})` :
-                   custodyFilter === 'bloom' ? `Bloom (${bloomCount})` :
-                   custodyFilter === 'watchlist' ? `Watchlist (${watchlistCount})` :
-                   `Home (${homeCount})`}
-                </Text>
-                <Text style={styles.filterDropdownArrow}>
-                  {showFilterDropdown ? '▲' : '▼'}
-                </Text>
-              </Pressable>
-              {showFilterDropdown && (
-                <View style={styles.filterDropdownOptions}>
-                  <Pressable
-                    style={[styles.filterDropdownOption, custodyFilter === 'all' && styles.filterDropdownOptionActive]}
-                    onPress={() => { setCustodyFilter('all'); setShowFilterDropdown(false); }}
-                  >
-                    <Text style={[styles.filterDropdownOptionText, custodyFilter === 'all' && styles.filterDropdownOptionTextActive]}>
-                      All ({allCount})
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.filterDropdownOption, custodyFilter === 'bloom' && styles.filterDropdownOptionActive]}
-                    onPress={() => { setCustodyFilter('bloom'); setShowFilterDropdown(false); }}
-                  >
-                    <Text style={[styles.filterDropdownOptionText, custodyFilter === 'bloom' && styles.filterDropdownOptionTextActive]}>
-                      Bloom ({bloomCount})
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.filterDropdownOption, custodyFilter === 'home' && styles.filterDropdownOptionActive]}
-                    onPress={() => { setCustodyFilter('home'); setShowFilterDropdown(false); }}
-                  >
-                    <Text style={[styles.filterDropdownOptionText, custodyFilter === 'home' && styles.filterDropdownOptionTextActive]}>
-                      Home ({homeCount})
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.filterDropdownOption, custodyFilter === 'watchlist' && styles.filterDropdownOptionActive]}
-                    onPress={() => { setCustodyFilter('watchlist'); setShowFilterDropdown(false); }}
-                  >
-                    <Text style={[styles.filterDropdownOptionText, custodyFilter === 'watchlist' && styles.filterDropdownOptionTextActive]}>
-                      Watchlist ({watchlistCount})
-                    </Text>
-                  </Pressable>
-                </View>
-              )}
-            </View>
-          )}
         </View>
       )}
 
@@ -1111,7 +1034,6 @@ export default function HomeScreen() {
         ) : (
           <FlatList
             data={[...filteredTokens, ...filteredAssets] as any[]}
-            extraData={custodyFilter}
             renderItem={({ item }) => {
               // Check if it's a token (has custody_type) or legacy asset
               if ('custody_type' in item) {
@@ -1772,53 +1694,6 @@ const styles = StyleSheet.create({
   emptyButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.textInverse,
-  },
-  filterContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  filterDropdownTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  filterDropdownText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.textSecondary,
-  },
-  filterDropdownArrow: {
-    fontSize: 10,
-    color: theme.textSecondary,
-  },
-  filterDropdownOptions: {
-    marginTop: 8,
-    backgroundColor: theme.card,
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: theme.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  filterDropdownOption: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  filterDropdownOptionActive: {
-    backgroundColor: theme.accent,
-  },
-  filterDropdownOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.textSecondary,
-  },
-  filterDropdownOptionTextActive: {
     color: theme.textInverse,
   },
   actionRow: {
