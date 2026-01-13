@@ -191,6 +191,7 @@ export default function HomeScreen() {
   const [now, setNow] = useState(Date.now());
   const [isFocused, setIsFocused] = useState(true);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+  const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false);
 
   // Restore header collapse preference from storage
   useEffect(() => {
@@ -830,6 +831,19 @@ export default function HomeScreen() {
     return sum + (t.current_value - t.purchase_price);
   }, 0);
 
+  // Home value (tokens at home + assets at home)
+  const homeTokens = tokens.filter(t => t.custody_type === 'home');
+  const homeAssets = ownedAssets.filter(a => (a.location || 'home') === 'home');
+  const homeValue = homeTokens.reduce((sum, t) => sum + (t.current_value ?? 0), 0)
+    + homeAssets.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
+
+  // Watchlist value (assets only - intent, not owned)
+  const watchlistAssets = ownedAssets.filter(a => a.location === 'watchlist');
+  const watchlistValue = watchlistAssets.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
+
+  // Total everything
+  const totalAllValue = portfolioValue + homeValue + watchlistValue;
+
   // Always show bloom custody value - no toggles, no options
   const displayedTotalValue = portfolioValue;
   const displayedTotalPnl = portfolioPnl;
@@ -914,8 +928,8 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Portfolio Value */}
-          <View style={styles.valueSection}>
+          {/* Portfolio Value - Tap to see breakdown */}
+          <Pressable style={styles.valueSection} onPress={() => setShowBalanceBreakdown(true)}>
             <Text style={styles.valueAmount}>{formatPrice(displayedTotalValue)}</Text>
             {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
               <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
@@ -934,31 +948,13 @@ export default function HomeScreen() {
               )}
               {pricingFresh && updateDelayed && <Text style={styles.updatedText}> · Update delayed</Text>}
             </View>
-          </View>
+          </Pressable>
 
         </View>
       )}
 
       {/* Assets */}
       <View style={styles.assetsSection}>
-        <View style={styles.actionRow}>
-          <Pressable style={styles.actionPrimary} onPress={() => router.push('/buy')}>
-            <Text style={styles.actionPrimaryText}>Buy</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.actionSecondary, sortedSellItems.length === 0 && styles.actionSecondaryDisabled]}
-            onPress={() => setShowSellModal(true)}
-            disabled={sortedSellItems.length === 0}
-          >
-            <Text style={[styles.actionSecondaryText, sortedSellItems.length === 0 && styles.actionSecondaryTextDisabled]}>
-              Sell
-            </Text>
-          </Pressable>
-          <Pressable style={styles.actionIconButton} onPress={() => router.push('/add-item')}>
-            <Text style={styles.actionIconText}>+</Text>
-          </Pressable>
-        </View>
-
         {notifications.length > 0 && (
           <View style={styles.alertsSection}>
             <Text style={styles.sectionTitle}>Alerts</Text>
@@ -1357,6 +1353,78 @@ export default function HomeScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Balance Breakdown Modal */}
+      <Modal
+        visible={showBalanceBreakdown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBalanceBreakdown(false)}
+      >
+        <Pressable
+          style={styles.breakdownOverlay}
+          onPress={() => setShowBalanceBreakdown(false)}
+        >
+          <View style={styles.breakdownCard}>
+            <View style={styles.breakdownRow}>
+              <View style={styles.breakdownLabelRow}>
+                <View style={[styles.breakdownDot, { backgroundColor: theme.accent }]} />
+                <Text style={styles.breakdownLabel}>Bloom</Text>
+              </View>
+              <Text style={styles.breakdownValue}>{formatPrice(portfolioValue)}</Text>
+            </View>
+            <Text style={styles.breakdownHint}>In custody</Text>
+
+            <View style={styles.breakdownDivider} />
+
+            <View style={styles.breakdownRow}>
+              <View style={styles.breakdownLabelRow}>
+                <View style={[styles.breakdownDot, { backgroundColor: theme.textTertiary }]} />
+                <Text style={styles.breakdownLabel}>Home</Text>
+              </View>
+              <Text style={styles.breakdownValue}>{formatPrice(homeValue)}</Text>
+            </View>
+            <Text style={styles.breakdownHint}>Tracked</Text>
+
+            <View style={styles.breakdownDivider} />
+
+            <View style={styles.breakdownRow}>
+              <View style={styles.breakdownLabelRow}>
+                <View style={[styles.breakdownDot, { backgroundColor: theme.textSecondary }]} />
+                <Text style={styles.breakdownLabel}>Watchlist</Text>
+              </View>
+              <Text style={styles.breakdownValue}>{formatPrice(watchlistValue)}</Text>
+            </View>
+            <Text style={styles.breakdownHint}>Intent</Text>
+
+            <View style={styles.breakdownTotalDivider} />
+
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownTotalLabel}>Total</Text>
+              <Text style={styles.breakdownTotalValue}>{formatPrice(totalAllValue)}</Text>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Fixed Bottom Bar */}
+      <View style={styles.bottomBar}>
+        <Pressable style={styles.bottomButton} onPress={() => router.push('/buy')}>
+          <Text style={styles.bottomButtonText}>Buy</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.bottomButton, styles.bottomButtonSecondary, sortedSellItems.length === 0 && styles.bottomButtonDisabled]}
+          onPress={() => setShowSellModal(true)}
+          disabled={sortedSellItems.length === 0}
+        >
+          <Text style={[styles.bottomButtonText, styles.bottomButtonTextSecondary, sortedSellItems.length === 0 && styles.bottomButtonTextDisabled]}>
+            Sell
+          </Text>
+        </Pressable>
+        <Pressable style={[styles.bottomButton, styles.bottomButtonIcon]} onPress={() => router.push('/add-item')}>
+          <Text style={styles.bottomButtonIconText}>+</Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -1493,7 +1561,7 @@ const styles = StyleSheet.create({
   },
   gridContent: {
     paddingHorizontal: 12,
-    paddingBottom: 100,
+    paddingBottom: 120, // Extra space for fixed bottom bar
   },
   gridRow: {
     justifyContent: 'space-between',
@@ -1695,61 +1763,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: theme.textInverse,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-  },
-  actionPrimary: {
-    flex: 1,
-    backgroundColor: theme.accent,
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  actionPrimaryText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.textInverse,
-  },
-  actionSecondary: {
-    flex: 1,
-    backgroundColor: theme.card,
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  actionSecondaryDisabled: {
-    backgroundColor: theme.backgroundSecondary,
-  },
-  actionSecondaryText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  actionSecondaryTextDisabled: {
-    color: theme.textSecondary,
-  },
-  actionIconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  actionIconText: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: theme.textPrimary,
-    marginTop: -2,
   },
   sectionTitle: {
     fontSize: 13,
@@ -2285,5 +2298,131 @@ const styles = StyleSheet.create({
   emptySellSubtitle: {
     fontSize: 14,
     color: theme.textSecondary,
+  },
+  // Balance Breakdown Modal
+  breakdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  breakdownCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  breakdownLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  breakdownDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  breakdownLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  breakdownValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  breakdownHint: {
+    fontSize: 12,
+    color: theme.textTertiary,
+    marginLeft: 18,
+    marginTop: 2,
+  },
+  breakdownDivider: {
+    height: 1,
+    backgroundColor: theme.border,
+    marginVertical: 12,
+  },
+  breakdownTotalDivider: {
+    height: 2,
+    backgroundColor: theme.textPrimary,
+    marginVertical: 16,
+  },
+  breakdownTotalLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  breakdownTotalValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  // Fixed Bottom Bar
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 34,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  bottomButton: {
+    flex: 1,
+    backgroundColor: theme.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: theme.accent,
+  },
+  bottomButtonDisabled: {
+    borderColor: theme.border,
+  },
+  bottomButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textInverse,
+  },
+  bottomButtonTextSecondary: {
+    color: theme.accent,
+  },
+  bottomButtonTextDisabled: {
+    color: theme.textTertiary,
+  },
+  bottomButtonIcon: {
+    flex: 0,
+    width: 48,
+    backgroundColor: theme.card,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+  },
+  bottomButtonIconText: {
+    fontSize: 24,
+    fontWeight: '500',
+    color: theme.textPrimary,
   },
 });
