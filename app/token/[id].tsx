@@ -687,7 +687,7 @@ export default function TokenDetailScreen() {
         .from('tokens')
         .update({ purchase_price: costBasis })
         .eq('id', token.id)
-        .eq('owner_id', session.user.id);
+        .eq('user_id', session.user.id);
 
       if (error) throw error;
 
