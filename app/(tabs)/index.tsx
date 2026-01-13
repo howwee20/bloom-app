@@ -877,10 +877,23 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Static Header */}
+      {/* Compact Header - Balance in row */}
       <View style={styles.headerArea}>
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, styles.headerTitleAccent]}>Bloom</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerLogo}>Bloom</Text>
+          <Pressable style={styles.headerCenter} onPress={() => setShowBalanceBreakdown(true)}>
+            <View style={styles.headerBalanceRow}>
+              <Text style={styles.headerBalance}>{formatPrice(displayedTotalValue)}</Text>
+              {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
+                <Text style={[styles.headerPnl, { color: totalPnlColor }]}>
+                  ({formatPnL(displayedTotalPnl)})
+                </Text>
+              )}
+            </View>
+            <Text style={styles.headerUpdated}>
+              {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
+            </Text>
+          </Pressable>
           <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
             <View style={styles.profileIcon}>
               <Text style={styles.profileIconText}>
@@ -889,19 +902,6 @@ export default function HomeScreen() {
             </View>
           </Pressable>
         </View>
-
-        {/* Portfolio Value - Tap to see breakdown */}
-        <Pressable style={styles.valueSection} onPress={() => setShowBalanceBreakdown(true)}>
-          <Text style={styles.valueAmount}>{formatPrice(displayedTotalValue)}</Text>
-          {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-            <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
-              {formatPnL(displayedTotalPnl)} all time
-            </Text>
-          )}
-          <Text style={styles.updatedTextSmall}>
-            {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
-          </Text>
-        </Pressable>
       </View>
 
       {/* Filter Tabs */}
@@ -1430,27 +1430,42 @@ const styles = StyleSheet.create({
   },
   headerArea: {
     backgroundColor: '#FFFFFF',
-    paddingBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
   },
-  header: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  headerTitle: {
+  headerLogo: {
     fontFamily: fonts.heading,
-    fontSize: 20,
-    color: theme.textPrimary,
-  },
-  headerTitleAccent: {
+    fontSize: 18,
     color: theme.accent,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  headerBalance: {
+    fontFamily: fonts.heading,
+    fontSize: 24,
+    color: theme.textPrimary,
+    letterSpacing: -0.5,
+  },
+  headerPnl: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  headerUpdated: {
+    fontSize: 10,
+    color: theme.textTertiary,
+    marginTop: 2,
   },
   profileButton: {
     padding: 4,
@@ -1467,27 +1482,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: theme.textInverse,
-  },
-  valueSection: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  valueAmount: {
-    fontFamily: fonts.heading,
-    fontSize: 36,
-    color: theme.textPrimary,
-    letterSpacing: -1,
-  },
-  totalPnl: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  updatedTextSmall: {
-    fontSize: 11,
-    color: theme.textTertiary,
-    marginTop: 4,
   },
   // Filter Tabs
   filterTabs: {
