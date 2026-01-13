@@ -1067,65 +1067,86 @@ export default function HomeScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               {sortedSellItems.length === 0 ? (
                 <View style={styles.emptySellState}>
-                  <Text style={styles.emptySellTitle}>No items to sell</Text>
-                  <Text style={styles.emptySellSubtitle}>Add an item to get started</Text>
-                </View>
-              ) : (
-                sortedSellItems.map(item => {
-                  const isBloom = item.custodyType === 'bloom';
-                  return (
+                  <Text style={styles.emptySellTitle}>Nothing to sell yet</Text>
+                  <Text style={styles.emptySellSubtitle}>Add something you want to liquidate</Text>
                   <Pressable
-                    key={`${item.type}-${item.id}`}
-                    style={[
-                      styles.sellPickRow,
-                      isBloom ? styles.sellPickRowBloom : styles.sellPickRowHome,
-                    ]}
+                    style={styles.addToSellButton}
                     onPress={() => {
                       setShowSellModal(false);
-                      setSelectedSellItem(item);
-                      setShowSellOptions(true);
+                      router.push('/add-item');
                     }}
                   >
-                    <View style={styles.sellPickLeft}>
-                      {item.imageUrl ? (
-                        <Image source={{ uri: item.imageUrl }} style={styles.sellPickThumb} />
-                      ) : (
-                        <View style={[styles.sellPickThumb, styles.sellOptionPlaceholder]}>
-                          <Text style={styles.sellOptionPlaceholderText}>
-                            {item.name.charAt(0)}
+                    <Text style={styles.addToSellButtonText}>+ Add item to sell</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <>
+                  {sortedSellItems.map(item => {
+                    const isBloom = item.custodyType === 'bloom';
+                    return (
+                    <Pressable
+                      key={`${item.type}-${item.id}`}
+                      style={[
+                        styles.sellPickRow,
+                        isBloom ? styles.sellPickRowBloom : styles.sellPickRowHome,
+                      ]}
+                      onPress={() => {
+                        setShowSellModal(false);
+                        setSelectedSellItem(item);
+                        setShowSellOptions(true);
+                      }}
+                    >
+                      <View style={styles.sellPickLeft}>
+                        {item.imageUrl ? (
+                          <Image source={{ uri: item.imageUrl }} style={styles.sellPickThumb} />
+                        ) : (
+                          <View style={[styles.sellPickThumb, styles.sellOptionPlaceholder]}>
+                            <Text style={styles.sellOptionPlaceholderText}>
+                              {item.name.charAt(0)}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.sellPickText}>
+                          <Text style={styles.sellPickName} numberOfLines={1}>
+                            {item.name}
                           </Text>
-                        </View>
-                      )}
-                      <View style={styles.sellPickText}>
-                        <Text style={styles.sellPickName} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <View style={styles.sellPickMetaRow}>
-                          <Text style={styles.sellPickMeta}>
-                            {item.size ? `Size ${item.size}` : 'Size —'} · {item.custodyLabel}
-                          </Text>
-                          <View
-                            style={[
-                              styles.sellPickBadge,
-                              isBloom ? styles.sellPickBadgeBloom : styles.sellPickBadgeHome,
-                            ]}
-                          >
-                            <Text
+                          <View style={styles.sellPickMetaRow}>
+                            <Text style={styles.sellPickMeta}>
+                              {item.size ? `Size ${item.size}` : 'Size —'} · {item.custodyLabel}
+                            </Text>
+                            <View
                               style={[
-                                styles.sellPickBadgeText,
-                                isBloom ? styles.sellPickBadgeTextBloom : styles.sellPickBadgeTextHome,
+                                styles.sellPickBadge,
+                                isBloom ? styles.sellPickBadgeBloom : styles.sellPickBadgeHome,
                               ]}
                             >
-                              {item.custodyLabel}
-                            </Text>
+                              <Text
+                                style={[
+                                  styles.sellPickBadgeText,
+                                  isBloom ? styles.sellPickBadgeTextBloom : styles.sellPickBadgeTextHome,
+                                ]}
+                              >
+                                {item.custodyLabel}
+                              </Text>
+                            </View>
                           </View>
                         </View>
                       </View>
-                    </View>
-                    <Text style={styles.sellPickValue}>{formatPrice(item.value)}</Text>
+                      <Text style={styles.sellPickValue}>{formatPrice(item.value)}</Text>
+                    </Pressable>
+                    );
+                  })}
+                  {/* Add something else to sell */}
+                  <Pressable
+                    style={styles.addToSellRow}
+                    onPress={() => {
+                      setShowSellModal(false);
+                      router.push('/add-item');
+                    }}
+                  >
+                    <Text style={styles.addToSellRowText}>+ Sell something else</Text>
                   </Pressable>
-                  );
-                })
+                </>
               )}
             </ScrollView>
 
@@ -1397,22 +1418,18 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      {/* Fixed Bottom Bar */}
+      {/* Fixed Bottom Bar - Buy and Sell only */}
       <View style={styles.bottomBar}>
         <Pressable style={styles.bottomButton} onPress={() => router.push('/buy')}>
           <Text style={styles.bottomButtonText}>Buy</Text>
         </Pressable>
         <Pressable
-          style={[styles.bottomButton, styles.bottomButtonSecondary, sortedSellItems.length === 0 && styles.bottomButtonDisabled]}
+          style={[styles.bottomButton, styles.bottomButtonSecondary]}
           onPress={() => setShowSellModal(true)}
-          disabled={sortedSellItems.length === 0}
         >
-          <Text style={[styles.bottomButtonText, styles.bottomButtonTextSecondary, sortedSellItems.length === 0 && styles.bottomButtonTextDisabled]}>
+          <Text style={[styles.bottomButtonText, styles.bottomButtonTextSecondary]}>
             Sell
           </Text>
-        </Pressable>
-        <Pressable style={styles.bottomButtonIcon} onPress={() => router.push('/add-item')}>
-          <Text style={styles.bottomButtonIconText}>+</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -2288,6 +2305,31 @@ const styles = StyleSheet.create({
   emptySellSubtitle: {
     fontSize: 14,
     color: theme.textSecondary,
+    marginBottom: 16,
+  },
+  addToSellButton: {
+    backgroundColor: theme.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 8,
+  },
+  addToSellButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.textInverse,
+  },
+  addToSellRow: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    marginTop: 8,
+  },
+  addToSellRowText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.accent,
   },
   // Balance Breakdown Modal
   breakdownOverlay: {
@@ -2370,9 +2412,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.border,
   },
-  bottomButtonDisabled: {
-    backgroundColor: theme.backgroundSecondary,
-  },
   bottomButtonText: {
     fontSize: 16,
     fontWeight: '600',
@@ -2380,25 +2419,5 @@ const styles = StyleSheet.create({
   },
   bottomButtonTextSecondary: {
     color: theme.textPrimary,
-  },
-  bottomButtonTextDisabled: {
-    color: theme.textSecondary,
-  },
-  bottomButtonIcon: {
-    flex: 0,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  bottomButtonIconText: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: theme.textPrimary,
-    marginTop: -2,
   },
 });
