@@ -1483,15 +1483,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.textInverse,
   },
-  // Filter Tabs
+  // Filter Tabs - below header, on cream background
   filterTabs: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.background,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
   },
   filterTab: {
     paddingHorizontal: 14,
