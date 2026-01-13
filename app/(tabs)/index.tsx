@@ -841,9 +841,6 @@ export default function HomeScreen() {
   const watchlistAssets = ownedAssets.filter(a => a.location === 'watchlist');
   const watchlistValue = watchlistAssets.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
 
-  // Total everything
-  const totalAllValue = portfolioValue + homeValue + watchlistValue;
-
   // Always show bloom custody value - no toggles, no options
   const displayedTotalValue = portfolioValue;
   const displayedTotalPnl = portfolioPnl;
@@ -894,7 +891,7 @@ export default function HomeScreen() {
         // Collapsed: compact sticky bar
         <View style={styles.headerAreaCollapsed}>
           <Text style={styles.headerTitleCollapsed}>Bloom</Text>
-          <View style={styles.collapsedCenter}>
+          <Pressable style={styles.collapsedCenter} onPress={() => setShowBalanceBreakdown(true)}>
             <Text style={styles.valueAmountCollapsed}>
               {formatPrice(displayedTotalValue)}
             </Text>
@@ -903,7 +900,7 @@ export default function HomeScreen() {
                 ({formatPnL(displayedTotalPnl)})
               </Text>
             )}
-          </View>
+          </Pressable>
           <Pressable onPress={toggleHeader} style={styles.collapseToggle}>
             <Text style={styles.collapseChevron}>▼</Text>
           </Pressable>
@@ -1396,13 +1393,6 @@ export default function HomeScreen() {
               <Text style={styles.breakdownValue}>{formatPrice(watchlistValue)}</Text>
             </View>
             <Text style={styles.breakdownHint}>Intent</Text>
-
-            <View style={styles.breakdownTotalDivider} />
-
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownTotalLabel}>Total</Text>
-              <Text style={styles.breakdownTotalValue}>{formatPrice(totalAllValue)}</Text>
-            </View>
           </View>
         </Pressable>
       </Modal>
@@ -2354,21 +2344,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: theme.border,
     marginVertical: 12,
-  },
-  breakdownTotalDivider: {
-    height: 2,
-    backgroundColor: theme.textPrimary,
-    marginVertical: 16,
-  },
-  breakdownTotalLabel: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.textPrimary,
-  },
-  breakdownTotalValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.textPrimary,
   },
   // Fixed Bottom Bar - floating on cream background
   bottomBar: {
