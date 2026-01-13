@@ -1709,12 +1709,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 8,
     right: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   custodyLabelBloom: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: theme.accent,
   },
   custodyLabelHome: {
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
@@ -1723,13 +1723,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(59, 130, 246, 0.15)',
   },
   custodyLabelText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   custodyLabelTextBloom: {
-    color: '#FFF',
+    color: theme.textInverse,
   },
   custodyLabelTextHome: {
     color: theme.textSecondary,
