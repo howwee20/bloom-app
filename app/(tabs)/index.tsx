@@ -2370,7 +2370,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.textPrimary,
   },
-  // Fixed Bottom Bar
+  // Fixed Bottom Bar - floating on cream background
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -2382,25 +2382,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 34,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
   },
   bottomButton: {
     flex: 1,
     backgroundColor: theme.accent,
-    borderRadius: 12,
+    borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   bottomButtonSecondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: theme.accent,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   bottomButtonDisabled: {
-    borderColor: theme.border,
+    backgroundColor: theme.backgroundSecondary,
   },
   bottomButtonText: {
     fontSize: 16,
@@ -2408,21 +2404,26 @@ const styles = StyleSheet.create({
     color: theme.textInverse,
   },
   bottomButtonTextSecondary: {
-    color: theme.accent,
+    color: theme.textPrimary,
   },
   bottomButtonTextDisabled: {
-    color: theme.textTertiary,
+    color: theme.textSecondary,
   },
   bottomButtonIcon: {
     flex: 0,
-    width: 48,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: theme.card,
-    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
     borderColor: theme.border,
   },
   bottomButtonIconText: {
-    fontSize: 24,
-    fontWeight: '500',
+    fontSize: 22,
+    fontWeight: '600',
     color: theme.textPrimary,
+    marginTop: -2,
   },
 });
