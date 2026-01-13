@@ -173,7 +173,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-  const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>('all');
+  const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>('bloom');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   // Buy Intent and Route Home modals removed - Buy button now navigates to /buy
   const [showSellModal, setShowSellModal] = useState(false);
