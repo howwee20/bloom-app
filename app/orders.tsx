@@ -1,7 +1,8 @@
-// Orders Screen - View order history and status
+// Orders Screen - View order history, order intents, and status
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Linking,
@@ -16,6 +17,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from './_layout';
 import { theme, fonts } from '../constants/Colors';
 
+// Order from existing orders table
 interface Order {
   order_id: string;
   sku: string;
@@ -36,11 +38,64 @@ interface Order {
   token_status: string | null;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+// Order intent (Wizard-of-Oz buy flow)
+interface OrderIntent {
+  id: string;
+  shoe_id: string;
+  shoe_name: string;
+  style_code: string;
+  image_url: string | null;
+  size: string;
+  route: 'home' | 'bloom';
+  quoted_marketplace: string | null;
+  quoted_price: number | null;
+  quoted_total: number | null;
+  max_total: number;
+  marketplace_used: string | null;
+  actual_total: number | null;
+  tracking_number: string | null;
+  tracking_carrier: string | null;
+  status: string;
+  status_label: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Unified order item for display
+interface UnifiedOrder {
+  type: 'order' | 'intent';
+  id: string;
+  name: string;
+  size: string;
+  image_url: string | null;
+  amount: number; // in dollars
+  route: 'home' | 'bloom';
+  status: string;
+  status_label: string;
+  status_color: string;
+  status_bg: string;
+  tracking_number: string | null;
+  tracking_carrier: string | null;
+  created_at: string;
+}
+
+// Status config for order intents
+const INTENT_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  pending: { label: 'Requested', color: theme.warning, bg: theme.warningBg },
+  executing: { label: 'Buying...', color: '#9B59B6', bg: 'rgba(155, 89, 182, 0.15)' },
+  ordered: { label: 'Ordered', color: theme.accent, bg: theme.accentLight || 'rgba(245, 196, 154, 0.15)' },
+  shipped: { label: 'In transit', color: '#E67E22', bg: 'rgba(230, 126, 34, 0.15)' },
+  delivered: { label: 'Delivered', color: theme.success, bg: theme.successBg },
+  cancelled: { label: 'Cancelled', color: theme.error, bg: theme.errorBg },
+  failed: { label: 'Failed', color: theme.error, bg: theme.errorBg },
+};
+
+// Status config for existing orders
+const ORDER_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   pending_payment: { label: 'Pending Payment', color: theme.warning, bg: theme.warningBg },
   paid: { label: 'Paid', color: theme.success, bg: theme.successBg },
-  fulfilling: { label: 'Fulfilling', color: '#9B59B6', bg: '#2E1F3D' },
-  shipped: { label: 'Shipped', color: '#E67E22', bg: '#2E2515' },
+  fulfilling: { label: 'Fulfilling', color: '#9B59B6', bg: 'rgba(155, 89, 182, 0.15)' },
+  shipped: { label: 'Shipped', color: '#E67E22', bg: 'rgba(230, 126, 34, 0.15)' },
   delivered: { label: 'Delivered', color: theme.success, bg: theme.successBg },
   complete: { label: 'Complete', color: theme.success, bg: theme.successBg },
   cancelled: { label: 'Cancelled', color: theme.error, bg: theme.errorBg },
@@ -48,7 +103,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 
 export default function OrdersScreen() {
   const { session } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<UnifiedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
@@ -61,10 +116,79 @@ export default function OrdersScreen() {
     if (!session) return;
 
     try {
-      const { data, error } = await supabase.rpc('get_user_orders_with_tokens');
-      if (!error && data) {
-        setOrders(data);
+      // Fetch both order intents and existing orders in parallel
+      const [intentsResult, ordersResult] = await Promise.all([
+        supabase.rpc('get_user_order_intents'),
+        supabase.rpc('get_user_orders_with_tokens'),
+      ]);
+
+      const unifiedOrders: UnifiedOrder[] = [];
+
+      // Process order intents
+      if (!intentsResult.error && intentsResult.data) {
+        for (const intent of intentsResult.data as OrderIntent[]) {
+          const statusConfig = INTENT_STATUS_CONFIG[intent.status] || {
+            label: intent.status_label || intent.status,
+            color: theme.textSecondary,
+            bg: theme.card,
+          };
+
+          // Special case: "In Bloom" for delivered bloom route
+          const displayLabel = intent.status === 'delivered' && intent.route === 'bloom'
+            ? 'In Bloom'
+            : statusConfig.label;
+
+          unifiedOrders.push({
+            type: 'intent',
+            id: intent.id,
+            name: intent.shoe_name || 'Unknown',
+            size: intent.size,
+            image_url: intent.image_url,
+            amount: intent.actual_total || intent.quoted_total || intent.max_total,
+            route: intent.route,
+            status: intent.status,
+            status_label: displayLabel,
+            status_color: statusConfig.color,
+            status_bg: statusConfig.bg,
+            tracking_number: intent.tracking_number,
+            tracking_carrier: intent.tracking_carrier,
+            created_at: intent.created_at,
+          });
+        }
       }
+
+      // Process existing orders
+      if (!ordersResult.error && ordersResult.data) {
+        for (const order of ordersResult.data as Order[]) {
+          const statusConfig = ORDER_STATUS_CONFIG[order.status] || {
+            label: order.status,
+            color: theme.textSecondary,
+            bg: theme.card,
+          };
+
+          unifiedOrders.push({
+            type: 'order',
+            id: order.order_id,
+            name: order.product_name || 'Unknown',
+            size: order.size,
+            image_url: order.product_image_url,
+            amount: order.amount_cents / 100,
+            route: order.lane === 'a' ? 'home' : 'bloom',
+            status: order.status,
+            status_label: statusConfig.label,
+            status_color: statusConfig.color,
+            status_bg: statusConfig.bg,
+            tracking_number: order.tracking_number,
+            tracking_carrier: order.tracking_carrier,
+            created_at: order.created_at,
+          });
+        }
+      }
+
+      // Sort by created_at descending
+      unifiedOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setOrders(unifiedOrders);
     } catch (e) {
       console.error('Error fetching orders:', e);
     } finally {
@@ -85,12 +209,12 @@ export default function OrdersScreen() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const formatPrice = (cents: number) => {
+  const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
-    }).format(cents / 100);
+    }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
@@ -121,21 +245,26 @@ export default function OrdersScreen() {
     Linking.openURL(url);
   };
 
-  const renderOrderCard = ({ item }: { item: Order }) => {
-    const statusConfig = STATUS_CONFIG[item.status] || { label: item.status, color: theme.textSecondary, bg: theme.card };
-    const showImage = item.product_image_url && !failedImages.has(item.order_id);
+  const renderOrderCard = ({ item }: { item: UnifiedOrder }) => {
+    const showImage = item.image_url && !failedImages.has(item.id);
+    const routeLabel = item.route === 'bloom' ? 'Bloom Custody' : 'Ship to me';
 
     return (
       <Pressable
         style={styles.orderCard}
-        onPress={() => router.push(`/orders/${item.order_id}`)}
+        onPress={() => {
+          if (item.type === 'order') {
+            router.push(`/orders/${item.id}`);
+          }
+          // For intents, we could add a detail view later
+        }}
       >
         {/* Header Row */}
         <View style={styles.orderHeader}>
           <Text style={styles.orderDate}>{formatDate(item.created_at)}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
-            <Text style={[styles.statusText, { color: statusConfig.color }]}>
-              {statusConfig.label}
+          <View style={[styles.statusBadge, { backgroundColor: item.status_bg }]}>
+            <Text style={[styles.statusText, { color: item.status_color }]}>
+              {item.status_label}
             </Text>
           </View>
         </View>
@@ -144,26 +273,33 @@ export default function OrdersScreen() {
         <View style={styles.productRow}>
           {showImage ? (
             <Image
-              source={{ uri: item.product_image_url! }}
+              source={{ uri: item.image_url! }}
               style={styles.productImage}
               resizeMode="contain"
-              onError={() => handleImageError(item.order_id)}
+              onError={() => handleImageError(item.id)}
             />
           ) : (
             <View style={[styles.productImage, styles.placeholderImage]}>
-              <Text style={styles.placeholderText}>{item.product_name?.charAt(0) || '?'}</Text>
+              <Text style={styles.placeholderText}>{item.name?.charAt(0) || '?'}</Text>
             </View>
           )}
 
           <View style={styles.productInfo}>
-            <Text style={styles.productName} numberOfLines={2}>{item.product_name}</Text>
+            <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
             <Text style={styles.productSize}>Size {item.size}</Text>
-            <View style={styles.laneBadge}>
-              <Text style={styles.laneBadgeText}>Bloom Custody</Text>
+            <View style={[styles.laneBadge, item.route === 'bloom' && styles.laneBadgeBloom]}>
+              <Text style={[styles.laneBadgeText, item.route === 'bloom' && styles.laneBadgeTextBloom]}>
+                {routeLabel}
+              </Text>
             </View>
           </View>
 
-          <Text style={styles.orderPrice}>{formatPrice(item.amount_cents)}</Text>
+          <View style={styles.priceColumn}>
+            <Text style={styles.orderPrice}>{formatPrice(item.amount)}</Text>
+            {item.type === 'intent' && item.status === 'pending' && (
+              <Text style={styles.priceHint}>Est.</Text>
+            )}
+          </View>
         </View>
 
         {/* Tracking Info */}
@@ -187,8 +323,8 @@ export default function OrdersScreen() {
       <Text style={styles.emptySubtitle}>
         Your purchase history will appear here
       </Text>
-      <Pressable style={styles.emptyButton} onPress={() => router.push('/(tabs)/exchange')}>
-        <Text style={styles.emptyButtonText}>Browse assets</Text>
+      <Pressable style={styles.emptyButton} onPress={() => router.push('/buy')}>
+        <Text style={styles.emptyButtonText}>Browse to buy</Text>
       </Pressable>
     </View>
   );
@@ -206,7 +342,8 @@ export default function OrdersScreen() {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <ActivityIndicator size="large" color={theme.accent} />
+          <Text style={styles.loadingText}>Loading orders...</Text>
         </View>
       ) : orders.length === 0 ? (
         renderEmptyState()
@@ -214,7 +351,7 @@ export default function OrdersScreen() {
         <FlatList
           data={orders}
           renderItem={renderOrderCard}
-          keyExtractor={(item) => item.order_id}
+          keyExtractor={(item) => `${item.type}-${item.id}`}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -337,14 +474,29 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     alignSelf: 'flex-start',
   },
+  laneBadgeBloom: {
+    backgroundColor: theme.accentLight || 'rgba(245, 196, 154, 0.15)',
+  },
   laneBadgeText: {
     fontSize: 11,
     color: theme.textSecondary,
+  },
+  laneBadgeTextBloom: {
+    color: theme.accent,
+    fontWeight: '600',
+  },
+  priceColumn: {
+    alignItems: 'flex-end',
   },
   orderPrice: {
     fontFamily: fonts.heading,
     fontSize: 16,
     color: theme.textPrimary,
+  },
+  priceHint: {
+    fontSize: 10,
+    color: theme.textSecondary,
+    marginTop: 2,
   },
   trackingRow: {
     flexDirection: 'row',
@@ -374,6 +526,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 12,
   },
   loadingText: {
     fontSize: 16,

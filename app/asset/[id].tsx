@@ -1015,7 +1015,7 @@ export default function AssetDetailScreen() {
                 </Pressable>
               ))
             ) : (
-              <Text style={styles.sectionBody}>No marketplace pricing yet.</Text>
+              <Text style={styles.sectionBody}>Updating prices...</Text>
             )}
 
             <Pressable style={styles.modalCancel} onPress={() => setShowHomeBuyOptions(false)}>

@@ -1166,7 +1166,7 @@ export default function TokenDetailScreen() {
                   );
                 })
               ) : (
-                <Text style={styles.sectionBody}>No marketplace pricing yet.</Text>
+                <Text style={styles.sectionBody}>Updating prices...</Text>
               )
             )}
 
@@ -1264,7 +1264,7 @@ export default function TokenDetailScreen() {
                 </Pressable>
               ))
             ) : (
-              <Text style={styles.sectionBody}>No marketplace pricing yet.</Text>
+              <Text style={styles.sectionBody}>Updating prices...</Text>
             )}
 
             <Pressable style={styles.modalCancel} onPress={() => setShowMarketSheet(false)}>
