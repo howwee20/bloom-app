@@ -840,22 +840,22 @@ export default function HomeScreen() {
   const ownedAssetsOnly = ownedAssets.filter(a => (a.location || 'home') !== 'watchlist');
   const watchlistAssets = ownedAssets.filter(a => a.location === 'watchlist');
 
-  const portfolioValue = tokens.reduce((sum, t) => sum + (t.current_value ?? 0), 0)
-    + ownedAssetsOnly.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
+  const bloomTokens = tokens.filter(t =>
+    t.custody_type === 'bloom' && (t.status === 'in_custody' || t.status === 'listed')
+  );
 
-  const portfolioPnl = tokens.reduce((sum, t) => {
+  const portfolioValue = bloomTokens.reduce((sum, t) => sum + (t.current_value ?? 0), 0);
+
+  const portfolioPnl = bloomTokens.reduce((sum, t) => {
     if (t.current_value === null || t.purchase_price === null || t.purchase_price <= 0) return sum;
     return sum + (t.current_value - t.purchase_price);
-  }, 0) + ownedAssetsOnly.reduce((sum, a) => {
-    if (a.current_price === null || a.entry_price === null || a.entry_price <= 0) return sum;
-    return sum + (a.current_price - a.entry_price);
   }, 0);
 
   const watchlistValue = watchlistAssets.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
 
   const displayedTotalValue = custodyFilter === 'watchlist' ? watchlistValue : portfolioValue;
   const displayedTotalPnl = custodyFilter === 'watchlist' ? null : portfolioPnl;
-  const hasItems = tokens.length > 0 || ownedAssets.length > 0;
+  const hasItems = displayedTotalValue > 0;
 
   const totalPnlColor = !displayedTotalPnl || displayedTotalPnl === 0
     ? theme.textSecondary
