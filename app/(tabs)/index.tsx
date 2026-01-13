@@ -1411,7 +1411,7 @@ export default function HomeScreen() {
             Sell
           </Text>
         </Pressable>
-        <Pressable style={[styles.bottomButton, styles.bottomButtonIcon]} onPress={() => router.push('/add-item')}>
+        <Pressable style={styles.bottomButtonIcon} onPress={() => router.push('/add-item')}>
           <Text style={styles.bottomButtonIconText}>+</Text>
         </Pressable>
       </View>
