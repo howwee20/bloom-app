@@ -7,6 +7,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -85,20 +86,180 @@ export default function BuyDetailScreen() {
     setQuoteLoading(false);
   }, [style_code]);
 
+  // Fetch saved address on mount
+  const fetchSavedAddress = useCallback(async () => {
+    if (!session) return;
+    try {
+      const { data, error } = await supabase.rpc('get_saved_shipping_address');
+      if (!error && data && data.length > 0) {
+        const saved = data[0];
+        if (saved.line1) {
+          setAddress({
+            name: saved.name || '',
+            line1: saved.line1 || '',
+            line2: saved.line2 || '',
+            city: saved.city || '',
+            state: saved.state || '',
+            zip: saved.zip || '',
+            country: saved.country || 'US',
+            phone: saved.phone || '',
+          });
+        }
+      }
+    } catch (e) {
+      console.log('No saved address:', e);
+    }
+  }, [session]);
+
   useEffect(() => {
     fetchQuote();
-  }, [fetchQuote]);
+    fetchSavedAddress();
+  }, [fetchQuote, fetchSavedAddress]);
 
   // Computed values
   const maxTotal = quote?.total ? calculateMaxTotal(quote.total) : 0;
   const canSubmit = selectedSize && selectedRoute && quote?.available && !submitting &&
     (selectedRoute === 'bloom' || (address.name && address.line1 && address.city && address.state && address.zip));
 
-  // Submit order intent
+  // Submit order with Stripe payment
   const handleSubmit = async () => {
     if (!canSubmit || !session || !quote) return;
 
     setSubmitting(true);
+    try {
+      // 1. Find the asset_id that has the price for this style code
+      const { data: assetData, error: assetError } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('stockx_sku', style_code)
+        .not('price', 'is', null)
+        .order('last_price_checked_at', { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (assetError || !assetData?.id) {
+        // No existing asset - create order_intent for manual processing
+        console.log('No asset found, creating order intent for manual processing');
+        await createOrderIntent();
+        return;
+      }
+
+      // 2. Call create-checkout to get Stripe session
+      const checkoutResponse = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            asset_id: assetData.id,
+            size: selectedSize,
+            lane: selectedRoute === 'home' ? 'a' : 'b',
+            marketplace: quote.marketplace || 'stockx',
+            shipping_name: selectedRoute === 'home' ? address.name.trim() : null,
+            shipping_address_line1: selectedRoute === 'home' ? address.line1.trim() : null,
+            shipping_address_line2: selectedRoute === 'home' && address.line2.trim() ? address.line2.trim() : null,
+            shipping_city: selectedRoute === 'home' ? address.city.trim() : null,
+            shipping_state: selectedRoute === 'home' ? address.state.trim().toUpperCase() : null,
+            shipping_zip: selectedRoute === 'home' ? address.zip.trim() : null,
+            shipping_country: 'US',
+            success_url: 'https://bloom-app-alpha.vercel.app/checkout/success',
+            cancel_url: 'https://bloom-app-alpha.vercel.app/buy',
+          }),
+        }
+      );
+
+      const checkoutResult = await checkoutResponse.json();
+
+      if (!checkoutResponse.ok) {
+        // If checkout fails due to staleness, fall back to order intent
+        if (checkoutResult.stale) {
+          console.log('Price stale, creating order intent');
+          await createOrderIntent();
+          return;
+        }
+        throw new Error(checkoutResult.error || 'Failed to create checkout');
+      }
+
+      // 3. Open Stripe checkout URL
+      if (checkoutResult.url) {
+        // Store the order_id for tracking
+        setCreatedOrderId(checkoutResult.order_id);
+
+        // Send Slack notification
+        try {
+          await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/notify-order-intent`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              order_id: checkoutResult.order_id,
+              shoe_name: name,
+              style_code: style_code,
+              size: selectedSize,
+              route: selectedRoute,
+              quoted_total: quote.total,
+              max_total: maxTotal,
+              email: session.user.email,
+            }),
+          });
+        } catch (slackErr) {
+          console.log('Slack notification skipped:', slackErr);
+        }
+
+        // Save address for next time (if ship to home)
+        if (selectedRoute === 'home' && address.line1) {
+          try {
+            await supabase.rpc('save_shipping_address', {
+              p_name: address.name.trim(),
+              p_line1: address.line1.trim(),
+              p_line2: address.line2.trim() || null,
+              p_city: address.city.trim(),
+              p_state: address.state.trim().toUpperCase(),
+              p_zip: address.zip.trim(),
+              p_country: 'US',
+              p_phone: address.phone.trim() || null,
+            });
+          } catch (e) {
+            console.log('Could not save address:', e);
+          }
+        }
+
+        // Open Stripe checkout
+        await Linking.openURL(checkoutResult.url);
+
+        // Show payment instructions
+        Alert.alert(
+          'Complete Payment',
+          'Complete your payment in the browser to finish your order.',
+          [
+            {
+              text: 'View Orders',
+              onPress: () => router.replace('/orders'),
+            },
+            {
+              text: 'OK',
+              onPress: () => router.replace('/(tabs)'),
+            },
+          ]
+        );
+      }
+    } catch (e: any) {
+      console.error('Checkout error:', e);
+      Alert.alert('Error', e.message || 'Failed to start checkout. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Fallback: Create order intent for manual processing (no Stripe)
+  const createOrderIntent = async () => {
+    if (!session || !quote || !selectedSize || !selectedRoute) return;
+
     try {
       const orderData = {
         user_id: session.user.id,
@@ -140,7 +301,7 @@ export default function BuyDetailScreen() {
       setCreatedOrderId(data.id);
       setShowSuccess(true);
 
-      // Try to send Slack notification (fire and forget)
+      // Send Slack notification
       try {
         await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/notify-order-intent`, {
           method: 'POST',
@@ -160,14 +321,11 @@ export default function BuyDetailScreen() {
           }),
         });
       } catch (slackErr) {
-        // Ignore Slack errors - order was created successfully
         console.log('Slack notification skipped:', slackErr);
       }
     } catch (e: any) {
       console.error('Order intent error:', e);
       Alert.alert('Error', e.message || 'Failed to submit order. Please try again.');
-    } finally {
-      setSubmitting(false);
     }
   };
 
