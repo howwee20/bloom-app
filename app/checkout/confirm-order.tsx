@@ -7,12 +7,21 @@ import {
   Linking,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useAuth } from '../_layout';
 import { theme, fonts } from '../../constants/Colors';
+
+const MARKETPLACE_LABELS: Record<string, string> = {
+  stockx: 'StockX',
+  goat: 'GOAT',
+  ebay: 'eBay',
+  bloom: 'Bloom',
+};
 
 export default function ConfirmOrderScreen() {
   const { session } = useAuth();
@@ -22,11 +31,21 @@ export default function ConfirmOrderScreen() {
     asset_image: string;
     size: string;
     price: string;
-    custody_status: string;
+    lane?: string;
+    marketplace?: string;
   }>();
 
   const [processing, setProcessing] = useState(false);
-  const isInstant = params.custody_status === 'in_vault';
+  const normalizedLane = params.lane === 'a' ? 'a' : 'b';
+  const isShipToMe = normalizedLane === 'a';
+  const normalizedMarketplace = (params.marketplace || 'stockx').toLowerCase();
+  const marketplaceLabel = MARKETPLACE_LABELS[normalizedMarketplace] || normalizedMarketplace.toUpperCase();
+  const [shippingName, setShippingName] = useState('');
+  const [shippingLine1, setShippingLine1] = useState('');
+  const [shippingLine2, setShippingLine2] = useState('');
+  const [shippingCity, setShippingCity] = useState('');
+  const [shippingState, setShippingState] = useState('');
+  const [shippingZip, setShippingZip] = useState('');
 
   const formatPrice = (price: string) => {
     return new Intl.NumberFormat('en-US', {
@@ -40,6 +59,17 @@ export default function ConfirmOrderScreen() {
     if (!session) {
       Alert.alert('Error', 'You must be logged in to purchase.');
       return;
+    }
+    if (!params.asset_id) {
+      Alert.alert('Error', 'This item is not ready for checkout yet.');
+      return;
+    }
+
+    if (isShipToMe) {
+      if (!shippingName.trim() || !shippingLine1.trim() || !shippingCity.trim() || !shippingState.trim() || !shippingZip.trim()) {
+        Alert.alert('Missing address', 'Enter your shipping details to continue.');
+        return;
+      }
     }
 
     try {
@@ -56,6 +86,15 @@ export default function ConfirmOrderScreen() {
           body: JSON.stringify({
             asset_id: params.asset_id,
             size: params.size,
+            lane: normalizedLane,
+            marketplace: normalizedMarketplace,
+            shipping_name: isShipToMe ? shippingName.trim() : null,
+            shipping_address_line1: isShipToMe ? shippingLine1.trim() : null,
+            shipping_address_line2: isShipToMe && shippingLine2.trim() ? shippingLine2.trim() : null,
+            shipping_city: isShipToMe ? shippingCity.trim() : null,
+            shipping_state: isShipToMe ? shippingState.trim() : null,
+            shipping_zip: isShipToMe ? shippingZip.trim() : null,
+            shipping_country: isShipToMe ? 'US' : null,
             success_url: 'https://bloom.app/checkout/success',
             cancel_url: 'https://bloom.app/checkout/cancel',
           }),
@@ -96,7 +135,7 @@ export default function ConfirmOrderScreen() {
       </View>
 
       {/* Content */}
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Product Image */}
         <View style={styles.imageContainer}>
           {params.asset_image ? (
@@ -115,23 +154,77 @@ export default function ConfirmOrderScreen() {
         {/* Product Info */}
         <Text style={styles.productName}>{params.asset_name}</Text>
         <Text style={styles.productSize}>Size {params.size}</Text>
+        <Text style={styles.marketplaceInfo}>Executed on {marketplaceLabel}</Text>
 
         {/* Price - Hero */}
         <Text style={styles.price}>{formatPrice(params.price)}</Text>
 
         {/* Delivery Info */}
         <Text style={styles.deliveryInfo}>
-          {isInstant ? 'Instant transfer in Bloom custody' : 'Ships to Bloom in 5-7 days'}
+          {isShipToMe ? 'Ships to you in 5-7 days' : 'Ships to Bloom in 5-7 days'}
         </Text>
 
         {/* Options */}
-        <Text style={styles.options}>Hold · Transfer · Ship anytime</Text>
+        <Text style={styles.options}>Bloom handles purchase + tracking</Text>
+
+        {isShipToMe && (
+          <View style={styles.shippingSection}>
+            <Text style={styles.shippingTitle}>Shipping address</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Full name"
+              placeholderTextColor={theme.textTertiary}
+              value={shippingName}
+              onChangeText={setShippingName}
+              autoCapitalize="words"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Address line 1"
+              placeholderTextColor={theme.textTertiary}
+              value={shippingLine1}
+              onChangeText={setShippingLine1}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Address line 2 (optional)"
+              placeholderTextColor={theme.textTertiary}
+              value={shippingLine2}
+              onChangeText={setShippingLine2}
+            />
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.input, styles.inputHalf]}
+                placeholder="City"
+                placeholderTextColor={theme.textTertiary}
+                value={shippingCity}
+                onChangeText={setShippingCity}
+              />
+              <TextInput
+                style={[styles.input, styles.inputQuarter]}
+                placeholder="State"
+                placeholderTextColor={theme.textTertiary}
+                value={shippingState}
+                onChangeText={setShippingState}
+                autoCapitalize="characters"
+              />
+              <TextInput
+                style={[styles.input, styles.inputQuarter]}
+                placeholder="ZIP"
+                placeholderTextColor={theme.textTertiary}
+                value={shippingZip}
+                onChangeText={setShippingZip}
+                keyboardType="number-pad"
+              />
+            </View>
+          </View>
+        )}
 
         {/* Terms */}
         <Text style={styles.terms}>
           By purchasing, you agree to Bloom's Terms.
         </Text>
-      </View>
+      </ScrollView>
 
       {/* Pay Button */}
       <View style={styles.actionContainer}>
@@ -182,10 +275,10 @@ const styles = StyleSheet.create({
     width: 40,
   },
   content: {
-    flex: 1,
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 32,
+    paddingBottom: 32,
   },
   imageContainer: {
     backgroundColor: '#FFF',
@@ -220,6 +313,11 @@ const styles = StyleSheet.create({
     color: theme.textSecondary,
     marginBottom: 24,
   },
+  marketplaceInfo: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    marginBottom: 12,
+  },
   price: {
     fontFamily: fonts.heading,
     fontSize: 44,
@@ -236,6 +334,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.textSecondary,
     marginBottom: 32,
+  },
+  shippingSection: {
+    width: '100%',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  shippingTitle: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  input: {
+    width: '100%',
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: theme.textPrimary,
+    marginBottom: 8,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  inputHalf: {
+    flex: 1.2,
+  },
+  inputQuarter: {
+    flex: 0.6,
   },
   terms: {
     fontSize: 12,

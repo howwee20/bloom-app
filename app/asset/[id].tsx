@@ -5,7 +5,6 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-  Linking,
   Modal,
   Pressable,
   SafeAreaView,
@@ -39,6 +38,11 @@ const PRICE_RANGES: RangeOption[] = [
 ];
 
 const LAST_SIZE_KEY = 'last_market_size';
+const MARKETPLACE_LABELS: Record<string, string> = {
+  stockx: 'StockX',
+  goat: 'GOAT',
+  ebay: 'eBay',
+};
 
 interface Asset {
   id: string;
@@ -97,6 +101,7 @@ export default function AssetDetailScreen() {
   const [sellTriggered, setSellTriggered] = useState(false);
   const [showBuyIntent, setShowBuyIntent] = useState(false);
   const [showHomeBuyOptions, setShowHomeBuyOptions] = useState(false);
+  const [marketplaceLane, setMarketplaceLane] = useState<'a' | 'b'>('b');
   const [matchingListing, setMatchingListing] = useState<ExchangeListing | null>(null);
   const [matchingListingLoading, setMatchingListingLoading] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
@@ -341,12 +346,20 @@ export default function AssetDetailScreen() {
         : 'AT HOME'
       : null;
 
-  const bestPriceLabel = priceSource
-    ? `Best price: ${formatPrice(asset?.price)} on ${priceSource}`
+  const normalizedPriceSource = priceSource?.toLowerCase() || null;
+  const sourceLabel = normalizedPriceSource
+    ? (MARKETPLACE_LABELS[normalizedPriceSource] || normalizedPriceSource)
+    : null;
+  const bestPriceLabel = sourceLabel
+    ? `Best price: ${formatPrice(asset?.price)} on ${sourceLabel}`
     : null;
 
-  const marketplaceRows = priceSource
-    ? [{ name: priceSource, price: asset?.price }]
+  const marketplaceRows = normalizedPriceSource && asset?.price
+    ? [{
+        id: normalizedPriceSource,
+        name: MARKETPLACE_LABELS[normalizedPriceSource] || normalizedPriceSource.toUpperCase(),
+        price: asset.price,
+      }]
     : [];
 
   const statsItems = [
@@ -361,28 +374,28 @@ export default function AssetDetailScreen() {
     },
   ];
 
-  const buildSearchQuery = () => {
-    if (!asset) return '';
-    const size = hasFixedSize ? asset.size : selectedSize;
-    if (asset.stockx_sku) {
-      return size ? `${asset.stockx_sku} ${size}` : asset.stockx_sku;
-    }
-    if (size) return `${asset.name} ${size}`;
-    return asset.name;
-  };
+  const handleMarketplaceCheckout = (marketplaceId: string) => {
+    if (!asset || !session) return;
 
-  const buildMarketplaceUrl = (marketplace: string) => {
-    const query = encodeURIComponent(buildSearchQuery());
-    switch (marketplace) {
-      case 'stockx':
-        return `https://stockx.com/search?s=${query}`;
-      case 'goat':
-        return `https://www.goat.com/search?query=${query}`;
-      case 'ebay':
-        return `https://www.ebay.com/sch/i.html?_nkw=${query}`;
-      default:
-        return `https://www.google.com/search?q=${query}`;
+    if (!hasFixedSize && !selectedSize) {
+      Alert.alert('Select Size', 'Please select a size before purchasing.');
+      return;
     }
+
+    const size = hasFixedSize ? asset.size! : selectedSize!;
+
+    router.push({
+      pathname: '/checkout/confirm-order',
+      params: {
+        asset_id: asset.id,
+        asset_name: asset.name,
+        asset_image: asset.image_url || '',
+        size,
+        price: asset.price.toString(),
+        lane: marketplaceLane,
+        marketplace: marketplaceId,
+      },
+    });
   };
 
   useEffect(() => {
@@ -436,7 +449,7 @@ export default function AssetDetailScreen() {
     loadMatchingListing();
   }, [showBuyIntent, session, asset?.stockx_sku, selectedSize, hasFixedSize]);
 
-  const handlePurchase = () => {
+  const handlePurchase = (options?: { marketplace?: string; lane?: 'a' | 'b' }) => {
     if (!asset || !session) return;
 
     if (!hasFixedSize && !selectedSize) {
@@ -446,7 +459,10 @@ export default function AssetDetailScreen() {
 
     const size = hasFixedSize ? asset.size! : selectedSize!;
 
-    // Navigate directly to confirm-order (ownership-first model)
+    const marketplaceId = options?.marketplace || normalizedPriceSource || 'stockx';
+    const laneValue = options?.lane || 'b';
+
+    // Navigate directly to confirm-order
     router.push({
       pathname: '/checkout/confirm-order',
       params: {
@@ -455,7 +471,8 @@ export default function AssetDetailScreen() {
         asset_image: asset.image_url || '',
         size: size,
         price: asset.price.toString(),
-        custody_status: asset.custody_status || 'available_to_acquire',
+        lane: laneValue,
+        marketplace: marketplaceId,
       },
     });
   };
@@ -544,14 +561,17 @@ export default function AssetDetailScreen() {
       const { error } = await supabase
         .from('assets')
         .update({ purchase_price: costBasis })
-        .eq('id', asset.id);
+        .eq('id', asset.id)
+        .eq('owner_id', session.user.id);
 
       if (error) throw error;
-      setShowCostBasisModal(false);
+
       // Update local state
       setAsset({ ...asset, purchase_price: costBasis });
-      Alert.alert('Cost basis updated', 'Your P&L will now reflect this purchase price.');
+      setShowCostBasisModal(false);
+      Alert.alert('Saved', 'Cost basis updated successfully.');
     } catch (e: any) {
+      console.error('Cost basis update error:', e);
       Alert.alert('Failed to update', e.message || 'Please try again.');
     }
   };
@@ -726,7 +746,7 @@ export default function AssetDetailScreen() {
           )}
           {marketplaceRows.length > 0 ? (
             marketplaceRows.map((row) => (
-              <View key={row.name} style={styles.marketRow}>
+              <View key={row.id} style={styles.marketRow}>
                 <Text style={styles.marketName}>{row.name}</Text>
                 <Text style={styles.marketPrice}>{formatPrice(row.price)}</Text>
               </View>
@@ -825,7 +845,7 @@ export default function AssetDetailScreen() {
             </Text>
           </Pressable>
           {isStale && (
-            <Text style={styles.staleNote}>Bloom price updating · Route Home still available</Text>
+            <Text style={styles.staleNote}>Bloom price updating · Ship to me still available</Text>
           )}
         </View>
       )}
@@ -834,11 +854,14 @@ export default function AssetDetailScreen() {
         <View style={styles.actionContainer}>
           <Pressable
             style={[styles.actionButton, !canBuy && styles.actionButtonDisabled]}
-            onPress={() => setShowHomeBuyOptions(true)}
+            onPress={() => {
+              setMarketplaceLane('a');
+              setShowHomeBuyOptions(true);
+            }}
             disabled={!canBuy}
           >
             <Text style={[styles.actionButtonText, !canBuy && styles.actionButtonTextDisabled]}>
-              {!canBuy ? 'Select Size' : 'View marketplaces'}
+              {!canBuy ? 'Select Size' : 'Choose marketplace'}
             </Text>
           </Pressable>
           <Text style={styles.unavailableNote}>No Bloom inventory yet</Text>
@@ -867,19 +890,20 @@ export default function AssetDetailScreen() {
 
             {isStale && (
               <View style={styles.intentNotice}>
-                <Text style={styles.intentNoticeText}>Bloom pricing is updating. Route Home is still available.</Text>
+                <Text style={styles.intentNoticeText}>Bloom pricing is updating. Ship to me is still available.</Text>
               </View>
             )}
 
             <Pressable
               style={styles.intentOption}
               onPress={() => {
+                setMarketplaceLane('a');
                 setShowBuyIntent(false);
                 setShowHomeBuyOptions(true);
               }}
             >
-              <Text style={styles.intentOptionTitle}>Route Home</Text>
-              <Text style={styles.intentOptionDesc}>Best all-in price across marketplaces</Text>
+              <Text style={styles.intentOptionTitle}>Ship to me</Text>
+              <Text style={styles.intentOptionDesc}>Bloom executes the best marketplace</Text>
             </Pressable>
 
             <Pressable
@@ -897,8 +921,9 @@ export default function AssetDetailScreen() {
                   Alert.alert('Price Updating', 'Bloom pricing is updating. Try again shortly.');
                   return;
                 }
+                setMarketplaceLane('b');
                 setShowBuyIntent(false);
-                handlePurchase();
+                setShowHomeBuyOptions(true);
               }}
             >
               <Text style={styles.intentOptionTitle}>Ship to Bloom</Text>
@@ -922,7 +947,7 @@ export default function AssetDetailScreen() {
                 }
                 if (asset?.custody_status === 'in_vault') {
                   setShowBuyIntent(false);
-                  handlePurchase();
+                  handlePurchase({ marketplace: 'bloom', lane: 'b' });
                   return;
                 }
                 if (matchingListing) {
@@ -953,7 +978,7 @@ export default function AssetDetailScreen() {
         </Pressable>
       </Modal>
 
-      {/* Route Home Modal */}
+      {/* Marketplace Selection Modal */}
       <Modal
         visible={showHomeBuyOptions}
         transparent
@@ -962,29 +987,36 @@ export default function AssetDetailScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowHomeBuyOptions(false)}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Route Home</Text>
-            <Text style={styles.intentSubtitle}>We send you to the best marketplace</Text>
+            <Text style={styles.modalTitle}>Choose Marketplace</Text>
+            <Text style={styles.intentSubtitle}>Bloom executes this purchase for you</Text>
 
             <View style={styles.intentCard}>
               <Text style={styles.intentOptionTitle}>Your selection</Text>
               <Text style={styles.intentOptionDesc}>
                 {asset.name} · {hasFixedSize ? asset.size : selectedSize || 'Size —'}
               </Text>
+              <Text style={styles.intentOptionDesc}>
+                {marketplaceLane === 'a' ? 'Ship to me' : 'Ship to Bloom'}
+              </Text>
             </View>
 
-            {['stockx', 'goat', 'ebay'].map((marketplace) => (
-              <Pressable
-                key={marketplace}
-                style={styles.routeOption}
-                onPress={() => {
-                  Linking.openURL(buildMarketplaceUrl(marketplace));
-                  setShowHomeBuyOptions(false);
-                }}
-              >
-                <Text style={styles.routeOptionTitle}>{marketplace.toUpperCase()}</Text>
-                <Text style={styles.routeOptionDesc}>Open search and checkout</Text>
-              </Pressable>
-            ))}
+            {marketplaceRows.length > 0 ? (
+              marketplaceRows.map((marketplace) => (
+                <Pressable
+                  key={marketplace.id}
+                  style={styles.routeOption}
+                  onPress={() => {
+                    setShowHomeBuyOptions(false);
+                    handleMarketplaceCheckout(marketplace.id);
+                  }}
+                >
+                  <Text style={styles.routeOptionTitle}>{marketplace.name}</Text>
+                  <Text style={styles.routeOptionDesc}>Buy at {formatPrice(marketplace.price)}</Text>
+                </Pressable>
+              ))
+            ) : (
+              <Text style={styles.sectionBody}>No marketplace pricing yet.</Text>
+            )}
 
             <Pressable style={styles.modalCancel} onPress={() => setShowHomeBuyOptions(false)}>
               <Text style={styles.modalCancelText}>Close</Text>

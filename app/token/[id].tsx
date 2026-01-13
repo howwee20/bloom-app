@@ -5,7 +5,6 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -103,6 +102,16 @@ interface TokenAttributes {
   brand?: string | null;
 }
 
+interface MarketplaceSellRequest {
+  id: string;
+  marketplace: string;
+  status: string;
+  requested_price: number | null;
+  payout_estimate: number | null;
+  size: string | null;
+  created_at: string;
+}
+
 const PRICE_RANGES: RangeOption[] = [
   { label: '7D', days: 7 },
   { label: '30D', days: 30 },
@@ -112,6 +121,17 @@ const PRICE_RANGES: RangeOption[] = [
 
 const SIZE_OPTIONS = ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13'];
 const LAST_SIZE_KEY = 'last_market_size';
+const MARKETPLACE_LABELS: Record<string, string> = {
+  stockx: 'StockX',
+  goat: 'GOAT',
+  ebay: 'eBay',
+  bloom: 'Bloom',
+};
+const MARKETPLACE_FEES: Record<string, { feeRate: number; shipping: number }> = {
+  stockx: { feeRate: 0.12, shipping: 14 },
+  goat: { feeRate: 0.12, shipping: 14 },
+  ebay: { feeRate: 0.1, shipping: 10 },
+};
 
 export default function TokenDetailScreen() {
   const { id, sell } = useLocalSearchParams<{ id: string; sell?: string }>();
@@ -136,6 +156,9 @@ export default function TokenDetailScreen() {
   const [assetDetails, setAssetDetails] = useState<AssetDetails | null>(null);
   const [tokenAttributes, setTokenAttributes] = useState<TokenAttributes | null>(null);
   const [marketplaceSize, setMarketplaceSize] = useState('');
+  const [marketplaceLane, setMarketplaceLane] = useState<'a' | 'b'>('b');
+  const [sellRequest, setSellRequest] = useState<MarketplaceSellRequest | null>(null);
+  const [sellRequestLoading, setSellRequestLoading] = useState(false);
 
   const handleMarketplaceSizeSelect = async (size: string) => {
     setMarketplaceSize(size);
@@ -162,6 +185,27 @@ export default function TokenDetailScreen() {
       setLoading(false);
     }
   }, [id, session]);
+
+  const fetchSellRequest = useCallback(async () => {
+    if (!token?.id || !session) return;
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_sell_requests')
+        .select('id, marketplace, status, requested_price, payout_estimate, size, created_at')
+        .eq('token_id', token.id)
+        .eq('user_id', session.user.id)
+        .in('status', ['requested', 'listed'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error) {
+        setSellRequest((data as MarketplaceSellRequest) || null);
+      }
+    } catch (e) {
+      console.error('Error fetching sell request:', e);
+    }
+  }, [token?.id, session]);
 
   const fetchAssetDetails = useCallback(async (assetId: string) => {
     const { data, error } = await supabase
@@ -267,6 +311,14 @@ export default function TokenDetailScreen() {
   }, [token?.id, fetchTokenAttributes]);
 
   useEffect(() => {
+    if (token?.id) {
+      fetchSellRequest();
+    } else {
+      setSellRequest(null);
+    }
+  }, [token?.id, fetchSellRequest]);
+
+  useEffect(() => {
     if (token?.size) {
       setMarketplaceSize(token.size);
       return;
@@ -302,19 +354,6 @@ export default function TokenDetailScreen() {
     const percentLabel =
       percent === null ? '--' : `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
     return `${sign}${formatMoneyValue(delta)} (${percentLabel})`;
-  };
-
-  // Build sell URL for marketplace
-  const buildMarketplaceUrl = (marketplace: string) => {
-    const size = token?.size || marketplaceSize;
-    const searchQuery = token ? `${token.product_name} ${size || ''}`.trim() : '';
-    const query = encodeURIComponent(searchQuery);
-    switch (marketplace) {
-      case 'stockx': return `https://stockx.com/search?s=${query}`;
-      case 'goat': return `https://www.goat.com/search?query=${query}`;
-      case 'ebay': return `https://www.ebay.com/sch/i.html?_nkw=${query}`;
-      default: return `https://www.google.com/search?q=${query}`;
-    }
   };
 
   const formatTimeAgo = (dateString?: string | null) => {
@@ -374,9 +413,6 @@ export default function TokenDetailScreen() {
   }, [priceHistory]);
 
   const hasValue = token?.current_value !== null && token?.current_value !== undefined;
-  const cashOutEstimate = token && hasValue
-    ? Math.round(token.current_value * 0.88 * 100) / 100
-    : 0;
 
   const handleListForSale = () => {
     if (!token?.is_exchange_eligible) {
@@ -496,6 +532,10 @@ export default function TokenDetailScreen() {
 
   const handleSellEntry = () => {
     if (!token) return;
+    if (sellRequest) {
+      showAlert('Request pending', 'You already have an active sell request.');
+      return;
+    }
     if (token.match_status === 'pending' || !hasValue) {
       showAlert('Needs match', 'Match this item to enable pricing and selling.');
       return;
@@ -504,10 +544,7 @@ export default function TokenDetailScreen() {
       handleListForSale();
       return;
     }
-    showAlert(
-      'Coming Soon',
-      `Marketplace selling is coming soon. You’ll receive ~${formatPrice(cashOutEstimate)} after fees.`
-    );
+    setShowSellSheet(true);
   };
 
   const handleSendToBloom = () => {
@@ -515,6 +552,93 @@ export default function TokenDetailScreen() {
       'Send to Bloom',
       'To move this item into Bloom custody, ship it directly from the source to Bloom. We will add the official flow here.',
     );
+  };
+
+  const estimateMarketplacePayout = (marketplaceId: string, price: number | null) => {
+    if (!price || price <= 0) return null;
+    const fees = MARKETPLACE_FEES[marketplaceId];
+    if (!fees) return null;
+    const feeEstimate = price * fees.feeRate;
+    const net = Math.max(price - feeEstimate - fees.shipping, 0);
+    return Math.round(net * 100) / 100;
+  };
+
+  const handleMarketplaceBuy = (marketplaceId: string) => {
+    if (!token?.matched_asset_id) {
+      showAlert('Match required', 'Match this item to enable checkout.');
+      return;
+    }
+    if (!token.current_value) {
+      showAlert('Price updating', 'Live pricing is updating. Try again shortly.');
+      return;
+    }
+    const size = token.size || marketplaceSize;
+    if (!size) {
+      showAlert('Select size', 'Select a size to continue.');
+      return;
+    }
+
+    router.push({
+      pathname: '/checkout/confirm-order',
+      params: {
+        asset_id: token.matched_asset_id,
+        asset_name: token.product_name,
+        asset_image: token.product_image_url || '',
+        size,
+        price: token.current_value.toString(),
+        lane: marketplaceLane,
+        marketplace: marketplaceId,
+      },
+    });
+  };
+
+  const handleMarketplaceSellRequest = async (marketplaceId: string) => {
+    if (!token || !session) return;
+    if (sellRequestLoading) return;
+    if (sellRequest) {
+      showAlert('Request pending', 'You already have an active sell request.');
+      return;
+    }
+    const size = token.size || marketplaceSize;
+    if (!size) {
+      showAlert('Select size', 'Select a size to continue.');
+      return;
+    }
+    if (!token.current_value) {
+      showAlert('Price updating', 'Live pricing is updating. Try again shortly.');
+      return;
+    }
+
+    try {
+      setSellRequestLoading(true);
+      const payoutEstimate = estimateMarketplacePayout(marketplaceId, token.current_value);
+      const { data, error } = await supabase
+        .from('marketplace_sell_requests')
+        .insert({
+          token_id: token.id,
+          user_id: session.user.id,
+          marketplace: marketplaceId,
+          size,
+          requested_price: token.current_value,
+          payout_estimate: payoutEstimate,
+          status: 'requested',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setSellRequest((data as MarketplaceSellRequest) || null);
+      setShowSellSheet(false);
+      showAlert(
+        'Sell request sent',
+        'Bloom will list it for you and notify you when it sells. You will ship after it sells.'
+      );
+    } catch (e: any) {
+      showAlert('Request failed', e.message || 'Please try again.');
+    } finally {
+      setSellRequestLoading(false);
+    }
   };
 
   const handleSaveAlert = async () => {
@@ -562,9 +686,11 @@ export default function TokenDetailScreen() {
       const { error } = await supabase
         .from('tokens')
         .update({ purchase_price: costBasis })
-        .eq('id', token.id);
+        .eq('id', token.id)
+        .eq('owner_id', session.user.id);
 
       if (error) throw error;
+
       const updatedPnl =
         token.current_value && costBasis > 0
           ? token.current_value - costBasis
@@ -584,8 +710,9 @@ export default function TokenDetailScreen() {
           : prev
       );
       setShowCostBasisModal(false);
-      showAlert('Cost basis updated', 'Your P&L will now reflect this purchase price.');
+      showAlert('Saved', 'Cost basis updated successfully.');
     } catch (e: any) {
+      console.error('Cost basis update error:', e);
       showAlert('Failed to update', e.message || 'Please try again.');
     }
   };
@@ -698,12 +825,20 @@ export default function TokenDetailScreen() {
   const changeLabel = rangeChange
     ? formatChange(rangeChange.delta, rangeChange.percent)
     : null;
+  const normalizedPriceSource = assetDetails?.price_source?.toLowerCase() || null;
+  const sourceLabel = normalizedPriceSource
+    ? (MARKETPLACE_LABELS[normalizedPriceSource] || normalizedPriceSource)
+    : null;
   const bestPriceLabel =
-    assetDetails?.price_source && hasValue
-      ? `Best price: ${formatMoneyValue(token.current_value)} on ${assetDetails.price_source}`
+    sourceLabel && hasValue
+      ? `Best price: ${formatMoneyValue(token.current_value)} on ${sourceLabel}`
       : null;
-  const marketplaceRows = assetDetails?.price_source && hasValue
-    ? [{ name: assetDetails.price_source, price: token.current_value }]
+  const marketplaceRows = normalizedPriceSource && hasValue
+    ? [{
+        id: normalizedPriceSource,
+        name: MARKETPLACE_LABELS[normalizedPriceSource] || normalizedPriceSource.toUpperCase(),
+        price: token.current_value,
+      }]
     : [];
   const statsItems = [
     { label: 'Market Value', value: formatMoneyValue(token.current_value) },
@@ -724,6 +859,12 @@ export default function TokenDetailScreen() {
   ];
   const holdingDays = token.purchase_date
     ? Math.max(0, Math.floor((Date.now() - new Date(token.purchase_date).getTime()) / 86400000))
+    : null;
+  const sellRequestMarketplaceLabel = sellRequest?.marketplace
+    ? (MARKETPLACE_LABELS[sellRequest.marketplace] || sellRequest.marketplace.toUpperCase())
+    : null;
+  const sellRequestLabel = sellRequestMarketplaceLabel
+    ? `Sell request pending · ${sellRequestMarketplaceLabel}`
     : null;
 
   return (
@@ -801,7 +942,7 @@ export default function TokenDetailScreen() {
             ) : null}
           </View>
           <Text style={styles.priceSubLabel}>
-            Market price (best){assetDetails?.price_source ? ` · ${assetDetails.price_source}` : ''}
+            Market price (best){sourceLabel ? ` · ${sourceLabel}` : ''}
           </Text>
           {bestPriceLabel ? (
             <Text style={styles.bestPriceLabel}>{bestPriceLabel}</Text>
@@ -836,7 +977,7 @@ export default function TokenDetailScreen() {
           )}
           {marketplaceRows.length > 0 ? (
             marketplaceRows.map((row) => (
-              <View key={row.name} style={styles.marketRow}>
+              <View key={row.id} style={styles.marketRow}>
                 <Text style={styles.marketName}>{row.name}</Text>
                 <Text style={styles.marketPrice}>{formatMoneyValue(row.price)}</Text>
               </View>
@@ -883,11 +1024,22 @@ export default function TokenDetailScreen() {
             <Text style={styles.listedLabel}>Listed for {formatPrice(token.listing_price)}</Text>
           </View>
         )}
+        {sellRequestLabel && (
+          <View style={styles.listedInfo}>
+            <Text style={styles.listedLabel}>{sellRequestLabel}</Text>
+          </View>
+        )}
 
         {/* WATCHLIST: Buy + Set Price Alert */}
         {statusLabel === 'WATCHLIST' ? (
           <>
-            <Pressable style={styles.actionButton} onPress={() => setShowMarketSheet(true)}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => {
+                setMarketplaceLane('b');
+                setShowMarketSheet(true);
+              }}
+            >
               <Text style={styles.actionButtonText}>Buy</Text>
             </Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => setShowAlertModal(true)}>
@@ -897,8 +1049,14 @@ export default function TokenDetailScreen() {
         ) : (
           <>
             {/* OWNED: Sell + custody-specific action */}
-            <Pressable style={styles.actionButton} onPress={() => setShowSellSheet(true)}>
-              <Text style={styles.actionButtonText}>Sell</Text>
+            <Pressable
+              style={[styles.actionButton, sellRequest && styles.actionButtonDisabled]}
+              onPress={() => setShowSellSheet(true)}
+              disabled={!!sellRequest}
+            >
+              <Text style={[styles.actionButtonText, sellRequest && styles.actionButtonTextDisabled]}>
+                {sellRequest ? 'Sell requested' : 'Sell'}
+              </Text>
             </Pressable>
             {isHomeCustody && isInCustody && (
               <Pressable style={styles.secondaryButton} onPress={handleSendToBloom}>
@@ -913,7 +1071,15 @@ export default function TokenDetailScreen() {
           </>
         )}
 
-        <Pressable style={styles.tertiaryButton} onPress={() => setShowMarketSheet(true)}>
+        <Pressable
+          style={styles.tertiaryButton}
+          onPress={() => {
+            if (statusLabel === 'WATCHLIST') {
+              setMarketplaceLane('b');
+            }
+            setShowMarketSheet(true);
+          }}
+        >
           <Text style={styles.tertiaryButtonText}>View marketplaces</Text>
         </Pressable>
       </View>
@@ -973,25 +1139,36 @@ export default function TokenDetailScreen() {
               </Pressable>
             )}
 
-            {/* External marketplaces */}
-            {['stockx', 'goat', 'ebay'].map((marketplace) => (
-              <Pressable
-                key={marketplace}
-                style={[
-                  styles.sellOption,
-                  !token.size && !marketplaceSize && styles.sellOptionDisabled,
-                ]}
-                onPress={() => {
-                  if (!token.size && !marketplaceSize) return;
-                  Linking.openURL(buildMarketplaceUrl(marketplace));
-                  setShowSellSheet(false);
-                }}
-                disabled={!token.size && !marketplaceSize}
-              >
-                <Text style={styles.sellOptionTitle}>{marketplace.toUpperCase()}</Text>
-                <Text style={styles.sellOptionDesc}>Open and list there</Text>
-              </Pressable>
-            ))}
+            {/* Bloom-managed marketplace listing (home custody) */}
+            {isHomeCustody && (
+              marketplaceRows.length > 0 ? (
+                marketplaceRows.map((marketplace) => {
+                  const payoutEstimate = estimateMarketplacePayout(marketplace.id, token.current_value);
+                  return (
+                    <Pressable
+                      key={marketplace.id}
+                      style={[
+                        styles.sellOption,
+                        (!token.size && !marketplaceSize) && styles.sellOptionDisabled,
+                        sellRequestLoading && styles.sellOptionDisabled,
+                      ]}
+                      onPress={() => {
+                        if (!token.size && !marketplaceSize) return;
+                        handleMarketplaceSellRequest(marketplace.id);
+                      }}
+                      disabled={!token.size && !marketplaceSize || sellRequestLoading}
+                    >
+                      <Text style={styles.sellOptionTitle}>{marketplace.name}</Text>
+                      <Text style={styles.sellOptionDesc}>
+                        {payoutEstimate ? `Estimated payout ${formatMoneyValue(payoutEstimate)}` : 'Bloom will list it for you'}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              ) : (
+                <Text style={styles.sectionBody}>No marketplace pricing yet.</Text>
+              )
+            )}
 
             <Pressable style={styles.modalCancel} onPress={() => setShowSellSheet(false)}>
               <Text style={styles.modalCancelText}>Cancel</Text>
@@ -1013,6 +1190,26 @@ export default function TokenDetailScreen() {
             <Text style={styles.sellSheetSubtitle}>
               {token.product_name} · Size {token.size || marketplaceSize || '—'}
             </Text>
+            {statusLabel === 'WATCHLIST' && (
+              <View style={styles.laneToggleRow}>
+                <Pressable
+                  style={[styles.laneToggle, marketplaceLane === 'a' && styles.laneToggleActive]}
+                  onPress={() => setMarketplaceLane('a')}
+                >
+                  <Text style={[styles.laneToggleText, marketplaceLane === 'a' && styles.laneToggleTextActive]}>
+                    Ship to me
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.laneToggle, marketplaceLane === 'b' && styles.laneToggleActive]}
+                  onPress={() => setMarketplaceLane('b')}
+                >
+                  <Text style={[styles.laneToggleText, marketplaceLane === 'b' && styles.laneToggleTextActive]}>
+                    Ship to Bloom
+                  </Text>
+                </Pressable>
+              </View>
+            )}
 
             {!token.size && (
               <View style={styles.marketSizeSection}>
@@ -1041,24 +1238,34 @@ export default function TokenDetailScreen() {
               </View>
             )}
 
-            {['stockx', 'goat', 'ebay'].map((marketplace) => (
-              <Pressable
-                key={marketplace}
-                style={[
-                  styles.sellOption,
-                  !token.size && !marketplaceSize && styles.sellOptionDisabled,
-                ]}
-                onPress={() => {
-                  if (!token.size && !marketplaceSize) return;
-                  Linking.openURL(buildMarketplaceUrl(marketplace));
-                  setShowMarketSheet(false);
-                }}
-                disabled={!token.size && !marketplaceSize}
-              >
-                <Text style={styles.sellOptionTitle}>{marketplace.toUpperCase()}</Text>
-                <Text style={styles.sellOptionDesc}>View recent listings</Text>
-              </Pressable>
-            ))}
+            {marketplaceRows.length > 0 ? (
+              marketplaceRows.map((marketplace) => (
+                <Pressable
+                  key={marketplace.id}
+                  style={[
+                    styles.sellOption,
+                    !token.size && !marketplaceSize && styles.sellOptionDisabled,
+                  ]}
+                  onPress={() => {
+                    if (!token.size && !marketplaceSize) return;
+                    if (statusLabel === 'WATCHLIST') {
+                      setShowMarketSheet(false);
+                      handleMarketplaceBuy(marketplace.id);
+                    }
+                  }}
+                  disabled={!token.size && !marketplaceSize}
+                >
+                  <Text style={styles.sellOptionTitle}>{marketplace.name}</Text>
+                  <Text style={styles.sellOptionDesc}>
+                    {statusLabel === 'WATCHLIST'
+                      ? `Buy at ${formatMoneyValue(marketplace.price)}`
+                      : `Market price ${formatMoneyValue(marketplace.price)}`}
+                  </Text>
+                </Pressable>
+              ))
+            ) : (
+              <Text style={styles.sectionBody}>No marketplace pricing yet.</Text>
+            )}
 
             <Pressable style={styles.modalCancel} onPress={() => setShowMarketSheet(false)}>
               <Text style={styles.modalCancelText}>Cancel</Text>
@@ -1574,10 +1781,16 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
+  actionButtonDisabled: {
+    backgroundColor: theme.border,
+  },
   actionButtonText: {
     fontSize: 17,
     fontWeight: '600',
     color: theme.textInverse,
+  },
+  actionButtonTextDisabled: {
+    color: theme.textSecondary,
   },
   secondaryButton: {
     backgroundColor: theme.card,
@@ -1924,6 +2137,32 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     justifyContent: 'center',
+  },
+  laneToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  laneToggle: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: theme.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  laneToggleActive: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  laneToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.textSecondary,
+  },
+  laneToggleTextActive: {
+    color: theme.textInverse,
   },
   marketSizeChip: {
     paddingHorizontal: 10,

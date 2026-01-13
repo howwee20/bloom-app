@@ -9,7 +9,6 @@ import {
   FlatList,
   Image,
   LayoutAnimation,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -54,6 +53,12 @@ const showAlert = (title: string, message: string, buttons?: Array<{text: string
 type CustodyFilter = 'all' | 'bloom' | 'home' | 'watchlist';
 const PRICE_FRESHNESS_MINUTES = 15;
 const PRICE_STALE_HOURS = 24;
+const MARKETPLACE_LABELS: Record<string, string> = {
+  stockx: 'StockX',
+};
+const MARKETPLACE_FEES: Record<string, { feeRate: number; shipping: number }> = {
+  stockx: { feeRate: 0.12, shipping: 14 },
+};
 
 // Token interface for ownership-first model
 interface Token {
@@ -175,6 +180,7 @@ export default function HomeScreen() {
   const [showSellOptions, setShowSellOptions] = useState(false);
   const [selectedSellItem, setSelectedSellItem] = useState<SellItem | null>(null);
   const [showBloomMarketOptions, setShowBloomMarketOptions] = useState(false);
+  const [marketplaceSellLoading, setMarketplaceSellLoading] = useState(false);
   const [showExchangeListing, setShowExchangeListing] = useState(false);
   const [exchangeListingPrice, setExchangeListingPrice] = useState('');
   const [exchangeListingLoading, setExchangeListingLoading] = useState(false);
@@ -431,40 +437,17 @@ export default function HomeScreen() {
     return (now - timestampMs) > PRICE_STALE_HOURS * 60 * 60 * 1000;
   };
 
-  const buildSearchQuery = (item: SellItem) => {
-    if (item.sku) return item.sku;
-    if (item.size) return `${item.name} ${item.size}`;
-    return item.name;
-  };
-
-  const buildMarketplaceUrl = (marketplace: string, item: SellItem) => {
-    const query = encodeURIComponent(buildSearchQuery(item));
-    switch (marketplace) {
-      case 'stockx':
-        return `https://stockx.com/search?s=${query}`;
-      case 'goat':
-        return `https://www.goat.com/search?query=${query}`;
-      case 'ebay':
-        return `https://www.ebay.com/sch/i.html?_nkw=${query}`;
-      default:
-        return `https://www.google.com/search?q=${query}`;
-    }
-  };
-
   // Route Home helper functions removed - now handled in /buy screen
 
   const marketplaceOptions = selectedSellItem
-    ? [
-        { id: 'stockx', name: 'StockX', feeRate: 0.12, shippingFee: 14 },
-        { id: 'goat', name: 'GOAT', feeRate: 0.12, shippingFee: 14 },
-        { id: 'ebay', name: 'eBay', feeRate: 0.1, shippingFee: 10 },
-      ].map(option => {
+    ? Object.entries(MARKETPLACE_FEES).map(([id, fees]) => {
         const gross = selectedSellItem.value || 0;
-        const feeEstimate = Math.round(gross * option.feeRate * 100) / 100;
-        const shipping = option.shippingFee;
+        const feeEstimate = Math.round(gross * fees.feeRate * 100) / 100;
+        const shipping = fees.shipping;
         const net = Math.max(gross - feeEstimate - shipping, 0);
         return {
-          ...option,
+          id,
+          name: MARKETPLACE_LABELS[id] || id.toUpperCase(),
           gross,
           feeEstimate,
           shipping,
@@ -497,6 +480,61 @@ export default function HomeScreen() {
     setExchangeListingLoading(false);
     setExchangeListingSuccess(false);
     setSelectedSellItem(null);
+  };
+
+  const handleMarketplaceSellRequest = async (marketplaceId: string) => {
+    if (!selectedSellItem) return;
+    if (!session?.user?.id) {
+      showAlert('Not signed in', 'Please sign in to sell.');
+      return;
+    }
+    if (selectedSellItem.type !== 'token') {
+      showAlert('Unavailable', 'Marketplace selling is only supported for tokens right now.');
+      return;
+    }
+    if (!selectedSellItem.size) {
+      showAlert('Missing size', 'Add a size to continue.');
+      return;
+    }
+    const fees = MARKETPLACE_FEES[marketplaceId];
+    if (!fees) {
+      showAlert('Unavailable', 'Marketplace pricing is not available yet.');
+      return;
+    }
+
+    try {
+      const gross = selectedSellItem.value || 0;
+      if (gross <= 0) {
+        showAlert('Price updating', 'Live pricing is updating. Try again shortly.');
+        return;
+      }
+      setMarketplaceSellLoading(true);
+      const feeEstimate = gross * fees.feeRate;
+      const payoutEstimate = Math.max(gross - feeEstimate - fees.shipping, 0);
+
+      const { error } = await supabase
+        .from('marketplace_sell_requests')
+        .insert({
+          token_id: selectedSellItem.id,
+          user_id: session.user.id,
+          marketplace: marketplaceId,
+          size: selectedSellItem.size,
+          requested_price: gross,
+          payout_estimate: payoutEstimate,
+          status: 'requested',
+        });
+
+      if (error) throw error;
+
+      setShowSellOptions(false);
+      setSelectedSellItem(null);
+      setShowBloomMarketOptions(false);
+      showAlert('Sell request sent', 'Bloom will list it for you and notify you when it sells.');
+    } catch (e: any) {
+      showAlert('Request failed', e.message || 'Please try again.');
+    } finally {
+      setMarketplaceSellLoading(false);
+    }
   };
 
   const handleConfirmExchangeListing = async () => {
@@ -1242,7 +1280,7 @@ export default function HomeScreen() {
                   onPress={() => setShowBloomMarketOptions(true)}
                 >
                   <Text style={styles.sellDecisionSecondaryText}>List on Market</Text>
-                  <Text style={styles.sellDecisionSubtext}>Route to StockX / GOAT / eBay</Text>
+                  <Text style={styles.sellDecisionSubtext}>Bloom lists it for you</Text>
                 </Pressable>
               </View>
             )}
@@ -1276,13 +1314,16 @@ export default function HomeScreen() {
                       <Text style={styles.sellOptionValueStrong}>{formatCurrency(option.net)}</Text>
                     </View>
                     <Pressable
-                      style={styles.sellOptionButton}
+                      style={[styles.sellOptionButton, marketplaceSellLoading && styles.sellOptionButtonDisabled]}
                       onPress={() => {
                         if (!selectedSellItem) return;
-                        Linking.openURL(buildMarketplaceUrl(option.id, selectedSellItem));
+                        handleMarketplaceSellRequest(option.id);
                       }}
+                      disabled={marketplaceSellLoading}
                     >
-                      <Text style={styles.sellOptionButtonText}>Continue</Text>
+                      <Text style={styles.sellOptionButtonText}>
+                        {marketplaceSellLoading ? 'Submitting...' : 'Sell with Bloom'}
+                      </Text>
                     </Pressable>
                   </View>
                 ))}
@@ -1291,7 +1332,7 @@ export default function HomeScreen() {
 
             {showMarketplaceCards && (
               <Text style={styles.sellDisclaimer}>
-                Estimates only. Final payout set by the marketplace.
+                Estimates only. Final payout set at execution.
               </Text>
             )}
 

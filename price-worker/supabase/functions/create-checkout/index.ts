@@ -24,7 +24,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { asset_id, size, success_url, cancel_url } = await req.json()
+    const {
+      asset_id,
+      size,
+      success_url,
+      cancel_url,
+      lane,
+      marketplace,
+      shipping_name,
+      shipping_address_line1,
+      shipping_address_line2,
+      shipping_city,
+      shipping_state,
+      shipping_zip,
+      shipping_country,
+    } = await req.json()
 
     if (!asset_id || !size) {
       return new Response(
@@ -33,7 +47,22 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Ownership-first model: all purchases are custody tokens (no lane selection)
+    const normalizedLane = lane === 'a' || lane === 'b' ? lane : 'b'
+    if (lane && lane !== 'a' && lane !== 'b') {
+      return new Response(
+        JSON.stringify({ error: 'lane must be a or b' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (normalizedLane === 'a') {
+      if (!shipping_name || !shipping_address_line1 || !shipping_city || !shipping_state || !shipping_zip) {
+        return new Response(
+          JSON.stringify({ error: 'shipping_name, address, city, state, and zip are required for lane a' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization')!
@@ -109,13 +138,15 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Convert price to cents
+    // Convert price to cents (raw market price for now)
     const amountCents = Math.round(asset.price * 100)
+
+    const normalizedMarketplace = (marketplace || asset.price_source || 'stockx').toString().toLowerCase()
 
     // Calculate quote expiration time
     const quoteExpiresAt = new Date(Date.now() + quoteExpirationMinutes * 60 * 1000);
 
-    // Create order record (ownership-first: all orders are custody)
+    // Create order record
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -125,7 +156,16 @@ Deno.serve(async (req) => {
         amount_cents: amountCents,
         quote_expires_at: quoteExpiresAt.toISOString(),
         status: 'pending_payment',
-        lane: 'b', // All purchases are ownership (custody) tokens
+        lane: normalizedLane,
+        marketplace: normalizedMarketplace,
+        execution_mode: 'brokered',
+        shipping_name: normalizedLane === 'a' ? shipping_name : null,
+        shipping_address_line1: normalizedLane === 'a' ? shipping_address_line1 : null,
+        shipping_address_line2: normalizedLane === 'a' ? shipping_address_line2 : null,
+        shipping_city: normalizedLane === 'a' ? shipping_city : null,
+        shipping_state: normalizedLane === 'a' ? shipping_state : null,
+        shipping_zip: normalizedLane === 'a' ? shipping_zip : null,
+        shipping_country: normalizedLane === 'a' ? (shipping_country || 'US') : null,
       })
       .select()
       .single()
@@ -163,6 +203,8 @@ Deno.serve(async (req) => {
         asset_id: asset.id,
         user_id: user.id,
         size: size,
+        lane: normalizedLane,
+        marketplace: normalizedMarketplace,
       },
       customer_email: user.email,
     })
@@ -180,6 +222,8 @@ Deno.serve(async (req) => {
         order_id: order.id,
         quote_expires_at: quoteExpiresAt.toISOString(),
         price_quoted: asset.price,
+        lane: normalizedLane,
+        marketplace: normalizedMarketplace,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

@@ -160,13 +160,15 @@ Deno.serve(async (req) => {
           .single()
 
         if (order) {
-          // Determine token status based on asset custody
-          // - 'in_vault' items are instant: token is immediately active and tradeable
-          // - 'available_to_acquire' items need to be purchased: token starts as acquiring
+          // Determine token status based on fulfillment lane + asset custody
+          // - Lane B (Bloom custody): can be instant if already in vault
+          // - Lane A (ship to customer): always acquiring (not exchange eligible)
           const assetCustody = (order.assets as any)?.custody_status;
-          const isInstant = assetCustody === 'in_vault';
+          const isLaneHome = order.lane === 'a';
+          const isInstant = !isLaneHome && assetCustody === 'in_vault';
           const tokenStatus = isInstant ? 'in_custody' : 'acquiring';
-          const exchangeEligible = isInstant; // Only instant items are immediately tradeable
+          const exchangeEligible = !isLaneHome && isInstant;
+          const custodyType = isLaneHome ? 'home' : 'bloom';
 
           // Create token record for this purchase (ownership-first model)
           const tokenData = {
@@ -178,7 +180,7 @@ Deno.serve(async (req) => {
             product_image_url: (order.assets as any)?.image_url,
             purchase_price: order.amount_cents / 100,
             purchase_date: new Date().toISOString(),
-            custody_type: 'bloom', // All tokens are Bloom custody
+            custody_type: custodyType,
             is_exchange_eligible: exchangeEligible,
             current_value: order.amount_cents / 100, // Initial value = purchase price
             value_updated_at: new Date().toISOString(),
@@ -215,8 +217,10 @@ Deno.serve(async (req) => {
           console.log(`Size: ${order.size}`)
           console.log(`Amount: $${(order.amount_cents / 100).toFixed(2)}`)
           console.log(`StockX SKU: ${(order.assets as any)?.stockx_sku}`)
+          console.log(`Lane: ${order.lane || 'b'}`)
+          console.log(`Marketplace: ${order.marketplace || 'stockx'}`)
           console.log(`Customer Email: ${session.customer_email}`)
-          console.log(`Token Status: acquiring`)
+          console.log(`Token Status: ${tokenStatus}`)
           console.log('==============================')
 
           // Send notification email to founder via Resend (ownership-first)

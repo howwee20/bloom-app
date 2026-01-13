@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   Image,
-  Linking,
   Modal,
   Pressable,
   SafeAreaView,
@@ -18,6 +18,11 @@ import { useAuth } from '../_layout';
 
 // Available shoe sizes
 const AVAILABLE_SIZES = ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13'];
+const MARKETPLACE_LABELS: Record<string, string> = {
+  stockx: 'StockX',
+  goat: 'GOAT',
+  ebay: 'eBay',
+};
 
 interface ExchangeListing {
   id: string;
@@ -39,10 +44,13 @@ export default function BuyDetailScreen() {
   const { session } = useAuth();
 
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [assetId, setAssetId] = useState<string | null>(null);
   const [marketPrice, setMarketPrice] = useState<number | null>(null);
+  const [priceSource, setPriceSource] = useState<string | null>(null);
   const [priceLoading, setPriceLoading] = useState(true);
   const [showSettlement, setShowSettlement] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
+  const [marketplaceLane, setMarketplaceLane] = useState<'a' | 'b'>('b');
   const [matchingListing, setMatchingListing] = useState<ExchangeListing | null>(null);
   const [listingLoading, setListingLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -57,7 +65,7 @@ export default function BuyDetailScreen() {
         // Get the latest price for this style code from assets
         const { data, error } = await supabase
           .from('assets')
-          .select('price, last_price_checked_at')
+          .select('id, price, price_source, last_price_checked_at')
           .eq('stockx_sku', style_code)
           .not('price', 'is', null)
           .order('last_price_checked_at', { ascending: false, nullsFirst: false })
@@ -66,6 +74,8 @@ export default function BuyDetailScreen() {
 
         if (!error && data?.price) {
           setMarketPrice(data.price);
+          setPriceSource((data as any).price_source || null);
+          setAssetId((data as any).id || null);
         }
       } catch (e) {
         console.error('Error fetching market price:', e);
@@ -124,22 +134,35 @@ export default function BuyDetailScreen() {
     }).format(price);
   };
 
-  const buildMarketplaceUrl = (marketplace: string) => {
-    const searchQuery = selectedSize
-      ? `${name} ${selectedSize}`
-      : name;
-    const query = encodeURIComponent(searchQuery || '');
+  const normalizedPriceSource = (priceSource || 'stockx').toLowerCase();
+  const marketplaceOptions = marketPrice
+    ? [{
+        id: normalizedPriceSource,
+        name: MARKETPLACE_LABELS[normalizedPriceSource] || normalizedPriceSource.toUpperCase(),
+        price: marketPrice,
+      }]
+    : [];
 
-    switch (marketplace) {
-      case 'stockx':
-        return `https://stockx.com/search?s=${query}`;
-      case 'goat':
-        return `https://www.goat.com/search?query=${query}`;
-      case 'ebay':
-        return `https://www.ebay.com/sch/i.html?_nkw=${query}`;
-      default:
-        return `https://www.google.com/search?q=${query}`;
+  const handleMarketplaceCheckout = (marketplaceId: string) => {
+    if (!selectedSize) {
+      return;
     }
+    if (!assetId) {
+      Alert.alert('Unavailable', 'This item is not ready for checkout yet.');
+      return;
+    }
+    router.push({
+      pathname: '/checkout/confirm-order',
+      params: {
+        asset_id: assetId,
+        asset_name: name,
+        asset_image: image_url || '',
+        size: selectedSize || '',
+        price: marketPrice?.toString() || '0',
+        lane: marketplaceLane,
+        marketplace: marketplaceId,
+      },
+    });
   };
 
   const handleContinue = () => {
@@ -149,24 +172,14 @@ export default function BuyDetailScreen() {
 
   const handleShipToMe = () => {
     setShowSettlement(false);
+    setMarketplaceLane('a');
     setShowMarketplace(true);
   };
 
   const handleShipToBloom = () => {
     setShowSettlement(false);
-    // Navigate to checkout with Bloom custody
-    router.push({
-      pathname: '/checkout/confirm-order',
-      params: {
-        catalog_item_id: id,
-        asset_name: name,
-        asset_image: image_url || '',
-        size: selectedSize || '',
-        price: marketPrice?.toString() || '0',
-        custody_status: 'shipping_to_bloom',
-        style_code: style_code,
-      },
-    });
+    setMarketplaceLane('b');
+    setShowMarketplace(true);
   };
 
   const handleInstantTransfer = () => {
@@ -286,7 +299,7 @@ export default function BuyDetailScreen() {
             {/* Ship to me */}
             <Pressable style={styles.settlementOption} onPress={handleShipToMe}>
               <Text style={styles.settlementTitle}>Ship to me</Text>
-              <Text style={styles.settlementDesc}>Best all-in price across marketplaces</Text>
+              <Text style={styles.settlementDesc}>Bloom executes the best marketplace</Text>
             </Pressable>
 
             {/* Ship to Bloom */}
@@ -335,27 +348,35 @@ export default function BuyDetailScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowMarketplace(false)}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Ship to me</Text>
-            <Text style={styles.modalSubtitle}>Choose a marketplace to complete your purchase</Text>
+            <Text style={styles.modalTitle}>Choose Marketplace</Text>
+            <Text style={styles.modalSubtitle}>Bloom executes this purchase for you</Text>
 
             <View style={styles.productSummary}>
               <Text style={styles.summaryName}>{name}</Text>
               <Text style={styles.summarySize}>Size {selectedSize}</Text>
             </View>
 
-            {['stockx', 'goat', 'ebay'].map((marketplace) => (
-              <Pressable
-                key={marketplace}
-                style={styles.marketplaceOption}
-                onPress={() => {
-                  Linking.openURL(buildMarketplaceUrl(marketplace));
-                  setShowMarketplace(false);
-                }}
-              >
-                <Text style={styles.marketplaceTitle}>{marketplace.toUpperCase()}</Text>
-                <Text style={styles.marketplaceDesc}>Open search and checkout</Text>
-              </Pressable>
-            ))}
+            <Text style={styles.modalSubtitle}>
+              {marketplaceLane === 'a' ? 'Ship to me' : 'Ship to Bloom'}
+            </Text>
+
+            {marketplaceOptions.length > 0 ? (
+              marketplaceOptions.map((marketplace) => (
+                <Pressable
+                  key={marketplace.id}
+                  style={styles.marketplaceOption}
+                  onPress={() => {
+                    setShowMarketplace(false);
+                    handleMarketplaceCheckout(marketplace.id);
+                  }}
+                >
+                  <Text style={styles.marketplaceTitle}>{marketplace.name}</Text>
+                  <Text style={styles.marketplaceDesc}>Buy at {formatPrice(marketplace.price)}</Text>
+                </Pressable>
+              ))
+            ) : (
+              <Text style={styles.priceUnavailable}>No marketplace pricing yet.</Text>
+            )}
 
             <Pressable style={styles.modalCancel} onPress={() => setShowMarketplace(false)}>
               <Text style={styles.modalCancelText}>Cancel</Text>
