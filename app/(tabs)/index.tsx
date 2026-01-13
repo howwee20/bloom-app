@@ -8,7 +8,6 @@ import {
   AppStateStatus,
   FlatList,
   Image,
-  LayoutAnimation,
   Modal,
   Platform,
   Pressable,
@@ -18,16 +17,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  UIManager,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fonts, theme } from '../../constants/Colors';
 
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+type CustodyFilter = 'bloom' | 'home' | 'watchlist';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
 
@@ -190,23 +184,8 @@ export default function HomeScreen() {
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const [now, setNow] = useState(Date.now());
   const [isFocused, setIsFocused] = useState(true);
-  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false);
-
-  // Restore header collapse preference from storage
-  useEffect(() => {
-    AsyncStorage.getItem('headerCollapsed').then(val => {
-      if (val === 'true') setIsHeaderCollapsed(true);
-    });
-  }, []);
-
-  // Toggle header with animation
-  const toggleHeader = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const newState = !isHeaderCollapsed;
-    setIsHeaderCollapsed(newState);
-    AsyncStorage.setItem('headerCollapsed', String(newState));
-  };
+  const [activeFilter, setActiveFilter] = useState<CustodyFilter>('bloom');
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -812,10 +791,6 @@ export default function HomeScreen() {
     </View>
   );
 
-  // Show all tokens and assets (no filtering - balance is always bloom custody only)
-  const filteredTokens = tokens;
-  const filteredAssets = ownedAssets;
-
   const ownedAssetsOnly = ownedAssets.filter(a => (a.location || 'home') !== 'watchlist');
 
   // Bloom custody tokens only (for balance calculation)
@@ -840,6 +815,22 @@ export default function HomeScreen() {
   // Watchlist value (assets only - intent, not owned)
   const watchlistAssets = ownedAssets.filter(a => a.location === 'watchlist');
   const watchlistValue = watchlistAssets.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
+
+  // Filter counts for tabs
+  const bloomCount = bloomTokens.length;
+  const homeCount = homeTokens.length + homeAssets.length;
+  const watchlistCount = watchlistAssets.length;
+
+  // Filtered items based on active tab
+  const filteredItems = (() => {
+    if (activeFilter === 'bloom') {
+      return bloomTokens;
+    } else if (activeFilter === 'home') {
+      return [...homeTokens, ...homeAssets];
+    } else {
+      return watchlistAssets;
+    }
+  })();
 
   // Always show bloom custody value - no toggles, no options
   const displayedTotalValue = portfolioValue;
@@ -886,69 +877,55 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Collapsible Header */}
-      {isHeaderCollapsed ? (
-        // Collapsed: compact sticky bar
-        <View style={styles.headerAreaCollapsed}>
-          <Text style={styles.headerTitleCollapsed}>Bloom</Text>
-          <Pressable style={styles.collapsedCenter} onPress={() => setShowBalanceBreakdown(true)}>
-            <Text style={styles.valueAmountCollapsed}>
-              {formatPrice(displayedTotalValue)}
+      {/* Static Header */}
+      <View style={styles.headerArea}>
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, styles.headerTitleAccent]}>Bloom</Text>
+          <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
+            <View style={styles.profileIcon}>
+              <Text style={styles.profileIconText}>
+                {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Portfolio Value - Tap to see breakdown */}
+        <Pressable style={styles.valueSection} onPress={() => setShowBalanceBreakdown(true)}>
+          <Text style={styles.valueAmount}>{formatPrice(displayedTotalValue)}</Text>
+          {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
+            <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
+              {formatPnL(displayedTotalPnl)} all time
             </Text>
-            {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-              <Text style={[styles.pnlCollapsed, { color: totalPnlColor }]}>
-                ({formatPnL(displayedTotalPnl)})
-              </Text>
-            )}
-          </Pressable>
-          <Pressable onPress={toggleHeader} style={styles.collapseToggle}>
-            <Text style={styles.collapseChevron}>▼</Text>
-          </Pressable>
-        </View>
-      ) : (
-        // Expanded: hero header
-        <View style={styles.headerArea}>
-          {/* Header row with collapse toggle */}
-          <View style={styles.header}>
-            <Text style={[styles.headerTitle, styles.headerTitleAccent]}>Bloom</Text>
-            <View style={styles.headerRight}>
-              <Pressable onPress={toggleHeader} style={styles.collapseToggle}>
-                <Text style={styles.collapseChevron}>▲</Text>
-              </Pressable>
-              <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
-                <View style={styles.profileIcon}>
-                  <Text style={styles.profileIconText}>
-                    {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
-                  </Text>
-                </View>
-              </Pressable>
-            </View>
-          </View>
+          )}
+          <Text style={styles.updatedTextSmall}>
+            {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
+          </Text>
+        </Pressable>
+      </View>
 
-          {/* Portfolio Value - Tap to see breakdown */}
-          <Pressable style={styles.valueSection} onPress={() => setShowBalanceBreakdown(true)}>
-            <Text style={styles.valueAmount}>{formatPrice(displayedTotalValue)}</Text>
-            {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-              <Text style={[styles.totalPnl, { color: totalPnlColor }]}>
-                {formatPnL(displayedTotalPnl)} all time
-              </Text>
-            )}
-            <View style={styles.updatedRow}>
-              <Text style={[styles.updatedText, !pricingFresh && styles.updatedTextPaused]}>
-                {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
-              </Text>
-              {!pricingFresh && lastUpdatedLabel && (
-                <Text style={styles.updatedText}> · Last update {lastUpdatedLabel}</Text>
-              )}
-              {!pricingFresh && !lastUpdatedLabel && (
-                <Text style={styles.updatedText}> · No successful updates yet</Text>
-              )}
-              {pricingFresh && updateDelayed && <Text style={styles.updatedText}> · Update delayed</Text>}
-            </View>
-          </Pressable>
+      {/* Filter Tabs */}
+      <View style={styles.filterTabs}>
+        {(['bloom', 'home', 'watchlist'] as CustodyFilter[]).map((filter) => {
+          const isActive = activeFilter === filter;
+          const count = filter === 'bloom' ? bloomCount
+            : filter === 'home' ? homeCount
+            : watchlistCount;
+          const label = filter.charAt(0).toUpperCase() + filter.slice(1);
 
-        </View>
-      )}
+          return (
+            <Pressable
+              key={filter}
+              style={[styles.filterTab, isActive && styles.filterTabActive]}
+              onPress={() => setActiveFilter(filter)}
+            >
+              <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+                {label} ({count})
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       {/* Assets */}
       <View style={styles.assetsSection}>
@@ -1022,11 +999,21 @@ export default function HomeScreen() {
             <ActivityIndicator size="large" color={theme.accent} />
             <Text style={styles.loadingText}>Loading...</Text>
           </View>
-        ) : !hasItems ? (
-          renderEmptyState()
+        ) : filteredItems.length === 0 ? (
+          <View style={styles.emptyFilterState}>
+            <Text style={styles.emptyFilterTitle}>
+              {activeFilter === 'bloom' ? 'No items in Bloom custody' :
+               activeFilter === 'home' ? 'No items at home' : 'No watchlist items'}
+            </Text>
+            <Text style={styles.emptyFilterSubtitle}>
+              {activeFilter === 'bloom' ? 'Buy items to add them to your Bloom account' :
+               activeFilter === 'home' ? 'Items you own but keep at home will show here' :
+               'Add items to your watchlist to track prices'}
+            </Text>
+          </View>
         ) : (
           <FlatList
-            data={[...filteredTokens, ...filteredAssets] as any[]}
+            data={filteredItems as any[]}
             renderItem={({ item }) => {
               // Check if it's a token (has custody_type) or legacy asset
               if ('custody_type' in item) {
@@ -1443,56 +1430,12 @@ const styles = StyleSheet.create({
   },
   headerArea: {
     backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingBottom: 16,
+    paddingBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
-  },
-  headerAreaCollapsed: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  headerTitleCollapsed: {
-    fontFamily: fonts.heading,
-    fontSize: 16,
-    color: theme.accent,
-  },
-  collapsedCenter: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  valueAmountCollapsed: {
-    fontFamily: fonts.heading,
-    fontSize: 22,
-    color: theme.textPrimary,
-    letterSpacing: -0.5,
-  },
-  pnlCollapsed: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  collapseToggle: {
-    padding: 8,
-  },
-  collapseChevron: {
-    fontSize: 12,
-    color: theme.textSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -1508,11 +1451,6 @@ const styles = StyleSheet.create({
   },
   headerTitleAccent: {
     color: theme.accent,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
   },
   profileButton: {
     padding: 4,
@@ -1532,38 +1470,55 @@ const styles = StyleSheet.create({
   },
   valueSection: {
     paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 32,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   valueAmount: {
     fontFamily: fonts.heading,
-    fontSize: 40,
+    fontSize: 36,
     color: theme.textPrimary,
     letterSpacing: -1,
   },
   totalPnl: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
+    marginTop: 2,
+  },
+  updatedTextSmall: {
+    fontSize: 11,
+    color: theme.textTertiary,
     marginTop: 4,
   },
-  updatedRow: {
+  // Filter Tabs
+  filterTabs: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
-  updatedText: {
-    fontSize: 12,
+  filterTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: theme.backgroundSecondary,
+  },
+  filterTabActive: {
+    backgroundColor: theme.accent,
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: theme.textSecondary,
   },
-  updatedTextPaused: {
-    color: theme.warning,
-    fontWeight: '600',
+  filterTabTextActive: {
+    color: theme.textInverse,
   },
   assetsSection: {
     flex: 1,
     backgroundColor: theme.backgroundSecondary,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     paddingTop: 12,
   },
   gridContent: {
@@ -1770,6 +1725,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: theme.textInverse,
+  },
+  emptyFilterState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  emptyFilterTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyFilterSubtitle: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 13,
