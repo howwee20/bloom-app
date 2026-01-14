@@ -99,55 +99,36 @@ export default function BuyScreen() {
     setOffers([]);
 
     try {
-      // Get Supabase URL for Edge Function
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+      // Use catalog search directly (Edge Function can be enabled later)
+      const { data, error } = await supabase.rpc('search_catalog_items', {
+        q: trimmed,
+        limit_n: 20,
+      });
 
-      // Call get-offers Edge Function
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/get-offers?q=${encodeURIComponent(trimmed)}&limit=20`,
-        {
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Search failed: ${response.status}`);
+      if (error) {
+        console.error('Search error:', error);
+        return;
       }
 
-      const data = await response.json();
-      setOffers(data.offers || []);
+      if (data) {
+        // Convert to BloomOffer format
+        const searchOffers: BloomOffer[] = data.map((item: CatalogItem) => ({
+          offer_id: `stockx:${item.id}`,
+          catalog_item_id: item.id,
+          title: item.display_name,
+          image: item.image_url_thumb,
+          price: item.lowest_price || 0,
+          total_estimate: (item.lowest_price || 0) * 1.12 + 14,
+          currency: 'USD' as const,
+          source: 'stockx',
+          condition: 'deadstock' as const,
+          source_url: `https://stockx.com/search?s=${encodeURIComponent(item.display_name)}`,
+          last_updated_at: new Date().toISOString(),
+        }));
+        setOffers(searchOffers.filter(o => o.price > 0));
+      }
     } catch (e) {
       console.error('Search error:', e);
-      // Fallback to legacy search if Edge Function fails
-      try {
-        const { data, error } = await supabase.rpc('search_catalog_items', {
-          q: trimmed,
-          limit_n: 20,
-        });
-        if (!error && data) {
-          // Convert to BloomOffer format
-          const legacyOffers: BloomOffer[] = data.map((item: CatalogItem) => ({
-            offer_id: `stockx:${item.id}`,
-            catalog_item_id: item.id,
-            title: item.display_name,
-            image: item.image_url_thumb,
-            price: item.lowest_price || 0,
-            total_estimate: (item.lowest_price || 0) * 1.12 + 14,
-            currency: 'USD',
-            source: 'stockx',
-            condition: 'deadstock',
-            source_url: `https://stockx.com/search?s=${encodeURIComponent(item.display_name)}`,
-            last_updated_at: new Date().toISOString(),
-          }));
-          setOffers(legacyOffers.filter(o => o.price > 0));
-        }
-      } catch (fallbackError) {
-        console.error('Fallback search error:', fallbackError);
-      }
     } finally {
       setLoading(false);
     }
@@ -163,13 +144,11 @@ export default function BuyScreen() {
 
     setPurchasing(true);
     try {
+      // Use existing RPC (migration adds new optional params)
       const { error } = await supabase.rpc('create_order_intent', {
         p_catalog_item_id: selectedOffer.catalog_item_id,
         p_size: size.trim(),
         p_destination: destination,
-        p_marketplace: selectedOffer.source,
-        p_source_url: selectedOffer.source_url,
-        p_quoted_total: selectedOffer.total_estimate,
       });
 
       if (error) throw error;
