@@ -1,9 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -14,6 +16,7 @@ import {
 } from 'react-native';
 import { theme, fonts } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
+import { useAuth } from './_layout';
 
 interface CatalogItem {
   id: string;
@@ -21,9 +24,14 @@ interface CatalogItem {
   brand: string;
   style_code: string;
   image_url_thumb: string | null;
+  lowest_price?: number | null;
+  marketplace?: string | null;
 }
 
+const SAVED_SIZE_KEY = 'bloom_saved_size';
+
 export default function BuyScreen() {
+  const { session } = useAuth();
   const searchInputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,6 +39,25 @@ export default function BuyScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Size and purchase state
+  const [size, setSize] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
+
+  // Load saved size on mount
+  useEffect(() => {
+    AsyncStorage.getItem(SAVED_SIZE_KEY).then((saved) => {
+      if (saved) setSize(saved);
+    });
+  }, []);
+
+  // Save size when changed
+  const handleSizeChange = (newSize: string) => {
+    setSize(newSize);
+    if (newSize.trim()) {
+      AsyncStorage.setItem(SAVED_SIZE_KEY, newSize.trim());
+    }
+  };
 
   const handleSearch = async () => {
     const trimmed = query.trim();
@@ -62,19 +89,36 @@ export default function BuyScreen() {
     }
   };
 
-  const handleSelectItem = () => {
+  const handleBuyPress = () => {
+    if (!size.trim()) {
+      // Focus size input if empty
+      return;
+    }
+    setShowConfirm(true);
+  };
+
+  const handleConfirmBuy = async (destination: 'bloom' | 'home') => {
     const item = results[currentIndex];
-    if (!item) return;
-    router.push({
-      pathname: '/buy/[id]',
-      params: {
-        id: item.id,
-        name: item.display_name,
-        style_code: item.style_code,
-        image_url: item.image_url_thumb || '',
-        brand: item.brand,
-      },
-    });
+    if (!item || !session?.user?.id) return;
+
+    setPurchasing(true);
+    try {
+      // Create order intent
+      const { data, error } = await supabase.rpc('create_order_intent', {
+        p_catalog_item_id: item.id,
+        p_size: size.trim(),
+        p_destination: destination,
+      });
+
+      if (error) throw error;
+
+      setShowConfirm(false);
+      router.replace('/(tabs)');
+    } catch (e) {
+      console.error('Purchase error:', e);
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   const handleClear = () => {
@@ -122,22 +166,41 @@ export default function BuyScreen() {
                   </View>
                 )}
                 <Text style={styles.resultName}>{currentItem.display_name}</Text>
-                <Text style={styles.resultMeta}>{currentItem.style_code}</Text>
 
-                <View style={styles.buttonRow}>
-                  <Pressable style={styles.buyButton} onPress={handleSelectItem}>
+                {/* Price + Source */}
+                <Text style={styles.priceRow}>
+                  <Text style={styles.priceText}>
+                    {currentItem.lowest_price ? `$${currentItem.lowest_price}` : 'Price TBD'}
+                  </Text>
+                  <Text style={styles.sourceText}>
+                    {currentItem.marketplace ? ` · ${currentItem.marketplace}` : ''}
+                  </Text>
+                </Text>
+
+                {/* Size + Buy row */}
+                <View style={styles.actionRow}>
+                  <TextInput
+                    style={styles.sizeInput}
+                    placeholder="Size"
+                    placeholderTextColor={theme.textTertiary}
+                    value={size}
+                    onChangeText={handleSizeChange}
+                    keyboardType="default"
+                  />
+                  <Pressable
+                    style={[styles.buyButton, !size.trim() && styles.buyButtonDisabled]}
+                    onPress={handleBuyPress}
+                  >
                     <Text style={styles.buyButtonText}>Buy</Text>
                   </Pressable>
-                  {hasMore && (
-                    <Pressable style={styles.nextButton} onPress={handleNext}>
-                      <Text style={styles.nextButtonText}>Next</Text>
-                    </Pressable>
-                  )}
                 </View>
 
-                <Text style={styles.countText}>
-                  {currentIndex + 1} of {results.length}
-                </Text>
+                {/* Next + count */}
+                {hasMore && (
+                  <Pressable style={styles.nextButton} onPress={handleNext}>
+                    <Text style={styles.nextButtonText}>Next ({currentIndex + 1}/{results.length})</Text>
+                  </Pressable>
+                )}
               </View>
             </View>
           ) : hasSearched ? (
@@ -171,6 +234,42 @@ export default function BuyScreen() {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* Confirm Modal */}
+      <Modal
+        visible={showConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirm(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowConfirm(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Ship to</Text>
+
+            <Pressable
+              style={styles.modalOption}
+              onPress={() => handleConfirmBuy('bloom')}
+              disabled={purchasing}
+            >
+              <Text style={styles.modalOptionTitle}>Bloom Vault</Text>
+              <Text style={styles.modalOptionDesc}>Store with us, sell anytime</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.modalOption}
+              onPress={() => handleConfirmBuy('home')}
+              disabled={purchasing}
+            >
+              <Text style={styles.modalOptionTitle}>My Address</Text>
+              <Text style={styles.modalOptionDesc}>Ship directly to me</Text>
+            </Pressable>
+
+            {purchasing && (
+              <ActivityIndicator size="small" color={theme.accent} style={{ marginTop: 16 }} />
+            )}
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -253,8 +352,8 @@ const styles = StyleSheet.create({
     borderColor: theme.accent,
   },
   resultImage: {
-    width: 140,
-    height: 100,
+    width: 160,
+    height: 120,
     borderRadius: 12,
     backgroundColor: '#FFF',
     marginBottom: 12,
@@ -265,30 +364,56 @@ const styles = StyleSheet.create({
   },
   resultImagePlaceholderText: {
     fontFamily: fonts.heading,
-    fontSize: 28,
+    fontSize: 32,
     color: theme.accent,
   },
   resultName: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: theme.textPrimary,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  resultMeta: {
-    fontSize: 13,
-    color: theme.textSecondary,
+  priceRow: {
     marginBottom: 16,
   },
-  buttonRow: {
+  priceText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  sourceText: {
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
+  actionRow: {
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+  },
+  sizeInput: {
+    width: 70,
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   buyButton: {
+    flex: 1,
     backgroundColor: theme.accent,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
+    paddingVertical: 14,
     borderRadius: 12,
+    alignItems: 'center',
+  },
+  buyButtonDisabled: {
+    opacity: 0.5,
   },
   buyButtonText: {
     color: theme.textInverse,
@@ -296,22 +421,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   nextButton: {
-    backgroundColor: theme.backgroundSecondary,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
+    marginTop: 12,
+    paddingVertical: 10,
   },
   nextButtonText: {
-    color: theme.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  countText: {
-    marginTop: 12,
-    fontSize: 12,
-    color: theme.textTertiary,
+    color: theme.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
   },
   noResult: {
     alignItems: 'center',
@@ -331,5 +447,43 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: theme.card,
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalOption: {
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+  },
+  modalOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 4,
+  },
+  modalOptionDesc: {
+    fontSize: 13,
+    color: theme.textSecondary,
   },
 });
