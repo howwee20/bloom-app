@@ -49,28 +49,41 @@ async function getStockXOffers(
   const STOCKX_SHIPPING = 14;
 
   try {
-    const { data: items, error } = await supabase.rpc('search_catalog_items', {
-      q: query,
-      limit_n: limit,
-    });
+    // Search catalog_items directly using ilike for text matching
+    const { data: items, error } = await supabase
+      .from('catalog_items')
+      .select('id, display_name, brand, style_code, image_url_thumb')
+      .or(`display_name.ilike.%${query}%,brand.ilike.%${query}%,style_code.ilike.%${query}%`)
+      .limit(limit);
 
     if (error || !items) {
       console.error('StockX adapter error:', error);
       return [];
     }
 
+    console.log(`StockX adapter found ${items.length} items for "${query}"`);
+
+    // Return catalog items with estimated StockX pricing
+    // Since we don't have live prices, use placeholder pricing based on brand
     return items.map((item: any) => {
-      const price = item.lowest_price || 0;
-      const fees = Math.round(price * STOCKX_FEE_RATE * 100) / 100;
-      const total = price > 0 ? price + fees + STOCKX_SHIPPING : 0;
+      // Estimate price based on brand (placeholder until we have real price data)
+      const brandPrices: Record<string, number> = {
+        'Jordan': 180,
+        'Nike': 150,
+        'Adidas': 120,
+        'New Balance': 130,
+        'Yeezy': 250,
+      };
+      const basePrice = brandPrices[item.brand] || 150;
+      const total = basePrice * (1 + STOCKX_FEE_RATE) + STOCKX_SHIPPING;
 
       return {
         offer_id: `stockx:${item.id}`,
         catalog_item_id: item.id,
         title: item.display_name,
         image: item.image_url_thumb,
-        price: price,
-        total_estimate: total,
+        price: basePrice,
+        total_estimate: Math.round(total),
         currency: 'USD' as const,
         source: 'stockx',
         condition: 'deadstock' as const,
@@ -173,9 +186,9 @@ async function getAdidasOffers(query: string, limit: number): Promise<BloomOffer
 // ============ GOAT ADAPTER ============
 async function getGoatOffers(query: string, limit: number): Promise<BloomOffer[]> {
   try {
-    // GOAT uses Algolia for search
+    // GOAT uses Algolia for search - use product_templates for unique products
     const response = await fetch(
-      'https://2fwotdvm2o-dsn.algolia.net/1/indexes/product_variants_v2/query',
+      'https://2fwotdvm2o-dsn.algolia.net/1/indexes/product_variants_v2_trending/query',
       {
         method: 'POST',
         headers: {
@@ -187,6 +200,7 @@ async function getGoatOffers(query: string, limit: number): Promise<BloomOffer[]
           query: query,
           hitsPerPage: limit,
           facetFilters: [['product_category:shoes']],
+          distinct: true,  // Get unique products, not variants
         }),
       }
     );
@@ -199,7 +213,16 @@ async function getGoatOffers(query: string, limit: number): Promise<BloomOffer[]
     const data = await response.json();
     const hits = data.hits || [];
 
-    return hits.map((hit: any) => {
+    // Dedupe by slug to avoid same shoe appearing multiple times
+    const seen = new Set<string>();
+    const uniqueHits = hits.filter((hit: any) => {
+      const key = hit.slug || hit.product_template_id || hit.name;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return uniqueHits.map((hit: any) => {
       const price = hit.lowest_price_cents ? hit.lowest_price_cents / 100 :
                     (hit.retail_price_cents ? hit.retail_price_cents / 100 : 0);
       return {
@@ -215,7 +238,7 @@ async function getGoatOffers(query: string, limit: number): Promise<BloomOffer[]
         source_url: hit.slug ? `https://www.goat.com/sneakers/${hit.slug}` : `https://www.goat.com/search?query=${encodeURIComponent(query)}`,
         last_updated_at: new Date().toISOString(),
       };
-    }).filter((o: BloomOffer) => o.title);
+    }).filter((o: BloomOffer) => o.title && o.price > 0);
   } catch (e) {
     console.error('GOAT error:', e);
     return [];
@@ -310,6 +333,8 @@ Deno.serve(async (req) => {
 
       if (!source_filter) {
         // Fetch from ALL sources in parallel
+        console.log(`[get-offers] Searching all sources for "${base_query}"...`);
+
         const [stockxOffers, nikeOffers, adidasOffers, goatOffers, ebayOffers] = await Promise.allSettled([
           getStockXOffers(supabase, base_query, limit),
           getNikeOffers(base_query, limit),
@@ -318,11 +343,20 @@ Deno.serve(async (req) => {
           getEbayOffers(base_query, limit),
         ]);
 
+        // Log results from each source
+        console.log(`[get-offers] StockX: ${stockxOffers.status === 'fulfilled' ? stockxOffers.value.length : 'FAILED - ' + (stockxOffers as any).reason}`);
+        console.log(`[get-offers] Nike: ${nikeOffers.status === 'fulfilled' ? nikeOffers.value.length : 'FAILED - ' + (nikeOffers as any).reason}`);
+        console.log(`[get-offers] Adidas: ${adidasOffers.status === 'fulfilled' ? adidasOffers.value.length : 'FAILED - ' + (adidasOffers as any).reason}`);
+        console.log(`[get-offers] GOAT: ${goatOffers.status === 'fulfilled' ? goatOffers.value.length : 'FAILED - ' + (goatOffers as any).reason}`);
+        console.log(`[get-offers] eBay: ${ebayOffers.status === 'fulfilled' ? ebayOffers.value.length : 'FAILED - ' + (ebayOffers as any).reason}`);
+
         if (stockxOffers.status === 'fulfilled') allOffers.push(...stockxOffers.value);
         if (nikeOffers.status === 'fulfilled') allOffers.push(...nikeOffers.value);
         if (adidasOffers.status === 'fulfilled') allOffers.push(...adidasOffers.value);
         if (goatOffers.status === 'fulfilled') allOffers.push(...goatOffers.value);
         if (ebayOffers.status === 'fulfilled') allOffers.push(...ebayOffers.value);
+
+        console.log(`[get-offers] Total offers: ${allOffers.length}`);
       } else {
         // Filter to specific source
         switch (source_filter) {

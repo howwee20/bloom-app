@@ -111,6 +111,10 @@ export default function BuyScreen() {
 
     console.log(`[Buy] Searching for "${trimmed}" across all sources...`);
 
+    // Set up timeout - don't hang forever
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8 second max
+
     try {
       // Call Edge Function to get live prices from Nike, Adidas, GOAT, eBay, StockX
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -123,8 +127,11 @@ export default function BuyScreen() {
             'Authorization': `Bearer ${supabaseKey}`,
             'Content-Type': 'application/json',
           },
+          signal: controller.signal,
         }
       );
+
+      clearTimeout(timeout);
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
@@ -134,10 +141,20 @@ export default function BuyScreen() {
       console.log(`[Buy] Got ${data.offers?.length || 0} offers from sources:`, data.sources_searched);
 
       // Set the live offers
-      setOffers(data.offers || []);
-    } catch (error) {
-      console.error('[Buy] Error fetching live prices:', error);
-      // Fallback to local search if Edge Function fails
+      if (data.offers && data.offers.length > 0) {
+        setOffers(data.offers);
+      } else {
+        // No live offers, fall back to catalog
+        throw new Error('No offers returned');
+      }
+    } catch (error: any) {
+      clearTimeout(timeout);
+      if (error.name === 'AbortError') {
+        console.log('[Buy] Search timed out, falling back to catalog');
+      } else {
+        console.error('[Buy] Error fetching live prices:', error);
+      }
+      // Fallback to local search if Edge Function fails or times out
       const results = searchCatalog(trimmed, 20);
       const fallbackOffers: BloomOffer[] = results.map((item: CatalogProduct) => ({
         offer_id: `catalog:${item.id}`,
@@ -339,7 +356,7 @@ export default function BuyScreen() {
                 <Text style={styles.modalTitle}>{selectedOffer.title}</Text>
                 <Text style={styles.modalPrice}>{formatPrice(selectedOffer.total_estimate)}</Text>
                 <Text style={styles.modalSource}>
-                  {SOURCE_LABELS[selectedOffer.source] || selectedOffer.source} · {CONDITION_LABELS[selectedOffer.condition] || selectedOffer.condition}
+                  {SOURCE_CONFIG[selectedOffer.source]?.label || selectedOffer.source} · {CONDITION_LABELS[selectedOffer.condition] || selectedOffer.condition}
                 </Text>
 
                 {/* Size input */}
