@@ -877,26 +877,31 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header - Balance is the hero */}
+      {/* Header - Balance inline with P&L */}
       <View style={styles.headerArea}>
-        <Pressable style={styles.profileButtonAbsolute} onPress={() => router.push('/profile')}>
-          <View style={styles.profileIcon}>
-            <Text style={styles.profileIconText}>
-              {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
+        <View style={styles.headerRow}>
+          <View style={styles.headerSpacer} />
+          <Pressable style={styles.headerCenter} onPress={() => setShowBalanceBreakdown(true)}>
+            <View style={styles.balanceRow}>
+              <Text style={styles.balanceAmount}>{formatPrice(displayedTotalValue)}</Text>
+              {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
+                <Text style={[styles.balancePnl, { color: totalPnlColor }]}>
+                  ({formatPnL(displayedTotalPnl)})
+                </Text>
+              )}
+            </View>
+            <Text style={styles.balanceUpdated}>
+              {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
             </Text>
-          </View>
-        </Pressable>
-        <Pressable style={styles.balanceSection} onPress={() => setShowBalanceBreakdown(true)}>
-          <Text style={styles.balanceAmount}>{formatPrice(displayedTotalValue)}</Text>
-          {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-            <Text style={[styles.balancePnl, { color: totalPnlColor }]}>
-              {formatPnL(displayedTotalPnl)}
-            </Text>
-          )}
-          <Text style={styles.balanceUpdated}>
-            {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
-          </Text>
-        </Pressable>
+          </Pressable>
+          <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
+            <View style={styles.profileIcon}>
+              <Text style={styles.profileIconText}>
+                {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
       </View>
 
       {/* Filter Tabs */}
@@ -1425,14 +1430,45 @@ const styles = StyleSheet.create({
   },
   headerArea: {
     backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    position: 'relative',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  profileButtonAbsolute: {
-    position: 'absolute',
-    top: 12,
-    right: 16,
-    zIndex: 1,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  headerSpacer: {
+    width: 32,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  balanceAmount: {
+    fontFamily: fonts.heading,
+    fontSize: 28,
+    color: theme.textPrimary,
+    letterSpacing: -0.5,
+  },
+  balancePnl: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  balanceUpdated: {
+    fontSize: 10,
+    color: theme.textTertiary,
+    marginTop: 4,
+  },
+  profileButton: {
+    padding: 4,
   },
   profileIcon: {
     width: 32,
@@ -1446,26 +1482,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: theme.textInverse,
-  },
-  balanceSection: {
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  balanceAmount: {
-    fontFamily: fonts.heading,
-    fontSize: 32,
-    color: theme.textPrimary,
-    letterSpacing: -0.5,
-  },
-  balancePnl: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  balanceUpdated: {
-    fontSize: 10,
-    color: theme.textTertiary,
-    marginTop: 4,
   },
   // Filter Tabs - below header, on cream background
   filterTabs: {
