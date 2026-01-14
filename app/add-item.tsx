@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { theme, fonts } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
-import { initSearchIndex, searchCatalog, isIndexReady, CatalogProduct } from '../lib/search';
+import { initSearchIndex, searchCatalog, isIndexReady, refreshCatalogIndex, CatalogProduct } from '../lib/search';
 import { useAuth } from './_layout';
 
 type CatalogCondition = 'new' | 'worn' | 'used';
@@ -49,10 +49,10 @@ export default function AddItemScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Load catalog index on mount
+  // Load catalog index on mount - force refresh to clear stale cache
   useEffect(() => {
-    initSearchIndex().then(() => {
-      console.log('[AddItem] Search index ready');
+    refreshCatalogIndex().then(() => {
+      console.log('[AddItem] Search index ready, items:', isIndexReady());
     });
   }, []);
 

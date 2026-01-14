@@ -92,15 +92,17 @@ async function loadCatalogIndex(): Promise<void> {
     const cached = await AsyncStorage.getItem(CATALOG_CACHE_KEY);
     if (cached) {
       const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < CACHE_TTL_MS) {
+      if (Date.now() - timestamp < CACHE_TTL_MS && data && data.length > 0) {
         catalogIndex = data;
         indexLoaded = true;
         console.log(`[Search] Loaded ${catalogIndex.length} items from cache`);
         return;
+      } else {
+        console.log('[Search] Cache expired or empty, fetching fresh...');
       }
     }
   } catch (e) {
-    console.log('[Search] Cache miss or error');
+    console.log('[Search] Cache miss or error:', e);
   }
 
   // Fetch from DB

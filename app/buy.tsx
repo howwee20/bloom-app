@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { theme, fonts } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
-import { initSearchIndex, searchCatalog, isIndexReady, CatalogProduct } from '../lib/search';
+import { initSearchIndex, searchCatalog, isIndexReady, refreshCatalogIndex, CatalogProduct } from '../lib/search';
 import { useAuth } from './_layout';
 
 // BloomOffer - unified offer from any marketplace
@@ -75,11 +75,11 @@ export default function BuyScreen() {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
 
-  // Load catalog index on mount - this is the Google trick
+  // Load catalog index on mount - force refresh to clear stale cache
   useEffect(() => {
-    initSearchIndex().then(() => {
+    refreshCatalogIndex().then(() => {
       setIndexReady(isIndexReady());
-      console.log('[Buy] Search index ready');
+      console.log('[Buy] Search index ready, items:', isIndexReady());
     });
   }, []);
 
