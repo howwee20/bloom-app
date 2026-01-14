@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
+  InteractionManager,
   Modal,
   Pressable,
   SafeAreaView,
@@ -58,10 +59,22 @@ export default function AddItemScreen() {
   // Auto-focus search input when screen gains focus
   useFocusEffect(
     useCallback(() => {
-      const timer = setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 50);
-      return () => clearTimeout(timer);
+      let cancelled = false;
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const task = InteractionManager.runAfterInteractions(() => {
+        timer = setTimeout(() => {
+          if (!cancelled) {
+            searchInputRef.current?.focus();
+          }
+        }, 75);
+      });
+      return () => {
+        cancelled = true;
+        if (timer) {
+          clearTimeout(timer);
+        }
+        task.cancel?.();
+      };
     }, [])
   );
 
@@ -208,6 +221,7 @@ export default function AddItemScreen() {
                 returnKeyType="search"
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoFocus
                 blurOnSubmit={false}
               />
               <Pressable onPress={handleClear} style={styles.clearButton}>
