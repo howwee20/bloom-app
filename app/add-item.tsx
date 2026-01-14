@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
+  InteractionManager,
   Modal,
   Pressable,
   SafeAreaView,
@@ -55,11 +56,12 @@ export default function AddItemScreen() {
     });
   }, []);
 
-  // Auto-focus search input on mount
+  // Auto-focus search input AFTER screen transition completes
   useEffect(() => {
-    setTimeout(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
       searchInputRef.current?.focus();
-    }, 100);
+    });
+    return () => task.cancel();
   }, []);
 
   // INSTANT SEARCH - Pure in-memory, ZERO network calls
