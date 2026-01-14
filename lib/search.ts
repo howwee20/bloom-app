@@ -111,11 +111,15 @@ async function loadCatalogIndex(): Promise<void> {
 
   const { data, error } = await supabase
     .from('catalog_items')
-    .select('id, display_name, brand, style_code, image_url_thumb, lowest_price, marketplace')
+    .select('id, display_name, brand, style_code, image_url_thumb')
     .limit(5000);
 
   if (error) {
     console.error('[Search] Failed to load catalog:', error);
+    console.error('[Search] Error details:', JSON.stringify(error));
+    // Set indexLoaded to prevent infinite retry attempts
+    indexLoaded = true;
+    catalogIndex = [];
     return;
   }
 
@@ -125,8 +129,8 @@ async function loadCatalogIndex(): Promise<void> {
     brand: item.brand || '',
     style_code: item.style_code || '',
     image_url: item.image_url_thumb,
-    price: item.lowest_price,
-    source: item.marketplace || 'stockx',
+    price: null,
+    source: 'catalog',
   }));
 
   indexLoaded = true;
