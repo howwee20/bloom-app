@@ -168,10 +168,12 @@ export default function AddItemScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Close button */}
-      <Pressable style={styles.closeButton} onPress={() => router.back()}>
-        <Text style={styles.closeButtonText}>✕</Text>
-      </Pressable>
+      {/* Close button - only show on initial search view */}
+      {!hasSearched && (
+        <Pressable style={styles.closeButton} onPress={() => router.back()}>
+          <Text style={styles.closeButtonText}>✕</Text>
+        </Pressable>
+      )}
 
       {hasSearched ? (
         /* Results view - logo top left, grid of tokens */
@@ -189,12 +191,11 @@ export default function AddItemScreen() {
                 returnKeyType="search"
                 autoCapitalize="none"
                 autoCorrect={false}
+                blurOnSubmit={false}
               />
-              {query.length > 0 && (
-                <Pressable onPress={handleClear} style={styles.clearButton}>
-                  <Text style={styles.clearButtonText}>✕</Text>
-                </Pressable>
-              )}
+              <Pressable onPress={handleClear} style={styles.clearButton}>
+                <Text style={styles.clearButtonText}>✕</Text>
+              </Pressable>
             </View>
           </View>
 
@@ -235,6 +236,7 @@ export default function AddItemScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
+              blurOnSubmit={false}
             />
             {query.length > 0 && (
               <Pressable onPress={handleClear} style={styles.clearButtonCenter}>
