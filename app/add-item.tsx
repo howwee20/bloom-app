@@ -2,10 +2,9 @@ import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Image,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -39,17 +38,16 @@ export default function AddItemScreen() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<CatalogItem[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Confirm modal state
-  const [showConfirm, setShowConfirm] = useState(false);
+  // Selected item for adding
+  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+  const [showSellModal, setShowSellModal] = useState(false);
   const [sizeInput, setSizeInput] = useState('');
   const [condition, setCondition] = useState<CatalogCondition | null>(null);
   const [costBasis, setCostBasis] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
 
   const handleSearch = async () => {
     const trimmed = query.trim();
@@ -58,7 +56,6 @@ export default function AddItemScreen() {
     setLoading(true);
     setHasSearched(true);
     setResults([]);
-    setCurrentIndex(0);
 
     try {
       const { data, error } = await supabase.rpc('search_catalog_items', {
@@ -75,29 +72,24 @@ export default function AddItemScreen() {
     }
   };
 
-  const handleNext = () => {
-    if (currentIndex < results.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    }
-  };
-
-  const handleSelectItem = () => {
+  const handleSelectItem = (item: CatalogItem) => {
+    setSelectedItem(item);
     setSizeInput('');
     setCondition(null);
     setCostBasis('');
     setSubmitError(null);
-    setShowConfirm(true);
+    setShowSellModal(true);
   };
 
-  const closeConfirm = () => {
-    setShowConfirm(false);
+  const closeSellModal = () => {
+    setShowSellModal(false);
+    setSelectedItem(null);
     setSubmitting(false);
     setSubmitError(null);
   };
 
   const handleAddAsset = async () => {
-    const item = results[currentIndex];
-    if (!item) return;
+    if (!selectedItem) return;
     if (!session?.user?.id) {
       setSubmitError('Please sign in to add an item.');
       return;
@@ -119,11 +111,11 @@ export default function AddItemScreen() {
         .from('assets')
         .insert({
           owner_id: session.user.id,
-          catalog_item_id: item.id,
-          name: item.display_name,
-          image_url: item.image_url_thumb,
-          brand: item.brand,
-          stockx_sku: item.style_code,
+          catalog_item_id: selectedItem.id,
+          name: selectedItem.display_name,
+          image_url: selectedItem.image_url_thumb,
+          brand: selectedItem.brand,
+          stockx_sku: selectedItem.style_code,
           size: trimmedSize || null,
           condition: condition || null,
           purchase_price: parsedCost,
@@ -133,7 +125,7 @@ export default function AddItemScreen() {
 
       if (insertError) throw insertError;
 
-      closeConfirm();
+      closeSellModal();
       router.back();
     } catch (e) {
       console.error('Add asset error:', e);
@@ -146,167 +138,190 @@ export default function AddItemScreen() {
   const handleClear = () => {
     setQuery('');
     setResults([]);
-    setCurrentIndex(0);
     setHasSearched(false);
-    searchInputRef.current?.focus();
   };
 
-  const currentItem = results[currentIndex];
-  const hasMore = currentIndex < results.length - 1;
+  // Render token card - same style as wallet/buy
+  const renderTokenCard = ({ item }: { item: CatalogItem }) => {
+    return (
+      <Pressable style={styles.tokenCard} onPress={() => handleSelectItem(item)}>
+        <View style={styles.cardImageContainer}>
+          {item.image_url_thumb ? (
+            <Image
+              source={{ uri: item.image_url_thumb }}
+              style={styles.cardImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={[styles.cardImage, styles.placeholderImage]}>
+              <Text style={styles.placeholderText}>{item.display_name.charAt(0)}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName} numberOfLines={2}>{item.display_name}</Text>
+          <Text style={styles.cardSku}>{item.style_code}</Text>
+        </View>
+      </Pressable>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardView}
-      >
-        {/* Close button */}
-        <Pressable style={styles.closeButton} onPress={() => router.back()}>
-          <Text style={styles.closeButtonText}>✕</Text>
-        </Pressable>
+      {/* Close button */}
+      <Pressable style={styles.closeButton} onPress={() => router.back()}>
+        <Text style={styles.closeButtonText}>✕</Text>
+      </Pressable>
 
-        {/* Center content */}
-        <View style={styles.centerArea}>
+      {hasSearched ? (
+        /* Results view - logo top left, grid of tokens */
+        <View style={styles.resultsContainer}>
+          {/* Header with logo and search */}
+          <View style={styles.resultsHeader}>
+            <Text style={styles.logoSmall}>Bloom</Text>
+            <View style={styles.searchBarSmall}>
+              <TextInput
+                ref={searchInputRef}
+                style={styles.searchInputSmall}
+                value={query}
+                onChangeText={setQuery}
+                onSubmitEditing={handleSearch}
+                returnKeyType="search"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {query.length > 0 && (
+                <Pressable onPress={handleClear} style={styles.clearButton}>
+                  <Text style={styles.clearButtonText}>✕</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* Results grid */}
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.accent} />
             </View>
-          ) : hasSearched && currentItem ? (
-            <View style={styles.resultSection}>
-              <View style={styles.resultCard}>
-                {currentItem.image_url_thumb ? (
-                  <Image
-                    source={{ uri: currentItem.image_url_thumb }}
-                    style={styles.resultImage}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
-                    <Text style={styles.resultImagePlaceholderText}>
-                      {currentItem.display_name.charAt(0)}
-                    </Text>
-                  </View>
-                )}
-                <Text style={styles.resultName}>{currentItem.display_name}</Text>
-                <Text style={styles.resultMeta}>{currentItem.style_code}</Text>
-
-                <View style={styles.buttonRow}>
-                  <Pressable style={styles.sellButton} onPress={handleSelectItem}>
-                    <Text style={styles.sellButtonText}>Sell</Text>
-                  </Pressable>
-                  {hasMore && (
-                    <Pressable style={styles.nextButton} onPress={handleNext}>
-                      <Text style={styles.nextButtonText}>Next</Text>
-                    </Pressable>
-                  )}
-                </View>
-
-                <Text style={styles.countText}>
-                  {currentIndex + 1} of {results.length}
-                </Text>
-              </View>
-            </View>
-          ) : hasSearched ? (
+          ) : results.length > 0 ? (
+            <FlatList
+              data={results}
+              renderItem={renderTokenCard}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              columnWrapperStyle={styles.gridRow}
+              contentContainerStyle={styles.gridContent}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
             <View style={styles.noResult}>
               <Text style={styles.noResultTitle}>No matches</Text>
               <Text style={styles.noResultSubtitle}>Try a different search</Text>
             </View>
-          ) : (
-            /* Logo + Search in center */
-            <View style={styles.searchCenter}>
-              <Text style={styles.logo}>Bloom</Text>
-              <View style={styles.searchInputWrapper}>
-                <TextInput
-                  ref={searchInputRef}
-                  style={styles.searchInput}
-                  value={query}
-                  onChangeText={setQuery}
-                  onSubmitEditing={handleSearch}
-                  returnKeyType="search"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoFocus
-                />
-                {query.length > 0 && (
-                  <Pressable onPress={handleClear} style={styles.clearButton}>
-                    <Text style={styles.clearButtonText}>✕</Text>
-                  </Pressable>
-                )}
-              </View>
-            </View>
           )}
         </View>
-      </KeyboardAvoidingView>
+      ) : (
+        /* Initial search view - centered logo and search */
+        <View style={styles.searchCenter}>
+          <Text style={styles.logo}>Bloom</Text>
+          <View style={styles.searchInputWrapper}>
+            <TextInput
+              ref={searchInputRef}
+              style={styles.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+            />
+            {query.length > 0 && (
+              <Pressable onPress={handleClear} style={styles.clearButtonCenter}>
+                <Text style={styles.clearButtonText}>✕</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      )}
 
-      {/* Confirm Modal */}
+      {/* Sell Modal */}
       <Modal
-        visible={showConfirm}
+        visible={showSellModal}
         transparent
         animationType="slide"
-        onRequestClose={closeConfirm}
+        onRequestClose={closeSellModal}
       >
-        <Pressable style={styles.modalOverlay} onPress={closeConfirm}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            {currentItem?.image_url_thumb && (
-              <Image source={{ uri: currentItem.image_url_thumb }} style={styles.modalImage} />
+        <Pressable style={styles.modalOverlay} onPress={closeSellModal}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            {selectedItem && (
+              <>
+                {selectedItem.image_url_thumb && (
+                  <Image
+                    source={{ uri: selectedItem.image_url_thumb }}
+                    style={styles.modalImage}
+                    resizeMode="contain"
+                  />
+                )}
+                <Text style={styles.modalTitle}>{selectedItem.display_name}</Text>
+                <Text style={styles.modalSubtitle}>{selectedItem.style_code}</Text>
+
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalLabel}>Size (optional)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="e.g., 10, 10.5, M, L"
+                    placeholderTextColor={theme.textTertiary}
+                    value={sizeInput}
+                    onChangeText={setSizeInput}
+                  />
+                </View>
+
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalLabel}>Condition (optional)</Text>
+                  <View style={styles.optionRow}>
+                    {CONDITION_OPTIONS.map((option) => {
+                      const isActive = condition === option.value;
+                      return (
+                        <Pressable
+                          key={option.value}
+                          style={[styles.optionChip, isActive && styles.optionChipActive]}
+                          onPress={() => setCondition(isActive ? null : option.value)}
+                        >
+                          <Text style={[styles.optionChipText, isActive && styles.optionChipTextActive]}>
+                            {option.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalLabel}>Cost basis (optional)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="$0.00"
+                    placeholderTextColor={theme.textTertiary}
+                    value={costBasis}
+                    onChangeText={setCostBasis}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+
+                {submitError && <Text style={styles.submitErrorText}>{submitError}</Text>}
+                <Pressable
+                  style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+                  onPress={handleAddAsset}
+                  disabled={submitting}
+                >
+                  <Text style={styles.submitButtonText}>
+                    {submitting ? 'Adding...' : 'Add to Sell'}
+                  </Text>
+                </Pressable>
+              </>
             )}
-            <Text style={styles.modalTitle}>{currentItem?.display_name}</Text>
-            <Text style={styles.modalSubtitle}>{currentItem?.style_code}</Text>
-
-            <View style={styles.modalSection}>
-              <Text style={styles.modalLabel}>Size (optional)</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="e.g., 10, 10.5, M, L"
-                placeholderTextColor={theme.textTertiary}
-                value={sizeInput}
-                onChangeText={setSizeInput}
-              />
-            </View>
-
-            <View style={styles.modalSection}>
-              <Text style={styles.modalLabel}>Condition (optional)</Text>
-              <View style={styles.optionRow}>
-                {CONDITION_OPTIONS.map((option) => {
-                  const isActive = condition === option.value;
-                  return (
-                    <Pressable
-                      key={option.value}
-                      style={[styles.optionChip, isActive && styles.optionChipActive]}
-                      onPress={() => setCondition(isActive ? null : option.value)}
-                    >
-                      <Text style={[styles.optionChipText, isActive && styles.optionChipTextActive]}>
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.modalSection}>
-              <Text style={styles.modalLabel}>Cost basis (optional)</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="$0.00"
-                placeholderTextColor={theme.textTertiary}
-                value={costBasis}
-                onChangeText={setCostBasis}
-                keyboardType="decimal-pad"
-              />
-            </View>
-
-            {submitError && <Text style={styles.submitErrorText}>{submitError}</Text>}
-            <Pressable
-              style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-              onPress={handleAddAsset}
-              disabled={submitting}
-            >
-              <Text style={[styles.submitButtonText, submitting && styles.submitButtonTextDisabled]}>
-                {submitting ? 'Adding...' : 'Add to Sell'}
-              </Text>
-            </Pressable>
-          </Pressable>
+          </View>
         </Pressable>
       </Modal>
     </SafeAreaView>
@@ -317,9 +332,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.background,
-  },
-  keyboardView: {
-    flex: 1,
   },
   closeButton: {
     position: 'absolute',
@@ -337,11 +349,10 @@ const styles = StyleSheet.create({
     color: theme.textSecondary,
     fontSize: 14,
   },
-  centerArea: {
+  // Initial centered search
+  searchCenter: {
     flex: 1,
     justifyContent: 'center',
-  },
-  searchCenter: {
     alignItems: 'center',
     paddingHorizontal: 32,
   },
@@ -372,88 +383,118 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fonts.body,
   },
-  clearButton: {
+  clearButtonCenter: {
     padding: 6,
   },
   clearButtonText: {
     color: theme.textSecondary,
     fontSize: 12,
   },
-  resultSection: {
-    padding: 16,
+  // Results view
+  resultsContainer: {
+    flex: 1,
   },
-  resultCard: {
-    backgroundColor: theme.card,
-    borderRadius: 20,
-    padding: 20,
+  resultsHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.accent,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 12,
   },
-  resultImage: {
-    width: 140,
-    height: 100,
+  logoSmall: {
+    fontFamily: fonts.heading,
+    fontSize: 24,
+    color: theme.accent,
+  },
+  searchBarSmall: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 12,
-    backgroundColor: '#FFF',
-    marginBottom: 12,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  resultImagePlaceholder: {
+  searchInputSmall: {
+    flex: 1,
+    paddingVertical: 10,
+    color: theme.textPrimary,
+    fontSize: 15,
+    fontFamily: fonts.body,
+  },
+  clearButton: {
+    padding: 6,
+  },
+  // Grid
+  gridContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 24,
+  },
+  gridRow: {
+    justifyContent: 'space-between',
+  },
+  // Token card - same as wallet
+  tokenCard: {
+    width: '47%',
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardImageContainer: {
+    backgroundColor: '#FFF',
+    padding: 8,
+  },
+  cardImage: {
+    width: '100%',
+    aspectRatio: 1.3,
+  },
+  placeholderImage: {
+    backgroundColor: '#F5F5F5',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  resultImagePlaceholderText: {
+  placeholderText: {
     fontFamily: fonts.heading,
-    fontSize: 28,
+    fontSize: 24,
     color: theme.accent,
   },
-  resultName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.textPrimary,
-    textAlign: 'center',
-    marginBottom: 4,
+  cardInfo: {
+    padding: 12,
   },
-  resultMeta: {
+  cardName: {
     fontSize: 13,
-    color: theme.textSecondary,
-    marginBottom: 16,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  sellButton: {
-    backgroundColor: theme.accent,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-  },
-  sellButtonText: {
-    color: theme.textInverse,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  nextButton: {
-    backgroundColor: theme.backgroundSecondary,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  nextButtonText: {
-    color: theme.textPrimary,
-    fontSize: 16,
     fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 4,
+    lineHeight: 17,
   },
-  countText: {
-    marginTop: 12,
-    fontSize: 12,
-    color: theme.textTertiary,
+  cardSku: {
+    fontSize: 11,
+    color: theme.textSecondary,
+  },
+  // Loading & empty
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   noResult: {
+    flex: 1,
     alignItems: 'center',
-    paddingVertical: 32,
+    justifyContent: 'center',
   },
   noResultTitle: {
     fontSize: 16,
@@ -465,44 +506,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.textSecondary,
   },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Modal styles
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: theme.card,
-    padding: 20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
     maxHeight: '90%',
   },
   modalImage: {
     width: 120,
-    height: 80,
+    height: 90,
     borderRadius: 12,
     alignSelf: 'center',
-    marginBottom: 12,
     backgroundColor: '#FFF',
+    marginBottom: 12,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.textPrimary,
     textAlign: 'center',
+    marginBottom: 4,
   },
   modalSubtitle: {
     fontSize: 13,
     color: theme.textSecondary,
-    marginTop: 4,
-    marginBottom: 16,
     textAlign: 'center',
+    marginBottom: 20,
   },
   modalSection: {
     marginBottom: 16,
@@ -513,7 +550,7 @@ const styles = StyleSheet.create({
     color: theme.textSecondary,
     marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   modalInput: {
     borderWidth: 1,
@@ -570,8 +607,5 @@ const styles = StyleSheet.create({
     color: theme.textInverse,
     fontWeight: '700',
     fontSize: 16,
-  },
-  submitButtonTextDisabled: {
-    color: theme.textInverse,
   },
 });
