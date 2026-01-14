@@ -125,7 +125,7 @@ export default function BuyScreen() {
           source_url: `https://stockx.com/search?s=${encodeURIComponent(item.display_name)}`,
           last_updated_at: new Date().toISOString(),
         }));
-        setOffers(searchOffers.filter(o => o.price > 0));
+        setOffers(searchOffers);
       }
     } catch (e) {
       console.error('Search error:', e);
