@@ -2,10 +2,10 @@
 // Using Zen Dots font for headers
 
 export const theme = {
-  // Accent color - Bloom baby blue
-  accent: '#A8D4E6',
-  accentDark: '#7BB8D4',
-  accentLight: '#E8F4FA',
+  // Accent color - Bloom orange (warm peach)
+  accent: '#F5C49A',
+  accentDark: '#E0A570',
+  accentLight: '#FFF0E5',
 
   // Backgrounds - Warm cream palette
   background: '#FDF8F3',
@@ -36,7 +36,7 @@ export const theme = {
   tabBar: '#FDF8F3',
   tabBarBorder: 'rgba(0, 0, 0, 0.08)',
   tabIconDefault: '#9A9A9A',
-  tabIconSelected: '#A8D4E6',
+  tabIconSelected: '#E8A875',
 };
 
 // Font family constant
