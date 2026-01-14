@@ -1429,7 +1429,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.background,
   },
   headerArea: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerRow: {
     flexDirection: 'row',
@@ -1481,29 +1483,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.textInverse,
   },
-  // Filter Tabs - floating pills
+  // Filter Tabs - below header, on cream background
   filterTabs: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    backgroundColor: theme.background,
     paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
     gap: 8,
   },
   filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: theme.backgroundSecondary,
   },
   filterTabActive: {
     backgroundColor: theme.accent,
-    shadowOpacity: 0.12,
   },
   filterTabText: {
     fontSize: 13,
