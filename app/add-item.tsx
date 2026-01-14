@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Modal,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import { theme, fonts } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
+import { initSearchIndex, searchCatalog, isIndexReady, CatalogProduct } from '../lib/search';
 import { useAuth } from './_layout';
 
 type CatalogCondition = 'new' | 'worn' | 'used';
@@ -36,7 +36,6 @@ export default function AddItemScreen() {
   const { session } = useAuth();
   const searchInputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<CatalogItem[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -49,27 +48,35 @@ export default function AddItemScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSearch = async () => {
+  // Load catalog index on mount
+  useEffect(() => {
+    initSearchIndex().then(() => {
+      console.log('[AddItem] Search index ready');
+    });
+  }, []);
+
+  // INSTANT SEARCH - Pure in-memory, ZERO network calls
+  const handleSearch = () => {
     const trimmed = query.trim();
     if (!trimmed) return;
 
-    setLoading(true);
+    const start = performance.now();
     setHasSearched(true);
-    setResults([]);
 
-    try {
-      const { data, error } = await supabase.rpc('search_catalog_items', {
-        q: trimmed,
-        limit_n: 20,
-      });
+    // Search local index - NO AWAIT, NO NETWORK, INSTANT
+    const searchResults = searchCatalog(trimmed, 20);
 
-      if (error) throw error;
-      setResults((data as CatalogItem[]) || []);
-    } catch (e) {
-      console.error('Search error:', e);
-    } finally {
-      setLoading(false);
-    }
+    // Convert to CatalogItem format
+    const items: CatalogItem[] = searchResults.map((item: CatalogProduct) => ({
+      id: item.id,
+      display_name: item.name,
+      brand: item.brand,
+      style_code: item.style_code,
+      image_url_thumb: item.image_url,
+    }));
+
+    setResults(items);
+    console.log(`[AddItem] Search completed in ${(performance.now() - start).toFixed(1)}ms`);
   };
 
   const handleSelectItem = (item: CatalogItem) => {
@@ -199,12 +206,8 @@ export default function AddItemScreen() {
             </View>
           </View>
 
-          {/* Results grid */}
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.accent} />
-            </View>
-          ) : results.length > 0 ? (
+          {/* Results grid - INSTANT, no loading spinner needed */}
+          {results.length > 0 ? (
             <FlatList
               data={results}
               renderItem={renderTokenCard}
@@ -213,6 +216,9 @@ export default function AddItemScreen() {
               columnWrapperStyle={styles.gridRow}
               contentContainerStyle={styles.gridContent}
               showsVerticalScrollIndicator={false}
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              windowSize={5}
             />
           ) : (
             <View style={styles.noResult}>
