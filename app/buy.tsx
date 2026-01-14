@@ -50,6 +50,7 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
   stockx: { label: 'StockX', color: '#006340' },
   ebay: { label: 'eBay', color: '#E53238' },
   goat: { label: 'GOAT', color: '#000000' },
+  grailed: { label: 'Grailed', color: '#7B1FA2' },
   adidas: { label: 'Adidas', color: '#000000' },
   nike: { label: 'Nike', color: '#F36F21' },
   catalog: { label: 'Catalog', color: '#888888' },

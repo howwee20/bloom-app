@@ -122,60 +122,205 @@ async function getGoatOffers(query: string, limit: number): Promise<BloomOffer[]
   }
 }
 
-// ============ STOCKX ADAPTER (REAL API via web scraping endpoint) ============
-async function getStockXOffers(query: string, limit: number): Promise<BloomOffer[]> {
-  try {
-    console.log(`[StockX] Searching for "${query}"...`);
+// ============ STOCKX ADAPTER (Official API v2 with OAuth) ============
+async function getStockXOffers(supabase: any, query: string, limit: number): Promise<BloomOffer[]> {
+  const apiKey = Deno.env.get('STOCKX_API_KEY');
+  const clientId = Deno.env.get('STOCKX_CLIENT_ID');
+  const clientSecret = Deno.env.get('STOCKX_CLIENT_SECRET');
 
-    // StockX search endpoint (public, no auth required)
+  // Try official API if credentials are available
+  if (apiKey && clientId && clientSecret) {
+    try {
+      console.log(`[StockX] Using official API for "${query}"...`);
+
+      // Get refresh token from database
+      const { data: tokenData } = await supabase.rpc('get_stockx_tokens');
+      const refreshToken = tokenData?.[0]?.refresh_token;
+
+      if (refreshToken) {
+        // Get access token
+        const basicAuth = btoa(`${clientId}:${clientSecret}`);
+        const tokenResponse = await fetchWithTimeout(
+          'https://accounts.stockx.com/oauth/token',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${basicAuth}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              grant_type: 'refresh_token',
+              refresh_token: refreshToken,
+            }).toString(),
+          },
+          5000
+        );
+
+        if (tokenResponse.ok) {
+          const tokenJson = await tokenResponse.json();
+          const accessToken = tokenJson.access_token;
+
+          // Search with official API
+          const searchResponse = await fetchWithTimeout(
+            `https://api.stockx.com/v2/catalog/search?query=${encodeURIComponent(query)}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'x-api-key': apiKey,
+              },
+            },
+            5000
+          );
+
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            const products = searchData.products || [];
+            console.log(`[StockX] Official API returned ${products.length} products`);
+
+            // Get market data for each product
+            const offers: BloomOffer[] = [];
+            for (const product of products.slice(0, limit)) {
+              try {
+                const marketResponse = await fetchWithTimeout(
+                  `https://api.stockx.com/v2/catalog/products/${product.productId}/market-data`,
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${accessToken}`,
+                      'x-api-key': apiKey,
+                    },
+                  },
+                  3000
+                );
+
+                if (marketResponse.ok) {
+                  const marketData = await marketResponse.json();
+                  const firstVariant = marketData[0];
+                  const lowestAsk = firstVariant?.lowestAskAmount || 0;
+
+                  if (lowestAsk > 0) {
+                    offers.push({
+                      offer_id: `stockx:${product.urlKey || product.productId}`,
+                      catalog_item_id: null,
+                      title: product.title || product.name,
+                      image: product.media?.thumbUrl || product.media?.imageUrl || null,
+                      price: lowestAsk,
+                      total_estimate: Math.round(lowestAsk * 1.12 + 14),
+                      currency: 'USD' as const,
+                      source: 'stockx',
+                      condition: 'deadstock' as const,
+                      source_url: `https://stockx.com/${product.urlKey || ''}`,
+                      last_updated_at: new Date().toISOString(),
+                    });
+                  }
+                }
+              } catch (e) {
+                // Skip this product if market data fails
+              }
+            }
+
+            if (offers.length > 0) {
+              console.log(`[StockX] Returning ${offers.length} offers with real prices`);
+              return offers;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[StockX] Official API error:', e);
+    }
+  }
+
+  // Fallback: Try public browse endpoint (often blocked but worth trying)
+  try {
+    console.log(`[StockX] Trying public API for "${query}"...`);
+
     const response = await fetchWithTimeout(
-      `https://stockx.com/api/browse?_search=${encodeURIComponent(query)}&page=1&resultsPerPage=${limit}&dataType=product&facetsToRetrieve[]=browseVerticals&propsToRetrieve[][]=brand&propsToRetrieve[][]=colorway&propsToRetrieve[][]=media.thumbUrl&propsToRetrieve[][]=title&propsToRetrieve[][]=productCategory&propsToRetrieve[][]=shortDescription&propsToRetrieve[][]=urlKey&propsToRetrieve[][]=market.lowestAsk&propsToRetrieve[][]=market.highestBid`,
+      `https://stockx.com/api/browse?_search=${encodeURIComponent(query)}&page=1&resultsPerPage=${limit}`,
       {
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+      },
+      5000
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      const products = data.Products || data.products || [];
+      console.log(`[StockX] Public API returned ${products.length} products`);
+
+      return products.map((p: any) => ({
+        offer_id: `stockx:${p.urlKey || p.id}`,
+        catalog_item_id: null,
+        title: p.title || p.shortDescription || 'StockX Product',
+        image: p.media?.thumbUrl || null,
+        price: p.market?.lowestAsk || 0,
+        total_estimate: p.market?.lowestAsk ? Math.round(p.market.lowestAsk * 1.12 + 14) : 0,
+        currency: 'USD' as const,
+        source: 'stockx',
+        condition: 'deadstock' as const,
+        source_url: p.urlKey ? `https://stockx.com/${p.urlKey}` : `https://stockx.com/search?s=${encodeURIComponent(query)}`,
+        last_updated_at: new Date().toISOString(),
+      })).filter((o: BloomOffer) => o.price > 0);
+    }
+  } catch (e) {
+    console.error('[StockX] Public API error:', e);
+  }
+
+  console.log('[StockX] No results from any endpoint');
+  return [];
+}
+
+// ============ GRAILED ADAPTER (Resale marketplace for used/vintage) ============
+async function getGrailedOffers(query: string, limit: number): Promise<BloomOffer[]> {
+  try {
+    console.log(`[Grailed] Searching for "${query}"...`);
+
+    // Try Grailed's public API endpoint
+    const response = await fetchWithTimeout(
+      `https://www.grailed.com/api/merchandise/marquee/listings?` +
+      `sold=false&on_sale=false&staff_pick=false&department=footwear&` +
+      `query=${encodeURIComponent(query)}&page=1&hitsPerPage=${limit}`,
+      {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         },
       },
       5000
     );
 
     if (!response.ok) {
-      const text = await response.text();
-      console.error(`[StockX] API error ${response.status}: ${text.substring(0, 200)}`);
+      console.error(`[Grailed] API error ${response.status}`);
       return [];
     }
 
     const data = await response.json();
-    console.log(`[StockX] Response keys: ${Object.keys(data).join(', ')}`);
-    const products = data.Products || data.products || [];
-    console.log(`[StockX] Got ${products.length} products`);
+    const listings = data.data || data.listings || data.hits || [];
+    console.log(`[Grailed] Got ${listings.length} listings`);
 
-    const offers = products.map((p: any) => {
-      const lowestAsk = p.market?.lowestAsk || 0;
-      const total = lowestAsk > 0 ? Math.round(lowestAsk * 1.12 + 14) : 0; // 12% fee + $14 ship
-
+    const offers = listings.map((listing: any) => {
+      const price = listing.price || listing.asking_price || 0;
       return {
-        offer_id: `stockx:${p.urlKey || p.id}`,
+        offer_id: `grailed:${listing.id}`,
         catalog_item_id: null,
-        title: p.title || p.shortDescription || 'StockX Product',
-        image: p.media?.thumbUrl || null,
-        price: lowestAsk,
-        total_estimate: total,
+        title: listing.title || listing.designer?.name + ' ' + (listing.description?.substring(0, 50) || '') || 'Grailed Item',
+        image: listing.cover_photo?.url || listing.photos?.[0]?.url || listing.image_url || null,
+        price: price,
+        total_estimate: price > 0 ? Math.round(price * 1.09 + 10) : 0, // 9% fee + $10 ship estimate
         currency: 'USD' as const,
-        source: 'stockx',
-        condition: 'deadstock' as const,
-        source_url: p.urlKey
-          ? `https://stockx.com/${p.urlKey}`
-          : `https://stockx.com/search?s=${encodeURIComponent(query)}`,
+        source: 'grailed',
+        condition: 'used' as const,
+        source_url: listing.id ? `https://www.grailed.com/listings/${listing.id}` : `https://www.grailed.com/shop?query=${encodeURIComponent(query)}`,
         last_updated_at: new Date().toISOString(),
       };
-    }).filter((o: BloomOffer) => o.price > 0);
+    }).filter((o: BloomOffer) => o.title && o.price > 0);
 
-    console.log(`[StockX] Returning ${offers.length} offers with prices`);
+    console.log(`[Grailed] Returning ${offers.length} offers`);
     return offers;
   } catch (e) {
-    console.error('[StockX] Error:', e);
+    console.error('[Grailed] Error:', e);
     return [];
   }
 }
@@ -480,11 +625,10 @@ Deno.serve(async (req) => {
 
       if (!source_filter) {
         // Fetch from ALL sources in parallel
-        const [goatOffers, stockxOffers, nikeOffers, adidasOffers, ebayOffers] = await Promise.allSettled([
+        const [goatOffers, stockxOffers, grailedOffers, ebayOffers] = await Promise.allSettled([
           getGoatOffers(base_query, limit),
-          getStockXOffers(base_query, limit),
-          getNikeOffers(base_query, limit),
-          getAdidasOffers(base_query, limit),
+          getStockXOffers(supabase, base_query, limit),
+          getGrailedOffers(base_query, limit),
           getEbayOffers(base_query, limit),
         ]);
 
@@ -505,20 +649,12 @@ Deno.serve(async (req) => {
           console.error('[StockX] FAILED:', (stockxOffers as any).reason);
         }
 
-        if (nikeOffers.status === 'fulfilled') {
-          allOffers.push(...nikeOffers.value);
-          sourceResults['nike'] = nikeOffers.value.length;
+        if (grailedOffers.status === 'fulfilled') {
+          allOffers.push(...grailedOffers.value);
+          sourceResults['grailed'] = grailedOffers.value.length;
         } else {
-          sourceResults['nike'] = -1;
-          console.error('[Nike] FAILED:', (nikeOffers as any).reason);
-        }
-
-        if (adidasOffers.status === 'fulfilled') {
-          allOffers.push(...adidasOffers.value);
-          sourceResults['adidas'] = adidasOffers.value.length;
-        } else {
-          sourceResults['adidas'] = -1;
-          console.error('[Adidas] FAILED:', (adidasOffers as any).reason);
+          sourceResults['grailed'] = -1;
+          console.error('[Grailed] FAILED:', (grailedOffers as any).reason);
         }
 
         if (ebayOffers.status === 'fulfilled') {
@@ -546,13 +682,10 @@ Deno.serve(async (req) => {
             allOffers.push(...await getGoatOffers(base_query, limit));
             break;
           case 'stockx':
-            allOffers.push(...await getStockXOffers(base_query, limit));
+            allOffers.push(...await getStockXOffers(supabase, base_query, limit));
             break;
-          case 'nike':
-            allOffers.push(...await getNikeOffers(base_query, limit));
-            break;
-          case 'adidas':
-            allOffers.push(...await getAdidasOffers(base_query, limit));
+          case 'grailed':
+            allOffers.push(...await getGrailedOffers(base_query, limit));
             break;
           case 'ebay':
             allOffers.push(...await getEbayOffers(base_query, limit));
@@ -577,7 +710,7 @@ Deno.serve(async (req) => {
           offers: allOffers.slice(0, limit),
           sources_searched: source_filter
             ? [source_filter]
-            : ['goat', 'stockx', 'nike', 'adidas', 'ebay'],
+            : ['goat', 'stockx', 'grailed', 'ebay'],
           source_results: sourceResults,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
