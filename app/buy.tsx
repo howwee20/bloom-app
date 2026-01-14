@@ -99,19 +99,37 @@ export default function BuyScreen() {
     setOffers([]);
 
     try {
-      // Use catalog search directly (Edge Function can be enabled later)
+      // Call get-offers Edge Function for multi-source search
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/get-offers?q=${encodeURIComponent(trimmed)}&limit=20`,
+        {
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setOffers(data.offers || []);
+        return;
+      }
+    } catch (e) {
+      console.error('Edge Function error, falling back:', e);
+    }
+
+    // Fallback to direct catalog search if Edge Function fails
+    try {
       const { data, error } = await supabase.rpc('search_catalog_items', {
         q: trimmed,
         limit_n: 20,
       });
 
-      if (error) {
-        console.error('Search error:', error);
-        return;
-      }
-
-      if (data) {
-        // Convert to BloomOffer format
+      if (!error && data) {
         const searchOffers: BloomOffer[] = data.map((item: CatalogItem) => ({
           offer_id: `stockx:${item.id}`,
           catalog_item_id: item.id,
