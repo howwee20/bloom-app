@@ -883,7 +883,7 @@ export default function HomeScreen() {
           <View style={styles.headerSpacer} />
           <Pressable style={styles.headerCenter} onPress={() => setShowBalanceBreakdown(true)}>
             <View style={styles.balanceRow}>
-              <Text style={styles.balanceAmount}>{formatPrice(displayedTotalValue)}</Text>
+              <Text style={styles.balanceAmount}>{formatCurrency(displayedTotalValue)}</Text>
               {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
                 <Text style={[styles.balancePnl, { color: totalPnlColor }]}>
                   ({formatPnL(displayedTotalPnl)})
