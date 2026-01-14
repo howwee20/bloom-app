@@ -10,6 +10,8 @@ interface OrderIntentNotification {
   quoted_total: number | null;
   max_total: number;
   email: string | null;
+  marketplace: string | null;
+  source_url: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -41,91 +43,118 @@ Deno.serve(async (req) => {
       : 'N/A';
     const maxTotalFormatted = `$${order.max_total.toFixed(2)}`;
     const routeLabel = order.route === 'bloom' ? 'Ship to Bloom' : 'Ship to me';
+    const marketplaceLabel = order.marketplace?.toUpperCase() || 'Unknown';
+
+    // Build Slack message blocks
+    const blocks: any[] = [
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: '🆕 NEW ORDER INTENT',
+          emoji: true,
+        },
+      },
+      {
+        type: 'section',
+        fields: [
+          {
+            type: 'mrkdwn',
+            text: `*Shoe:*\n${order.shoe_name}`,
+          },
+          {
+            type: 'mrkdwn',
+            text: `*Style Code:*\n${order.style_code}`,
+          },
+        ],
+      },
+      {
+        type: 'section',
+        fields: [
+          {
+            type: 'mrkdwn',
+            text: `*Size:*\n${order.size}`,
+          },
+          {
+            type: 'mrkdwn',
+            text: `*Route:*\n${routeLabel}`,
+          },
+        ],
+      },
+      {
+        type: 'section',
+        fields: [
+          {
+            type: 'mrkdwn',
+            text: `*Source:*\n${marketplaceLabel}`,
+          },
+          {
+            type: 'mrkdwn',
+            text: `*Quoted Total:*\n${quotedTotalFormatted}`,
+          },
+        ],
+      },
+      {
+        type: 'section',
+        fields: [
+          {
+            type: 'mrkdwn',
+            text: `*Max Approved:*\n${maxTotalFormatted}`,
+          },
+          {
+            type: 'mrkdwn',
+            text: `*User:*\n${order.email || 'N/A'}`,
+          },
+        ],
+      },
+    ];
+
+    // Add clickable source URL if available
+    if (order.source_url) {
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `🔗 *<${order.source_url}|BUY HERE - Click to Purchase>*`,
+        },
+      });
+    }
+
+    blocks.push(
+      {
+        type: 'section',
+        fields: [
+          {
+            type: 'mrkdwn',
+            text: `*Order ID:*\n\`${order.order_id}\``,
+          },
+        ],
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `⏰ ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} ET`,
+          },
+        ],
+      },
+      {
+        type: 'divider',
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: '👆 *Action Required:* Click the link above, buy the item, and update status in admin.',
+        },
+      }
+    );
 
     // Build Slack message
     const slackMessage = {
-      text: `🆕 NEW ORDER INTENT`,
-      blocks: [
-        {
-          type: 'header',
-          text: {
-            type: 'plain_text',
-            text: '🆕 NEW ORDER INTENT',
-            emoji: true,
-          },
-        },
-        {
-          type: 'section',
-          fields: [
-            {
-              type: 'mrkdwn',
-              text: `*Shoe:*\n${order.shoe_name}`,
-            },
-            {
-              type: 'mrkdwn',
-              text: `*Style Code:*\n${order.style_code}`,
-            },
-          ],
-        },
-        {
-          type: 'section',
-          fields: [
-            {
-              type: 'mrkdwn',
-              text: `*Size:*\n${order.size}`,
-            },
-            {
-              type: 'mrkdwn',
-              text: `*Route:*\n${routeLabel}`,
-            },
-          ],
-        },
-        {
-          type: 'section',
-          fields: [
-            {
-              type: 'mrkdwn',
-              text: `*Quoted Total:*\n${quotedTotalFormatted}`,
-            },
-            {
-              type: 'mrkdwn',
-              text: `*Max Approved:*\n${maxTotalFormatted}`,
-            },
-          ],
-        },
-        {
-          type: 'section',
-          fields: [
-            {
-              type: 'mrkdwn',
-              text: `*User:*\n${order.email || 'N/A'}`,
-            },
-            {
-              type: 'mrkdwn',
-              text: `*Order ID:*\n\`${order.order_id}\``,
-            },
-          ],
-        },
-        {
-          type: 'context',
-          elements: [
-            {
-              type: 'mrkdwn',
-              text: `⏰ ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} ET`,
-            },
-          ],
-        },
-        {
-          type: 'divider',
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: '👆 *Action Required:* Execute purchase manually and update status in admin.',
-          },
-        },
-      ],
+      text: `🆕 NEW ORDER INTENT - ${order.shoe_name} (${marketplaceLabel})`,
+      blocks,
     };
 
     // Send to Slack

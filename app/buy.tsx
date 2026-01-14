@@ -17,6 +17,22 @@ import { theme, fonts } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './_layout';
 
+// BloomOffer - unified offer from any marketplace
+interface BloomOffer {
+  offer_id: string;
+  catalog_item_id: string | null;
+  title: string;
+  image: string | null;
+  price: number;
+  total_estimate: number;
+  currency: 'USD';
+  source: string;
+  condition: 'new' | 'used' | 'deadstock';
+  source_url: string;
+  last_updated_at: string;
+}
+
+// Legacy interface for backwards compatibility with existing search
 interface CatalogItem {
   id: string;
   display_name: string;
@@ -29,16 +45,32 @@ interface CatalogItem {
 
 const SAVED_SIZE_KEY = 'bloom_saved_size';
 
+// Source display names
+const SOURCE_LABELS: Record<string, string> = {
+  stockx: 'StockX',
+  ebay: 'eBay',
+  goat: 'GOAT',
+  adidas: 'Adidas',
+  nike: 'Nike',
+};
+
+// Condition labels
+const CONDITION_LABELS: Record<string, string> = {
+  new: 'New',
+  used: 'Used',
+  deadstock: 'DS',
+};
+
 export default function BuyScreen() {
   const { session } = useAuth();
   const searchInputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<CatalogItem[]>([]);
+  const [offers, setOffers] = useState<BloomOffer[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Selected item for purchase
-  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+  // Selected offer for purchase
+  const [selectedOffer, setSelectedOffer] = useState<BloomOffer | null>(null);
   const [size, setSize] = useState('');
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
@@ -64,43 +96,86 @@ export default function BuyScreen() {
 
     setLoading(true);
     setHasSearched(true);
-    setResults([]);
+    setOffers([]);
 
     try {
-      const { data, error } = await supabase.rpc('search_catalog_items', {
-        q: trimmed,
-        limit_n: 20,
-      });
+      // Get Supabase URL for Edge Function
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-      if (error) throw error;
-      setResults((data as CatalogItem[]) || []);
+      // Call get-offers Edge Function
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/get-offers?q=${encodeURIComponent(trimmed)}&limit=20`,
+        {
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setOffers(data.offers || []);
     } catch (e) {
       console.error('Search error:', e);
+      // Fallback to legacy search if Edge Function fails
+      try {
+        const { data, error } = await supabase.rpc('search_catalog_items', {
+          q: trimmed,
+          limit_n: 20,
+        });
+        if (!error && data) {
+          // Convert to BloomOffer format
+          const legacyOffers: BloomOffer[] = data.map((item: CatalogItem) => ({
+            offer_id: `stockx:${item.id}`,
+            catalog_item_id: item.id,
+            title: item.display_name,
+            image: item.image_url_thumb,
+            price: item.lowest_price || 0,
+            total_estimate: (item.lowest_price || 0) * 1.12 + 14,
+            currency: 'USD',
+            source: 'stockx',
+            condition: 'deadstock',
+            source_url: `https://stockx.com/search?s=${encodeURIComponent(item.display_name)}`,
+            last_updated_at: new Date().toISOString(),
+          }));
+          setOffers(legacyOffers.filter(o => o.price > 0));
+        }
+      } catch (fallbackError) {
+        console.error('Fallback search error:', fallbackError);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectItem = (item: CatalogItem) => {
-    setSelectedItem(item);
+  const handleSelectOffer = (offer: BloomOffer) => {
+    setSelectedOffer(offer);
     setShowBuyModal(true);
   };
 
   const handleConfirmBuy = async (destination: 'bloom' | 'home') => {
-    if (!selectedItem || !session?.user?.id || !size.trim()) return;
+    if (!selectedOffer || !session?.user?.id || !size.trim()) return;
 
     setPurchasing(true);
     try {
       const { error } = await supabase.rpc('create_order_intent', {
-        p_catalog_item_id: selectedItem.id,
+        p_catalog_item_id: selectedOffer.catalog_item_id,
         p_size: size.trim(),
         p_destination: destination,
+        p_marketplace: selectedOffer.source,
+        p_source_url: selectedOffer.source_url,
+        p_quoted_total: selectedOffer.total_estimate,
       });
 
       if (error) throw error;
 
       setShowBuyModal(false);
-      setSelectedItem(null);
+      setSelectedOffer(null);
       router.replace('/(tabs)');
     } catch (e) {
       console.error('Purchase error:', e);
@@ -111,7 +186,7 @@ export default function BuyScreen() {
 
   const handleClear = () => {
     setQuery('');
-    setResults([]);
+    setOffers([]);
     setHasSearched(false);
   };
 
@@ -120,29 +195,30 @@ export default function BuyScreen() {
     return `$${price.toFixed(0)}`;
   };
 
-  // Render token card - same style as wallet
-  const renderTokenCard = ({ item }: { item: CatalogItem }) => {
+  // Render offer card - matches wallet token card style exactly
+  const renderOfferCard = ({ item }: { item: BloomOffer }) => {
+    const sourceLabel = SOURCE_LABELS[item.source] || item.source;
+    const conditionLabel = CONDITION_LABELS[item.condition] || item.condition;
+
     return (
-      <Pressable style={styles.tokenCard} onPress={() => handleSelectItem(item)}>
+      <Pressable style={styles.tokenCard} onPress={() => handleSelectOffer(item)}>
         <View style={styles.cardImageContainer}>
-          {item.image_url_thumb ? (
+          {item.image ? (
             <Image
-              source={{ uri: item.image_url_thumb }}
+              source={{ uri: item.image }}
               style={styles.cardImage}
               resizeMode="contain"
             />
           ) : (
             <View style={[styles.cardImage, styles.placeholderImage]}>
-              <Text style={styles.placeholderText}>{item.display_name.charAt(0)}</Text>
+              <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
             </View>
           )}
         </View>
         <View style={styles.cardInfo}>
-          <Text style={styles.cardName} numberOfLines={2}>{item.display_name}</Text>
-          <Text style={styles.cardPrice}>{formatPrice(item.lowest_price)}</Text>
-          {item.marketplace && (
-            <Text style={styles.cardSource}>{item.marketplace}</Text>
-          )}
+          <Text style={styles.cardName} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.cardPrice}>{formatPrice(item.total_estimate)}</Text>
+          <Text style={styles.cardSource}>{sourceLabel} · {conditionLabel}</Text>
         </View>
       </Pressable>
     );
@@ -185,11 +261,11 @@ export default function BuyScreen() {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.accent} />
             </View>
-          ) : results.length > 0 ? (
+          ) : offers.length > 0 ? (
             <FlatList
-              data={results}
-              renderItem={renderTokenCard}
-              keyExtractor={(item) => item.id}
+              data={offers}
+              renderItem={renderOfferCard}
+              keyExtractor={(item) => item.offer_id}
               numColumns={2}
               columnWrapperStyle={styles.gridRow}
               contentContainerStyle={styles.gridContent}
@@ -236,17 +312,20 @@ export default function BuyScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowBuyModal(false)}>
           <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-            {selectedItem && (
+            {selectedOffer && (
               <>
-                {selectedItem.image_url_thumb && (
+                {selectedOffer.image && (
                   <Image
-                    source={{ uri: selectedItem.image_url_thumb }}
+                    source={{ uri: selectedOffer.image }}
                     style={styles.modalImage}
                     resizeMode="contain"
                   />
                 )}
-                <Text style={styles.modalTitle}>{selectedItem.display_name}</Text>
-                <Text style={styles.modalPrice}>{formatPrice(selectedItem.lowest_price)}</Text>
+                <Text style={styles.modalTitle}>{selectedOffer.title}</Text>
+                <Text style={styles.modalPrice}>{formatPrice(selectedOffer.total_estimate)}</Text>
+                <Text style={styles.modalSource}>
+                  {SOURCE_LABELS[selectedOffer.source] || selectedOffer.source} · {CONDITION_LABELS[selectedOffer.condition] || selectedOffer.condition}
+                </Text>
 
                 {/* Size input */}
                 <View style={styles.sizeRow}>
@@ -508,6 +587,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: theme.textPrimary,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  modalSource: {
+    fontSize: 13,
+    color: theme.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
   },
