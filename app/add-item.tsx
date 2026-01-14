@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -55,21 +55,15 @@ export default function AddItemScreen() {
     });
   }, []);
 
-  // Auto-focus search input - aggressive approach with retry
-  useEffect(() => {
-    // First attempt after short delay
-    const t1 = setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 100);
-    // Backup attempt after screen fully mounted
-    const t2 = setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 400);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
+  // Auto-focus search input when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }, [])
+  );
 
   // INSTANT SEARCH - Pure in-memory, ZERO network calls
   const handleSearch = () => {
