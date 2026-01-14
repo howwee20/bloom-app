@@ -99,46 +99,31 @@ export default function BuyScreen() {
     setOffers([]);
 
     try {
-      // Call get-offers Edge Function for multi-source search
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/get-offers?q=${encodeURIComponent(trimmed)}&limit=20`,
-        {
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setOffers(data.offers || []);
-        return;
-      }
-    } catch (e) {
-      console.error('Edge Function error, falling back:', e);
-    }
-
-    // Fallback to direct catalog search if Edge Function fails
-    try {
+      // INDEX-FIRST: Query LOCAL catalog_items table ONLY
+      // This is instant (<50ms) because it's our own database
+      // NO external API calls here - that's what makes Google fast
       const { data, error } = await supabase.rpc('search_catalog_items', {
         q: trimmed,
         limit_n: 20,
       });
 
-      if (!error && data) {
+      if (error) {
+        console.error('Search error:', error);
+        return;
+      }
+
+      if (data) {
+        // Show results IMMEDIATELY with cached prices
+        // Price comes from our local DB (updated by price worker)
         const searchOffers: BloomOffer[] = data.map((item: CatalogItem) => ({
-          offer_id: `stockx:${item.id}`,
+          offer_id: `bloom:${item.id}`,
           catalog_item_id: item.id,
           title: item.display_name,
           image: item.image_url_thumb,
           price: item.lowest_price || 0,
-          total_estimate: (item.lowest_price || 0) * 1.12 + 14,
+          total_estimate: item.lowest_price ? (item.lowest_price * 1.12 + 14) : 0,
           currency: 'USD' as const,
-          source: 'stockx',
+          source: item.marketplace || 'stockx',
           condition: 'deadstock' as const,
           source_url: `https://stockx.com/search?s=${encodeURIComponent(item.display_name)}`,
           last_updated_at: new Date().toISOString(),
