@@ -101,98 +101,100 @@ export default function BuyScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        {/* Header with logo and search */}
+        {/* Header - just logo and close */}
         <View style={styles.header}>
           <Pressable style={styles.closeButton} onPress={() => router.back()}>
             <Text style={styles.closeButtonText}>✕</Text>
           </Pressable>
-
           <Text style={styles.logo}>Bloom</Text>
-
-          <View style={styles.searchRow}>
-            <View style={styles.searchInputWrapper}>
-              <TextInput
-                ref={searchInputRef}
-                style={styles.searchInput}
-                placeholder="Bloom it"
-                placeholderTextColor={theme.textTertiary}
-                value={query}
-                onChangeText={setQuery}
-                onSubmitEditing={handleSearch}
-                returnKeyType="search"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {query.length > 0 && (
-                <Pressable onPress={handleClear} style={styles.clearButton}>
-                  <Text style={styles.clearButtonText}>✕</Text>
-                </Pressable>
-              )}
-            </View>
-            <Pressable
-              style={[styles.searchButton, !query.trim() && styles.searchButtonDisabled]}
-              onPress={handleSearch}
-              disabled={!query.trim() || loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color={theme.textInverse} />
-              ) : (
-                <Text style={styles.searchButtonText}>Go</Text>
-              )}
-            </Pressable>
-          </View>
         </View>
 
-        {/* Result */}
-        {hasSearched && !loading && (
-          <View style={styles.resultSection}>
-            {currentItem ? (
-              <View style={styles.resultCard}>
-                {currentItem.image_url_thumb ? (
-                  <Image
-                    source={{ uri: currentItem.image_url_thumb }}
-                    style={styles.resultImage}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
-                    <Text style={styles.resultImagePlaceholderText}>
-                      {currentItem.display_name.charAt(0)}
-                    </Text>
-                  </View>
-                )}
-                <Text style={styles.resultName}>{currentItem.display_name}</Text>
-                <Text style={styles.resultMeta}>{currentItem.style_code}</Text>
+        {/* Result - centered in middle */}
+        <View style={styles.contentArea}>
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.accent} />
+            </View>
+          )}
 
-                <View style={styles.buttonRow}>
-                  <Pressable style={styles.buyButton} onPress={handleSelectItem}>
-                    <Text style={styles.buyButtonText}>Buy</Text>
-                  </Pressable>
-                  {hasMore && (
-                    <Pressable style={styles.nextButton} onPress={handleNext}>
-                      <Text style={styles.nextButtonText}>Next</Text>
-                    </Pressable>
+          {hasSearched && !loading && (
+            <View style={styles.resultSection}>
+              {currentItem ? (
+                <View style={styles.resultCard}>
+                  {currentItem.image_url_thumb ? (
+                    <Image
+                      source={{ uri: currentItem.image_url_thumb }}
+                      style={styles.resultImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
+                      <Text style={styles.resultImagePlaceholderText}>
+                        {currentItem.display_name.charAt(0)}
+                      </Text>
+                    </View>
                   )}
-                </View>
+                  <Text style={styles.resultName}>{currentItem.display_name}</Text>
+                  <Text style={styles.resultMeta}>{currentItem.style_code}</Text>
 
-                <Text style={styles.countText}>
-                  {currentIndex + 1} of {results.length}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.noResult}>
-                <Text style={styles.noResultTitle}>No matches</Text>
-                <Text style={styles.noResultSubtitle}>Try a different search</Text>
-              </View>
+                  <View style={styles.buttonRow}>
+                    <Pressable style={styles.buyButton} onPress={handleSelectItem}>
+                      <Text style={styles.buyButtonText}>Buy</Text>
+                    </Pressable>
+                    {hasMore && (
+                      <Pressable style={styles.nextButton} onPress={handleNext}>
+                        <Text style={styles.nextButtonText}>Next</Text>
+                      </Pressable>
+                    )}
+                  </View>
+
+                  <Text style={styles.countText}>
+                    {currentIndex + 1} of {results.length}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.noResult}>
+                  <Text style={styles.noResultTitle}>No matches</Text>
+                  <Text style={styles.noResultSubtitle}>Try a different search</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Search bar - floating at bottom */}
+        <View style={styles.searchBar}>
+          <View style={styles.searchInputWrapper}>
+            <TextInput
+              ref={searchInputRef}
+              style={styles.searchInput}
+              placeholder="Bloom it"
+              placeholderTextColor={theme.textTertiary}
+              value={query}
+              onChangeText={setQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {query.length > 0 && (
+              <Pressable onPress={handleClear} style={styles.clearButton}>
+                <Text style={styles.clearButtonText}>✕</Text>
+              </Pressable>
             )}
           </View>
-        )}
-
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.accent} />
-          </View>
-        )}
+          <Pressable
+            style={[styles.searchButton, !query.trim() && styles.searchButtonDisabled]}
+            onPress={handleSearch}
+            disabled={!query.trim() || loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={theme.textInverse} />
+            ) : (
+              <Text style={styles.searchButtonText}>Go</Text>
+            )}
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -207,12 +209,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    backgroundColor: theme.card,
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingBottom: 8,
+    alignItems: 'center',
   },
   closeButton: {
     position: 'absolute',
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.backgroundSecondary,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -232,26 +232,37 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontFamily: fonts.heading,
-    fontSize: 24,
+    fontSize: 28,
     color: theme.accent,
     textAlign: 'center',
-    marginBottom: 12,
   },
-  searchRow: {
+  contentArea: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  searchBar: {
     flexDirection: 'row',
     gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   searchInputWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.backgroundSecondary,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 14,
     color: theme.textPrimary,
     fontSize: 16,
     fontFamily: fonts.body,
@@ -265,17 +276,22 @@ const styles = StyleSheet.create({
   },
   searchButton: {
     backgroundColor: theme.accent,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingHorizontal: 24,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   searchButtonDisabled: {
     opacity: 0.5,
   },
   searchButtonText: {
     color: theme.textInverse,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   resultSection: {
