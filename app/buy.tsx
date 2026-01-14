@@ -45,13 +45,14 @@ interface CatalogItem {
 
 const SAVED_SIZE_KEY = 'bloom_saved_size';
 
-// Source display names
-const SOURCE_LABELS: Record<string, string> = {
-  stockx: 'StockX',
-  ebay: 'eBay',
-  goat: 'GOAT',
-  adidas: 'Adidas',
-  nike: 'Nike',
+// Source display names and colors
+const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
+  stockx: { label: 'StockX', color: '#006340' },
+  ebay: { label: 'eBay', color: '#E53238' },
+  goat: { label: 'GOAT', color: '#000000' },
+  adidas: { label: 'Adidas', color: '#000000' },
+  nike: { label: 'Nike', color: '#F36F21' },
+  catalog: { label: 'Catalog', color: '#888888' },
 };
 
 // Condition labels
@@ -68,6 +69,7 @@ export default function BuyScreen() {
   const [indexReady, setIndexReady] = useState(false);
   const [offers, setOffers] = useState<BloomOffer[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [loadingLivePrices, setLoadingLivePrices] = useState(false);
 
   // Selected offer for purchase
   const [selectedOffer, setSelectedOffer] = useState<BloomOffer | null>(null);
@@ -98,35 +100,62 @@ export default function BuyScreen() {
     }
   };
 
-  // INSTANT SEARCH - Pure in-memory, ZERO network calls
-  // This is the Google/Backrub approach
-  const handleSearch = () => {
+  // MULTI-SOURCE SEARCH - Fetch live prices from all marketplaces
+  const handleSearch = async () => {
     const trimmed = query.trim();
     if (!trimmed) return;
 
-    const start = performance.now();
     setHasSearched(true);
+    setLoadingLivePrices(true);
+    setOffers([]);
 
-    // Search local index - NO AWAIT, NO NETWORK, INSTANT
-    const results = searchCatalog(trimmed, 20);
+    console.log(`[Buy] Searching for "${trimmed}" across all sources...`);
 
-    // Convert to BloomOffer format
-    const searchOffers: BloomOffer[] = results.map((item: CatalogProduct) => ({
-      offer_id: `bloom:${item.id}`,
-      catalog_item_id: item.id,
-      title: item.name,
-      image: item.image_url,
-      price: item.price || 0,
-      total_estimate: item.price ? (item.price * 1.12 + 14) : 0,
-      currency: 'USD' as const,
-      source: item.source || 'stockx',
-      condition: 'deadstock' as const,
-      source_url: `https://stockx.com/search?s=${encodeURIComponent(item.name)}`,
-      last_updated_at: new Date().toISOString(),
-    }));
+    try {
+      // Call Edge Function to get live prices from Nike, Adidas, GOAT, eBay, StockX
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-    setOffers(searchOffers);
-    console.log(`[Buy] Search completed in ${(performance.now() - start).toFixed(1)}ms`);
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/get-offers?q=${encodeURIComponent(trimmed)}&limit=30`,
+        {
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[Buy] Got ${data.offers?.length || 0} offers from sources:`, data.sources_searched);
+
+      // Set the live offers
+      setOffers(data.offers || []);
+    } catch (error) {
+      console.error('[Buy] Error fetching live prices:', error);
+      // Fallback to local search if Edge Function fails
+      const results = searchCatalog(trimmed, 20);
+      const fallbackOffers: BloomOffer[] = results.map((item: CatalogProduct) => ({
+        offer_id: `catalog:${item.id}`,
+        catalog_item_id: item.id,
+        title: item.name,
+        image: item.image_url,
+        price: 0,
+        total_estimate: 0,
+        currency: 'USD' as const,
+        source: 'catalog',
+        condition: 'deadstock' as const,
+        source_url: `https://stockx.com/search?s=${encodeURIComponent(item.name)}`,
+        last_updated_at: new Date().toISOString(),
+      }));
+      setOffers(fallbackOffers);
+    } finally {
+      setLoadingLivePrices(false);
+    }
   };
 
   const handleSelectOffer = (offer: BloomOffer) => {
@@ -171,11 +200,15 @@ export default function BuyScreen() {
 
   // Render offer card - matches wallet token card style exactly
   const renderOfferCard = ({ item }: { item: BloomOffer }) => {
-    const sourceLabel = SOURCE_LABELS[item.source] || item.source;
+    const sourceConfig = SOURCE_CONFIG[item.source] || { label: item.source, color: '#888' };
     const conditionLabel = CONDITION_LABELS[item.condition] || item.condition;
 
     return (
       <Pressable style={styles.tokenCard} onPress={() => handleSelectOffer(item)}>
+        {/* Source badge */}
+        <View style={[styles.sourceBadge, { backgroundColor: sourceConfig.color }]}>
+          <Text style={styles.sourceBadgeText}>{sourceConfig.label}</Text>
+        </View>
         <View style={styles.cardImageContainer}>
           {item.image ? (
             <Image
@@ -191,8 +224,10 @@ export default function BuyScreen() {
         </View>
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.cardPrice}>{formatPrice(item.total_estimate)}</Text>
-          <Text style={styles.cardSource}>{sourceLabel} · {conditionLabel}</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.cardPrice}>{formatPrice(item.total_estimate)}</Text>
+            <Text style={styles.cardCondition}>{conditionLabel}</Text>
+          </View>
         </View>
       </Pressable>
     );
@@ -231,8 +266,13 @@ export default function BuyScreen() {
             </View>
           </View>
 
-          {/* Results grid - INSTANT, no loading spinner needed */}
-          {offers.length > 0 ? (
+          {/* Results grid - Shows live prices from multiple sources */}
+          {loadingLivePrices ? (
+            <View style={styles.noResult}>
+              <Text style={styles.noResultTitle}>Finding best prices...</Text>
+              <Text style={styles.noResultSubtitle}>Checking Nike, Adidas, GOAT, eBay, StockX</Text>
+            </View>
+          ) : offers.length > 0 ? (
             <FlatList
               data={offers}
               renderItem={renderOfferCard}
@@ -508,6 +548,32 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.textSecondary,
     marginTop: 2,
+  },
+  sourceBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    zIndex: 10,
+  },
+  sourceBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  cardCondition: {
+    fontSize: 11,
+    color: theme.textSecondary,
+    fontWeight: '500',
   },
   // Loading & empty
   loadingContainer: {
