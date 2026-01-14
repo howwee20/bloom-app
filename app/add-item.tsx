@@ -1,15 +1,13 @@
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,25 +17,15 @@ import { theme, fonts } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './_layout';
 
-type CatalogLocation = 'home' | 'watchlist';
 type CatalogCondition = 'new' | 'worn' | 'used';
-type BrandFilter = 'All' | 'Jordan' | 'Nike' | 'adidas' | 'New Balance' | 'Other';
 
 interface CatalogItem {
   id: string;
   display_name: string;
   brand: string;
-  model: string;
-  colorway_name: string;
   style_code: string;
-  release_year: number | null;
   image_url_thumb: string | null;
-  popularity_rank: number;
 }
-
-const BRAND_FILTERS: BrandFilter[] = ['All', 'Jordan', 'Nike', 'adidas', 'New Balance', 'Other'];
-const MAIN_BRANDS = ['Jordan', 'Nike', 'adidas', 'New Balance'];
-const PAGE_SIZE = 50;
 
 const CONDITION_OPTIONS: Array<{ value: CatalogCondition; label: string }> = [
   { value: 'new', label: 'New' },
@@ -45,134 +33,62 @@ const CONDITION_OPTIONS: Array<{ value: CatalogCondition; label: string }> = [
   { value: 'used', label: 'Used' },
 ];
 
-const LOCATION_OPTIONS: Array<{ value: CatalogLocation; label: string }> = [
-  { value: 'home', label: 'Home' },
-  { value: 'watchlist', label: 'Watchlist' },
-];
-
 export default function AddItemScreen() {
   const { session } = useAuth();
   const searchInputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<CatalogItem[]>([]);
-  const [browseItems, setBrowseItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [browseLoading, setBrowseLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+  const [result, setResult] = useState<CatalogItem | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Confirm modal state
   const [showConfirm, setShowConfirm] = useState(false);
   const [sizeInput, setSizeInput] = useState('');
   const [condition, setCondition] = useState<CatalogCondition | null>(null);
   const [costBasis, setCostBasis] = useState('');
-  const [location, setLocation] = useState<CatalogLocation>('home');
   const [submitting, setSubmitting] = useState(false);
-  const [brandFilter, setBrandFilter] = useState<BrandFilter>('All');
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Fetch browse items with brand filter and pagination
-  const fetchBrowseItems = useCallback(async (brand: BrandFilter, offset: number = 0) => {
-    if (offset === 0) {
-      setBrowseLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
-
-    try {
-      let queryBuilder = supabase
-        .from('catalog_items')
-        .select('id, display_name, brand, model, colorway_name, style_code, release_year, image_url_thumb, popularity_rank')
-        .order('popularity_rank', { ascending: true })
-        .range(offset, offset + PAGE_SIZE - 1);
-
-      // Apply brand filter
-      if (brand === 'Other') {
-        queryBuilder = queryBuilder.not('brand', 'in', `(${MAIN_BRANDS.join(',')})`);
-      } else if (brand !== 'All') {
-        queryBuilder = queryBuilder.eq('brand', brand);
-      }
-
-      const { data, error: fetchError } = await queryBuilder;
-
-      if (fetchError) throw fetchError;
-
-      const items = (data as CatalogItem[]) || [];
-
-      if (offset === 0) {
-        setBrowseItems(items);
-      } else {
-        setBrowseItems(prev => [...prev, ...items]);
-      }
-
-      setHasMore(items.length === PAGE_SIZE);
-    } catch (e) {
-      console.error('Browse fetch error:', e);
-      setError('Failed to load items.');
-    } finally {
-      setBrowseLoading(false);
-      setLoadingMore(false);
-    }
-  }, []);
-
-  // Initial load
+  // Auto-focus on mount
   useEffect(() => {
-    fetchBrowseItems(brandFilter, 0);
-  }, []);
-
-  // Handle brand filter change
-  const handleBrandChange = (brand: BrandFilter) => {
-    setBrandFilter(brand);
-    setHasMore(true);
-    fetchBrowseItems(brand, 0);
-  };
-
-  // Load more items
-  const loadMore = () => {
-    if (loadingMore || !hasMore || query.trim()) return;
-    fetchBrowseItems(brandFilter, browseItems.length);
-  };
-
-  // Search with debounce
-  useEffect(() => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      setError(null);
-      return;
-    }
-
     const timer = setTimeout(() => {
-      searchCatalog(query);
-    }, 200);
-
+      searchInputRef.current?.focus();
+    }, 300);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, []);
 
-  const searchCatalog = async (value: string) => {
+  const handleSearch = async () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
     setLoading(true);
-    setError(null);
+    setHasSearched(true);
+    setResult(null);
+
     try {
-      const { data, error: searchError } = await supabase.rpc('search_catalog_items', {
-        q: value,
-        limit_n: 30,
+      // Search and return the TOP result only
+      const { data, error } = await supabase.rpc('search_catalog_items', {
+        q: trimmed,
+        limit_n: 1,
       });
 
-      if (searchError) throw searchError;
-      setSearchResults((data as CatalogItem[]) || []);
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setResult(data[0] as CatalogItem);
+      }
     } catch (e) {
       console.error('Search error:', e);
-      setError('Search failed. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const openConfirm = (item: CatalogItem) => {
-    setSelectedItem(item);
+  const handleSelectItem = () => {
+    if (!result) return;
     setSizeInput('');
     setCondition(null);
     setCostBasis('');
-    setLocation('home');
     setSubmitError(null);
     setShowConfirm(true);
   };
@@ -184,7 +100,7 @@ export default function AddItemScreen() {
   };
 
   const handleAddAsset = async () => {
-    if (!selectedItem) return;
+    if (!result) return;
     if (!session?.user?.id) {
       setSubmitError('Please sign in to add an item.');
       return;
@@ -206,16 +122,16 @@ export default function AddItemScreen() {
         .from('assets')
         .insert({
           owner_id: session.user.id,
-          catalog_item_id: selectedItem.id,
-          name: selectedItem.display_name,
-          image_url: selectedItem.image_url_thumb,
-          brand: selectedItem.brand,
-          stockx_sku: selectedItem.style_code,
+          catalog_item_id: result.id,
+          name: result.display_name,
+          image_url: result.image_url_thumb,
+          brand: result.brand,
+          stockx_sku: result.style_code,
           size: trimmedSize || null,
           condition: condition || null,
           purchase_price: parsedCost,
           status: 'pending',
-          location,
+          location: 'home', // Add to home for selling
         });
 
       if (insertError) throw insertError;
@@ -230,104 +146,11 @@ export default function AddItemScreen() {
     }
   };
 
-  // Determine what to show
-  const isSearching = query.trim().length > 0;
-  const listData = isSearching ? searchResults : browseItems;
-  const showEmptyState = !loading && !browseLoading && listData.length === 0;
-
-  const renderItem = ({ item }: { item: CatalogItem }) => (
-    <Pressable style={styles.tokenCard} onPress={() => openConfirm(item)}>
-      <View style={styles.cardImageContainer}>
-        {item.image_url_thumb ? (
-          <Image source={{ uri: item.image_url_thumb }} style={styles.cardImage} resizeMode="contain" />
-        ) : (
-          <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-            <Text style={styles.cardImagePlaceholderText}>
-              {item.display_name.charAt(0)}
-            </Text>
-          </View>
-        )}
-      </View>
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName} numberOfLines={2}>
-          {item.display_name}
-        </Text>
-        <Text style={styles.cardMeta} numberOfLines={1}>
-          {item.style_code}
-        </Text>
-      </View>
-    </Pressable>
-  );
-
-  const renderHeader = () => (
-    <View style={styles.stickyHeader}>
-      {/* Search */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchInputWrapper}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            ref={searchInputRef}
-            style={styles.searchInput}
-            placeholder="Search by name or style code"
-            placeholderTextColor={theme.textTertiary}
-            value={query}
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-          />
-          {query.length > 0 && (
-            <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
-              <Text style={styles.clearButtonText}>✕</Text>
-            </Pressable>
-          )}
-        </View>
-        {loading && <ActivityIndicator style={styles.searchSpinner} size="small" color={theme.accent} />}
-      </View>
-
-      {/* Brand Filter Chips */}
-      {!isSearching && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterChipsContainer}
-          style={styles.filterChipsScroll}
-        >
-          {BRAND_FILTERS.map((brand) => {
-            const isActive = brandFilter === brand;
-            return (
-              <Pressable
-                key={brand}
-                style={[styles.filterChip, isActive && styles.filterChipActive]}
-                onPress={() => handleBrandChange(brand)}
-              >
-                <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
-                  {brand}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      )}
-
-      {/* Section Header */}
-      <View style={styles.listHeader}>
-        <Text style={styles.listHeaderText}>
-          {isSearching ? 'Search Results' : brandFilter === 'All' ? 'Browse All' : brandFilter}
-        </Text>
-        {(browseLoading || loading) && <ActivityIndicator size="small" color={theme.accent} />}
-      </View>
-    </View>
-  );
-
-  const renderFooter = () => {
-    if (!loadingMore) return null;
-    return (
-      <View style={styles.loadingMore}>
-        <ActivityIndicator size="small" color={theme.accent} />
-        <Text style={styles.loadingMoreText}>Loading more...</Text>
-      </View>
-    );
+  const handleClear = () => {
+    setQuery('');
+    setResult(null);
+    setHasSearched(false);
+    searchInputRef.current?.focus();
   };
 
   return (
@@ -336,46 +159,87 @@ export default function AddItemScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Add Item</Text>
-          <Pressable style={styles.closeButton} onPress={() => router.back()}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </Pressable>
-        </View>
+        {/* Close Button */}
+        <Pressable style={styles.closeButton} onPress={() => router.back()}>
+          <Text style={styles.closeButtonText}>✕</Text>
+        </Pressable>
 
-        {showEmptyState ? (
-          <View style={styles.emptyWrapper}>
-            {renderHeader()}
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>
-                {isSearching ? 'No matches found' : 'No items available'}
-              </Text>
-              <Text style={styles.emptySubtitle}>
-                {isSearching ? 'Try a different search term' : 'Check back later'}
-              </Text>
+        {/* Main Content - Centered */}
+        <View style={styles.content}>
+          {/* Title */}
+          <Text style={styles.title}>What are you selling?</Text>
+          <Text style={styles.subtitle}>Type anything. We'll find it.</Text>
+
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchInputWrapper}>
+              <TextInput
+                ref={searchInputRef}
+                style={styles.searchInput}
+                placeholder="Jordan 4 Military Blue size 10"
+                placeholderTextColor={theme.textTertiary}
+                value={query}
+                onChangeText={setQuery}
+                onSubmitEditing={handleSearch}
+                returnKeyType="search"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {query.length > 0 && (
+                <Pressable onPress={handleClear} style={styles.clearButton}>
+                  <Text style={styles.clearButtonText}>✕</Text>
+                </Pressable>
+              )}
             </View>
+            <Pressable
+              style={[styles.searchButton, !query.trim() && styles.searchButtonDisabled]}
+              onPress={handleSearch}
+              disabled={!query.trim() || loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color={theme.textInverse} />
+              ) : (
+                <Text style={styles.searchButtonText}>Search</Text>
+              )}
+            </Pressable>
           </View>
-        ) : (
-          <FlatList
-            data={listData}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            ListHeaderComponent={renderHeader}
-            ListFooterComponent={renderFooter}
-            numColumns={2}
-            columnWrapperStyle={styles.gridRow}
-            contentContainerStyle={styles.listContent}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.3}
-            showsVerticalScrollIndicator={false}
-            initialNumToRender={20}
-            maxToRenderPerBatch={20}
-            windowSize={10}
-          />
-        )}
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+          {/* Result */}
+          {hasSearched && !loading && (
+            <View style={styles.resultSection}>
+              {result ? (
+                <View style={styles.resultCard}>
+                  {result.image_url_thumb ? (
+                    <Image
+                      source={{ uri: result.image_url_thumb }}
+                      style={styles.resultImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
+                      <Text style={styles.resultImagePlaceholderText}>
+                        {result.display_name.charAt(0)}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={styles.resultName}>{result.display_name}</Text>
+                  <Text style={styles.resultMeta}>{result.style_code}</Text>
+                  <Pressable style={styles.sellButton} onPress={handleSelectItem}>
+                    <Text style={styles.sellButtonText}>Sell This</Text>
+                  </Pressable>
+                  <Pressable onPress={handleClear}>
+                    <Text style={styles.searchAgainText}>Search again</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.noResult}>
+                  <Text style={styles.noResultTitle}>No match found</Text>
+                  <Text style={styles.noResultSubtitle}>Try a different search</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
       </KeyboardAvoidingView>
 
       {/* Confirm Modal */}
@@ -387,11 +251,11 @@ export default function AddItemScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={closeConfirm}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            {selectedItem?.image_url_thumb && (
-              <Image source={{ uri: selectedItem.image_url_thumb }} style={styles.modalImage} />
+            {result?.image_url_thumb && (
+              <Image source={{ uri: result.image_url_thumb }} style={styles.modalImage} />
             )}
-            <Text style={styles.modalTitle}>{selectedItem?.display_name}</Text>
-            <Text style={styles.modalSubtitle}>{selectedItem?.style_code}</Text>
+            <Text style={styles.modalTitle}>{result?.display_name}</Text>
+            <Text style={styles.modalSubtitle}>{result?.style_code}</Text>
 
             <View style={styles.modalSection}>
               <Text style={styles.modalLabel}>Size (optional)</Text>
@@ -436,26 +300,6 @@ export default function AddItemScreen() {
               />
             </View>
 
-            <View style={styles.modalSection}>
-              <Text style={styles.modalLabel}>Location</Text>
-              <View style={styles.optionRow}>
-                {LOCATION_OPTIONS.map((option) => {
-                  const isActive = location === option.value;
-                  return (
-                    <Pressable
-                      key={option.value}
-                      style={[styles.optionChip, isActive && styles.optionChipActive]}
-                      onPress={() => setLocation(option.value)}
-                    >
-                      <Text style={[styles.optionChipText, isActive && styles.optionChipTextActive]}>
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
             {submitError && <Text style={styles.submitErrorText}>{submitError}</Text>}
             <Pressable
               style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
@@ -463,7 +307,7 @@ export default function AddItemScreen() {
               disabled={submitting}
             >
               <Text style={[styles.submitButtonText, submitting && styles.submitButtonTextDisabled]}>
-                {submitting ? 'Adding...' : 'Add to Wallet'}
+                {submitting ? 'Adding...' : 'Add to Sell'}
               </Text>
             </Pressable>
           </Pressable>
@@ -481,212 +325,156 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  headerTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 20,
-    color: theme.textPrimary,
-  },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.backgroundSecondary,
   },
   closeButtonText: {
     color: theme.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
   },
-  stickyHeader: {
-    backgroundColor: theme.background,
-    paddingBottom: 8,
-  },
-  searchSection: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    flexDirection: 'row',
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 80,
     alignItems: 'center',
   },
+  title: {
+    fontFamily: fonts.heading,
+    fontSize: 28,
+    color: theme.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: theme.textSecondary,
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  searchContainer: {
+    width: '100%',
+    gap: 12,
+  },
   searchInputWrapper: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.card,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    borderWidth: 2,
     borderColor: theme.border,
-  },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
     color: theme.textPrimary,
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: fonts.body,
   },
   clearButton: {
-    padding: 4,
+    padding: 8,
   },
   clearButtonText: {
     color: theme.textSecondary,
-    fontSize: 12,
-  },
-  searchSpinner: {
-    marginLeft: 8,
-  },
-  filterChipsScroll: {
-    maxHeight: 44,
-  },
-  filterChipsContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-    flexDirection: 'row',
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: theme.card,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  filterChipActive: {
-    backgroundColor: theme.accent,
-    borderColor: theme.accent,
-  },
-  filterChipText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: theme.textSecondary,
   },
-  filterChipTextActive: {
-    color: theme.textInverse,
-  },
-  listHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  searchButton: {
+    backgroundColor: theme.accent,
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: 'center',
   },
-  listHeaderText: {
-    fontSize: 13,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    color: theme.textSecondary,
-    fontWeight: '600',
+  searchButtonDisabled: {
+    opacity: 0.5,
   },
-  listContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 100,
+  searchButtonText: {
+    color: theme.textInverse,
+    fontSize: 17,
+    fontWeight: '700',
   },
-  gridRow: {
-    justifyContent: 'space-between',
-  },
-  tokenCard: {
-    width: '47%',
-    backgroundColor: theme.card,
-    borderRadius: 16,
-    marginBottom: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: theme.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardImageContainer: {
-    backgroundColor: '#FFF',
-    padding: 8,
-  },
-  cardImage: {
+  resultSection: {
+    marginTop: 32,
     width: '100%',
-    aspectRatio: 1.3,
+    alignItems: 'center',
   },
-  cardImagePlaceholder: {
-    backgroundColor: '#F5F5F5',
+  resultCard: {
+    width: '100%',
+    backgroundColor: theme.card,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.accent,
+  },
+  resultImage: {
+    width: 160,
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    marginBottom: 16,
+  },
+  resultImagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardImagePlaceholderText: {
+  resultImagePlaceholderText: {
     fontFamily: fonts.heading,
-    fontSize: 24,
+    fontSize: 32,
     color: theme.accent,
   },
-  cardInfo: {
-    padding: 12,
-  },
-  cardName: {
-    fontSize: 13,
-    fontWeight: '600',
+  resultName: {
+    fontSize: 18,
+    fontWeight: '700',
     color: theme.textPrimary,
+    textAlign: 'center',
     marginBottom: 4,
-    lineHeight: 17,
   },
-  cardMeta: {
-    fontSize: 11,
+  resultMeta: {
+    fontSize: 14,
     color: theme.textSecondary,
+    marginBottom: 20,
   },
-  emptyWrapper: {
-    flex: 1,
+  sellButton: {
+    backgroundColor: theme.accent,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 14,
+    marginBottom: 12,
   },
-  emptyState: {
-    paddingHorizontal: 16,
-    paddingTop: 48,
+  sellButtonText: {
+    color: theme.textInverse,
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  searchAgainText: {
+    color: theme.textSecondary,
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  noResult: {
     alignItems: 'center',
+    paddingVertical: 24,
   },
-  emptyTitle: {
+  noResultTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: theme.textPrimary,
     marginBottom: 8,
   },
-  emptySubtitle: {
+  noResultSubtitle: {
     fontSize: 14,
     color: theme.textSecondary,
   },
-  loadingMore: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
-    gap: 8,
-  },
-  loadingMoreText: {
-    fontSize: 13,
-    color: theme.textSecondary,
-  },
-  errorText: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    color: theme.error,
-    fontSize: 12,
-  },
-  submitErrorText: {
-    color: theme.error,
-    fontSize: 12,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -765,6 +553,12 @@ const styles = StyleSheet.create({
   },
   optionChipTextActive: {
     color: theme.textPrimary,
+  },
+  submitErrorText: {
+    color: theme.error,
+    fontSize: 12,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   submitButton: {
     backgroundColor: theme.accent,
