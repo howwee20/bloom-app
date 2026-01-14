@@ -55,6 +55,13 @@ export default function AddItemScreen() {
     });
   }, []);
 
+  // Auto-focus search input on mount
+  useEffect(() => {
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
+  }, []);
+
   // INSTANT SEARCH - Pure in-memory, ZERO network calls
   const handleSearch = () => {
     const trimmed = query.trim();
