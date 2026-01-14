@@ -99,9 +99,8 @@ export default function BuyScreen() {
 
         {/* Main Content - Centered */}
         <View style={styles.content}>
-          {/* Title */}
-          <Text style={styles.title}>What do you want?</Text>
-          <Text style={styles.subtitle}>Type anything. We'll find it.</Text>
+          {/* Bloom Logo */}
+          <Text style={styles.logo}>Bloom</Text>
 
           {/* Search Bar */}
           <View style={styles.searchContainer}>
@@ -109,7 +108,7 @@ export default function BuyScreen() {
               <TextInput
                 ref={searchInputRef}
                 style={styles.searchInput}
-                placeholder="Jordan 4 Military Blue size 10"
+                placeholder="bloom it"
                 placeholderTextColor={theme.textTertiary}
                 value={query}
                 onChangeText={setQuery}
@@ -205,21 +204,14 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 80,
+    paddingTop: 100,
     alignItems: 'center',
   },
-  title: {
+  logo: {
     fontFamily: fonts.heading,
-    fontSize: 28,
-    color: theme.textPrimary,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: theme.textSecondary,
+    fontSize: 48,
+    color: theme.accent,
     marginBottom: 32,
-    textAlign: 'center',
   },
   searchContainer: {
     width: '100%',
