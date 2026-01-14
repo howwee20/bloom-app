@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Modal,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { theme, fonts } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
+import { initSearchIndex, searchCatalog, isIndexReady, CatalogProduct } from '../lib/search';
 import { useAuth } from './_layout';
 
 // BloomOffer - unified offer from any marketplace
@@ -65,7 +65,7 @@ export default function BuyScreen() {
   const { session } = useAuth();
   const searchInputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [indexReady, setIndexReady] = useState(false);
   const [offers, setOffers] = useState<BloomOffer[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -74,6 +74,14 @@ export default function BuyScreen() {
   const [size, setSize] = useState('');
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+
+  // Load catalog index on mount - this is the Google trick
+  useEffect(() => {
+    initSearchIndex().then(() => {
+      setIndexReady(isIndexReady());
+      console.log('[Buy] Search index ready');
+    });
+  }, []);
 
   // Load saved size on mount
   useEffect(() => {
@@ -90,51 +98,35 @@ export default function BuyScreen() {
     }
   };
 
-  const handleSearch = async () => {
+  // INSTANT SEARCH - Pure in-memory, ZERO network calls
+  // This is the Google/Backrub approach
+  const handleSearch = () => {
     const trimmed = query.trim();
     if (!trimmed) return;
 
-    setLoading(true);
+    const start = performance.now();
     setHasSearched(true);
-    setOffers([]);
 
-    try {
-      // INDEX-FIRST: Query LOCAL catalog_items table ONLY
-      // This is instant (<50ms) because it's our own database
-      // NO external API calls here - that's what makes Google fast
-      const { data, error } = await supabase.rpc('search_catalog_items', {
-        q: trimmed,
-        limit_n: 20,
-      });
+    // Search local index - NO AWAIT, NO NETWORK, INSTANT
+    const results = searchCatalog(trimmed, 20);
 
-      if (error) {
-        console.error('Search error:', error);
-        return;
-      }
+    // Convert to BloomOffer format
+    const searchOffers: BloomOffer[] = results.map((item: CatalogProduct) => ({
+      offer_id: `bloom:${item.id}`,
+      catalog_item_id: item.id,
+      title: item.name,
+      image: item.image_url,
+      price: item.price || 0,
+      total_estimate: item.price ? (item.price * 1.12 + 14) : 0,
+      currency: 'USD' as const,
+      source: item.source || 'stockx',
+      condition: 'deadstock' as const,
+      source_url: `https://stockx.com/search?s=${encodeURIComponent(item.name)}`,
+      last_updated_at: new Date().toISOString(),
+    }));
 
-      if (data) {
-        // Show results IMMEDIATELY with cached prices
-        // Price comes from our local DB (updated by price worker)
-        const searchOffers: BloomOffer[] = data.map((item: CatalogItem) => ({
-          offer_id: `bloom:${item.id}`,
-          catalog_item_id: item.id,
-          title: item.display_name,
-          image: item.image_url_thumb,
-          price: item.lowest_price || 0,
-          total_estimate: item.lowest_price ? (item.lowest_price * 1.12 + 14) : 0,
-          currency: 'USD' as const,
-          source: item.marketplace || 'stockx',
-          condition: 'deadstock' as const,
-          source_url: `https://stockx.com/search?s=${encodeURIComponent(item.display_name)}`,
-          last_updated_at: new Date().toISOString(),
-        }));
-        setOffers(searchOffers);
-      }
-    } catch (e) {
-      console.error('Search error:', e);
-    } finally {
-      setLoading(false);
-    }
+    setOffers(searchOffers);
+    console.log(`[Buy] Search completed in ${(performance.now() - start).toFixed(1)}ms`);
   };
 
   const handleSelectOffer = (offer: BloomOffer) => {
@@ -239,12 +231,8 @@ export default function BuyScreen() {
             </View>
           </View>
 
-          {/* Results grid */}
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.accent} />
-            </View>
-          ) : offers.length > 0 ? (
+          {/* Results grid - INSTANT, no loading spinner needed */}
+          {offers.length > 0 ? (
             <FlatList
               data={offers}
               renderItem={renderOfferCard}
@@ -253,6 +241,9 @@ export default function BuyScreen() {
               columnWrapperStyle={styles.gridRow}
               contentContainerStyle={styles.gridContent}
               showsVerticalScrollIndicator={false}
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              windowSize={5}
             />
           ) : (
             <View style={styles.noResult}>
