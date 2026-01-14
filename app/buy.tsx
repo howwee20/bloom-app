@@ -27,7 +27,8 @@ export default function BuyScreen() {
   const searchInputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<CatalogItem | null>(null);
+  const [results, setResults] = useState<CatalogItem[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
 
   // Auto-focus on mount
@@ -44,20 +45,17 @@ export default function BuyScreen() {
 
     setLoading(true);
     setHasSearched(true);
-    setResult(null);
+    setResults([]);
+    setCurrentIndex(0);
 
     try {
-      // Search and return the TOP result only
       const { data, error } = await supabase.rpc('search_catalog_items', {
         q: trimmed,
-        limit_n: 1,
+        limit_n: 20,
       });
 
       if (error) throw error;
-
-      if (data && data.length > 0) {
-        setResult(data[0] as CatalogItem);
-      }
+      setResults((data as CatalogItem[]) || []);
     } catch (e) {
       console.error('Search error:', e);
     } finally {
@@ -65,26 +63,37 @@ export default function BuyScreen() {
     }
   };
 
-  const handleBuy = () => {
-    if (!result) return;
+  const handleNext = () => {
+    if (currentIndex < results.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    }
+  };
+
+  const handleSelectItem = () => {
+    const item = results[currentIndex];
+    if (!item) return;
     router.push({
       pathname: '/buy/[id]',
       params: {
-        id: result.id,
-        name: result.display_name,
-        style_code: result.style_code,
-        image_url: result.image_url_thumb || '',
-        brand: result.brand,
+        id: item.id,
+        name: item.display_name,
+        style_code: item.style_code,
+        image_url: item.image_url_thumb || '',
+        brand: item.brand,
       },
     });
   };
 
   const handleClear = () => {
     setQuery('');
-    setResult(null);
+    setResults([]);
+    setCurrentIndex(0);
     setHasSearched(false);
     searchInputRef.current?.focus();
   };
+
+  const currentItem = results[currentIndex];
+  const hasMore = currentIndex < results.length - 1;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -92,23 +101,20 @@ export default function BuyScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        {/* Close Button */}
-        <Pressable style={styles.closeButton} onPress={() => router.back()}>
-          <Text style={styles.closeButtonText}>✕</Text>
-        </Pressable>
+        {/* Header with logo and search */}
+        <View style={styles.header}>
+          <Pressable style={styles.closeButton} onPress={() => router.back()}>
+            <Text style={styles.closeButtonText}>✕</Text>
+          </Pressable>
 
-        {/* Main Content - Centered */}
-        <View style={styles.content}>
-          {/* Bloom Logo */}
           <Text style={styles.logo}>Bloom</Text>
 
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
+          <View style={styles.searchRow}>
             <View style={styles.searchInputWrapper}>
               <TextInput
                 ref={searchInputRef}
                 style={styles.searchInput}
-                placeholder="bloom it"
+                placeholder="Bloom it"
                 placeholderTextColor={theme.textTertiary}
                 value={query}
                 onChangeText={setQuery}
@@ -131,47 +137,62 @@ export default function BuyScreen() {
               {loading ? (
                 <ActivityIndicator size="small" color={theme.textInverse} />
               ) : (
-                <Text style={styles.searchButtonText}>Search</Text>
+                <Text style={styles.searchButtonText}>Go</Text>
               )}
             </Pressable>
           </View>
-
-          {/* Result */}
-          {hasSearched && !loading && (
-            <View style={styles.resultSection}>
-              {result ? (
-                <View style={styles.resultCard}>
-                  {result.image_url_thumb ? (
-                    <Image
-                      source={{ uri: result.image_url_thumb }}
-                      style={styles.resultImage}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
-                      <Text style={styles.resultImagePlaceholderText}>
-                        {result.display_name.charAt(0)}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={styles.resultName}>{result.display_name}</Text>
-                  <Text style={styles.resultMeta}>{result.style_code}</Text>
-                  <Pressable style={styles.buyButton} onPress={handleBuy}>
-                    <Text style={styles.buyButtonText}>Buy This</Text>
-                  </Pressable>
-                  <Pressable onPress={handleClear}>
-                    <Text style={styles.searchAgainText}>Search again</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <View style={styles.noResult}>
-                  <Text style={styles.noResultTitle}>No match found</Text>
-                  <Text style={styles.noResultSubtitle}>Try a different search</Text>
-                </View>
-              )}
-            </View>
-          )}
         </View>
+
+        {/* Result */}
+        {hasSearched && !loading && (
+          <View style={styles.resultSection}>
+            {currentItem ? (
+              <View style={styles.resultCard}>
+                {currentItem.image_url_thumb ? (
+                  <Image
+                    source={{ uri: currentItem.image_url_thumb }}
+                    style={styles.resultImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
+                    <Text style={styles.resultImagePlaceholderText}>
+                      {currentItem.display_name.charAt(0)}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.resultName}>{currentItem.display_name}</Text>
+                <Text style={styles.resultMeta}>{currentItem.style_code}</Text>
+
+                <View style={styles.buttonRow}>
+                  <Pressable style={styles.buyButton} onPress={handleSelectItem}>
+                    <Text style={styles.buyButtonText}>Buy</Text>
+                  </Pressable>
+                  {hasMore && (
+                    <Pressable style={styles.nextButton} onPress={handleNext}>
+                      <Text style={styles.nextButtonText}>Next</Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                <Text style={styles.countText}>
+                  {currentIndex + 1} of {results.length}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.noResult}>
+                <Text style={styles.noResultTitle}>No matches</Text>
+                <Text style={styles.noResultSubtitle}>Try a different search</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.accent} />
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -185,95 +206,95 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
+  header: {
+    backgroundColor: theme.card,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
   closeButton: {
     position: 'absolute',
-    top: 16,
+    top: 12,
     right: 16,
     zIndex: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: theme.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonText: {
     color: theme.textSecondary,
-    fontSize: 16,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 100,
-    alignItems: 'center',
+    fontSize: 14,
   },
   logo: {
     fontFamily: fonts.heading,
-    fontSize: 48,
+    fontSize: 24,
     color: theme.accent,
-    marginBottom: 32,
+    textAlign: 'center',
+    marginBottom: 12,
   },
-  searchContainer: {
-    width: '100%',
-    gap: 12,
+  searchRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   searchInputWrapper: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.card,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    borderWidth: 2,
-    borderColor: theme.border,
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 12,
+    paddingHorizontal: 12,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: 10,
     color: theme.textPrimary,
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: fonts.body,
   },
   clearButton: {
-    padding: 8,
+    padding: 6,
   },
   clearButtonText: {
     color: theme.textSecondary,
-    fontSize: 14,
+    fontSize: 12,
   },
   searchButton: {
     backgroundColor: theme.accent,
-    paddingVertical: 16,
-    borderRadius: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   searchButtonDisabled: {
     opacity: 0.5,
   },
   searchButtonText: {
     color: theme.textInverse,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
   },
   resultSection: {
-    marginTop: 32,
-    width: '100%',
-    alignItems: 'center',
+    padding: 16,
   },
   resultCard: {
-    width: '100%',
     backgroundColor: theme.card,
     borderRadius: 20,
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: theme.accent,
   },
   resultImage: {
-    width: 160,
-    height: 120,
+    width: 140,
+    height: 100,
     borderRadius: 12,
     backgroundColor: '#FFF',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   resultImagePlaceholder: {
     alignItems: 'center',
@@ -281,50 +302,71 @@ const styles = StyleSheet.create({
   },
   resultImagePlaceholderText: {
     fontFamily: fonts.heading,
-    fontSize: 32,
+    fontSize: 28,
     color: theme.accent,
   },
   resultName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: theme.textPrimary,
     textAlign: 'center',
     marginBottom: 4,
   },
   resultMeta: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.textSecondary,
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 10,
   },
   buyButton: {
     backgroundColor: theme.accent,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    borderRadius: 14,
-    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 12,
   },
   buyButtonText: {
     color: theme.textInverse,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
   },
-  searchAgainText: {
-    color: theme.textSecondary,
-    fontSize: 14,
-    textDecorationLine: 'underline',
+  nextButton: {
+    backgroundColor: theme.backgroundSecondary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  nextButtonText: {
+    color: theme.textPrimary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  countText: {
+    marginTop: 12,
+    fontSize: 12,
+    color: theme.textTertiary,
   },
   noResult: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 32,
   },
   noResultTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: theme.textPrimary,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   noResultSubtitle: {
     fontSize: 14,
     color: theme.textSecondary,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
