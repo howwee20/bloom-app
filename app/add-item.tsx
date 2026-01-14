@@ -160,98 +160,81 @@ export default function AddItemScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        {/* Header - just logo and close */}
-        <View style={styles.header}>
-          <Pressable style={styles.closeButton} onPress={() => router.back()}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </Pressable>
-          <Text style={styles.logo}>Bloom</Text>
-        </View>
+        {/* Close button */}
+        <Pressable style={styles.closeButton} onPress={() => router.back()}>
+          <Text style={styles.closeButtonText}>✕</Text>
+        </Pressable>
 
-        {/* Result - centered in middle */}
-        <View style={styles.contentArea}>
-          {loading && (
+        {/* Center content */}
+        <View style={styles.centerArea}>
+          {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.accent} />
             </View>
-          )}
-
-          {hasSearched && !loading && (
+          ) : hasSearched && currentItem ? (
             <View style={styles.resultSection}>
-              {currentItem ? (
-                <View style={styles.resultCard}>
-                  {currentItem.image_url_thumb ? (
-                    <Image
-                      source={{ uri: currentItem.image_url_thumb }}
-                      style={styles.resultImage}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
-                      <Text style={styles.resultImagePlaceholderText}>
-                        {currentItem.display_name.charAt(0)}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={styles.resultName}>{currentItem.display_name}</Text>
-                  <Text style={styles.resultMeta}>{currentItem.style_code}</Text>
-
-                  <View style={styles.buttonRow}>
-                    <Pressable style={styles.sellButton} onPress={handleSelectItem}>
-                      <Text style={styles.sellButtonText}>Sell</Text>
-                    </Pressable>
-                    {hasMore && (
-                      <Pressable style={styles.nextButton} onPress={handleNext}>
-                        <Text style={styles.nextButtonText}>Next</Text>
-                      </Pressable>
-                    )}
+              <View style={styles.resultCard}>
+                {currentItem.image_url_thumb ? (
+                  <Image
+                    source={{ uri: currentItem.image_url_thumb }}
+                    style={styles.resultImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
+                    <Text style={styles.resultImagePlaceholderText}>
+                      {currentItem.display_name.charAt(0)}
+                    </Text>
                   </View>
+                )}
+                <Text style={styles.resultName}>{currentItem.display_name}</Text>
+                <Text style={styles.resultMeta}>{currentItem.style_code}</Text>
 
-                  <Text style={styles.countText}>
-                    {currentIndex + 1} of {results.length}
-                  </Text>
+                <View style={styles.buttonRow}>
+                  <Pressable style={styles.sellButton} onPress={handleSelectItem}>
+                    <Text style={styles.sellButtonText}>Sell</Text>
+                  </Pressable>
+                  {hasMore && (
+                    <Pressable style={styles.nextButton} onPress={handleNext}>
+                      <Text style={styles.nextButtonText}>Next</Text>
+                    </Pressable>
+                  )}
                 </View>
-              ) : (
-                <View style={styles.noResult}>
-                  <Text style={styles.noResultTitle}>No matches</Text>
-                  <Text style={styles.noResultSubtitle}>Try a different search</Text>
-                </View>
-              )}
+
+                <Text style={styles.countText}>
+                  {currentIndex + 1} of {results.length}
+                </Text>
+              </View>
+            </View>
+          ) : hasSearched ? (
+            <View style={styles.noResult}>
+              <Text style={styles.noResultTitle}>No matches</Text>
+              <Text style={styles.noResultSubtitle}>Try a different search</Text>
+            </View>
+          ) : (
+            /* Logo + Search in center */
+            <View style={styles.searchCenter}>
+              <Text style={styles.logo}>Bloom</Text>
+              <View style={styles.searchInputWrapper}>
+                <TextInput
+                  ref={searchInputRef}
+                  style={styles.searchInput}
+                  value={query}
+                  onChangeText={setQuery}
+                  onSubmitEditing={handleSearch}
+                  returnKeyType="search"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                />
+                {query.length > 0 && (
+                  <Pressable onPress={handleClear} style={styles.clearButton}>
+                    <Text style={styles.clearButtonText}>✕</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
           )}
-        </View>
-
-        {/* Search bar - floating at bottom */}
-        <View style={styles.searchBar}>
-          <View style={styles.searchInputWrapper}>
-            <TextInput
-              ref={searchInputRef}
-              style={styles.searchInput}
-              value={query}
-              onChangeText={setQuery}
-              onSubmitEditing={handleSearch}
-              returnKeyType="search"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoFocus
-            />
-            {query.length > 0 && (
-              <Pressable onPress={handleClear} style={styles.clearButton}>
-                <Text style={styles.clearButtonText}>✕</Text>
-              </Pressable>
-            )}
-          </View>
-          <Pressable
-            style={[styles.searchButton, !query.trim() && styles.searchButtonDisabled]}
-            onPress={handleSearch}
-            disabled={!query.trim() || loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={theme.textInverse} />
-            ) : (
-              <Text style={styles.searchButtonText}>Go</Text>
-            )}
-          </Pressable>
         </View>
       </KeyboardAvoidingView>
 
@@ -338,12 +321,6 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    alignItems: 'center',
-  },
   closeButton: {
     position: 'absolute',
     top: 12,
@@ -360,25 +337,23 @@ const styles = StyleSheet.create({
     color: theme.textSecondary,
     fontSize: 14,
   },
-  logo: {
-    fontFamily: fonts.heading,
-    fontSize: 28,
-    color: theme.accent,
-    textAlign: 'center',
-  },
-  contentArea: {
+  centerArea: {
     flex: 1,
     justifyContent: 'center',
   },
-  searchBar: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
+  searchCenter: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  logo: {
+    fontFamily: fonts.heading,
+    fontSize: 32,
+    color: theme.accent,
+    textAlign: 'center',
+    marginBottom: 20,
   },
   searchInputWrapper: {
-    flex: 1,
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -403,26 +378,6 @@ const styles = StyleSheet.create({
   clearButtonText: {
     color: theme.textSecondary,
     fontSize: 12,
-  },
-  searchButton: {
-    backgroundColor: theme.accent,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  searchButtonDisabled: {
-    opacity: 0.5,
-  },
-  searchButtonText: {
-    color: theme.textInverse,
-    fontSize: 16,
-    fontWeight: '700',
   },
   resultSection: {
     padding: 16,
