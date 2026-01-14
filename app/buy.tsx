@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -31,13 +31,6 @@ export default function BuyScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Auto-focus on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, []);
 
   const handleSearch = async () => {
     const trimmed = query.trim();
@@ -168,14 +161,13 @@ export default function BuyScreen() {
             <TextInput
               ref={searchInputRef}
               style={styles.searchInput}
-              placeholder="Bloom it"
-              placeholderTextColor={theme.textTertiary}
               value={query}
               onChangeText={setQuery}
               onSubmitEditing={handleSearch}
               returnKeyType="search"
               autoCapitalize="none"
               autoCorrect={false}
+              autoFocus
             />
             {query.length > 0 && (
               <Pressable onPress={handleClear} style={styles.clearButton}>
