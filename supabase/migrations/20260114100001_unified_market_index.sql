@@ -121,6 +121,9 @@ $$;
 GRANT EXECUTE ON FUNCTION create_order_intent(UUID, TEXT, TEXT, TEXT, TEXT, NUMERIC) TO authenticated;
 
 -- 4) Update get_all_order_intents to include source_url
+-- Need to drop first because we're changing the return type
+DROP FUNCTION IF EXISTS get_all_order_intents(TEXT);
+
 CREATE OR REPLACE FUNCTION get_all_order_intents(p_status TEXT DEFAULT NULL)
 RETURNS TABLE (
   id UUID,
