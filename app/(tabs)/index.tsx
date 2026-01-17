@@ -1,6 +1,6 @@
 // HOME Screen - Portfolio View (Coinbase Style with Zen Dots)
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,6 +8,7 @@ import {
   AppStateStatus,
   FlatList,
   Image,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -20,6 +21,7 @@ import {
   View,
 } from 'react-native';
 import { fonts, theme } from '../../constants/Colors';
+import { CommandBar, parseCommand, getSearchQuery } from '../../components/CommandBar';
 
 type CustodyFilter = 'bloom' | 'home' | 'watchlist';
 import { supabase } from '../../lib/supabase';
@@ -50,6 +52,32 @@ const MARKETPLACE_LABELS: Record<string, string> = {
 };
 const MARKETPLACE_FEES: Record<string, { feeRate: number; shipping: number }> = {
   stockx: { feeRate: 0.12, shipping: 14 },
+};
+
+// Command bar offer interface
+interface BloomOffer {
+  offer_id: string;
+  catalog_item_id: string | null;
+  title: string;
+  image: string | null;
+  price: number;
+  total_estimate: number;
+  currency: 'USD';
+  source: string;
+  condition: 'new' | 'used' | 'deadstock';
+  source_url: string;
+  last_updated_at: string;
+}
+
+// Source colors for offer cards
+const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
+  stockx: { label: 'StockX', color: '#006340' },
+  ebay: { label: 'eBay', color: '#E53238' },
+  goat: { label: 'GOAT', color: '#000000' },
+  grailed: { label: 'Grailed', color: '#7B1FA2' },
+  adidas: { label: 'Adidas', color: '#000000' },
+  nike: { label: 'Nike', color: '#F36F21' },
+  catalog: { label: 'Catalog', color: '#888888' },
 };
 
 // Token interface for ownership-first model
@@ -187,8 +215,129 @@ export default function HomeScreen() {
   const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false);
   const [activeFilter, setActiveFilter] = useState<CustodyFilter>('bloom');
 
+  // Command bar state
+  const [commandActive, setCommandActive] = useState(false);
+  const [commandQuery, setCommandQuery] = useState('');
+  const [commandResults, setCommandResults] = useState<BloomOffer[]>([]);
+  const [commandLoading, setCommandLoading] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState<BloomOffer | null>(null);
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [buySize, setBuySize] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
+  const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
+  };
+
+  // Command bar handlers
+  const handleCommandQueryChange = (query: string) => {
+    setCommandQuery(query);
+
+    // Clear previous debounce
+    if (commandDebounceRef.current) {
+      clearTimeout(commandDebounceRef.current);
+    }
+
+    // Get the actual search query (strips buy/sell prefixes)
+    const searchQuery = getSearchQuery(query);
+    if (!searchQuery) {
+      setCommandResults([]);
+      setCommandLoading(false);
+      return;
+    }
+
+    // Debounced search
+    setCommandLoading(true);
+    commandDebounceRef.current = setTimeout(async () => {
+      try {
+        const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+        const response = await fetch(
+          `${supabaseUrl}/functions/v1/get-offers?q=${encodeURIComponent(searchQuery)}&limit=20`,
+          {
+            headers: {
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setCommandResults(data.offers || []);
+        } else {
+          setCommandResults([]);
+        }
+      } catch (error) {
+        console.error('Command search error:', error);
+        setCommandResults([]);
+      } finally {
+        setCommandLoading(false);
+      }
+    }, 300);
+  };
+
+  const handleCommandFocus = () => {
+    setCommandActive(true);
+  };
+
+  const handleCommandClear = () => {
+    setCommandQuery('');
+    setCommandActive(false);
+    setCommandResults([]);
+    setCommandLoading(false);
+    Keyboard.dismiss();
+  };
+
+  const handleCommandSubmit = () => {
+    const intent = parseCommand(commandQuery);
+
+    if (intent.type === 'sell') {
+      // Open sell modal
+      setShowSellModal(true);
+      return;
+    }
+
+    // For buy/search, results are already shown
+    // User will tap an offer to proceed
+  };
+
+  const handleSelectOffer = (offer: BloomOffer) => {
+    setSelectedOffer(offer);
+    setShowBuyModal(true);
+  };
+
+  const handleConfirmBuy = async (destination: 'bloom' | 'home') => {
+    if (!selectedOffer || !session?.user?.id || !buySize.trim()) return;
+
+    setPurchasing(true);
+    try {
+      const { error } = await supabase.rpc('create_order_intent', {
+        p_catalog_item_id: selectedOffer.catalog_item_id,
+        p_size: buySize.trim(),
+        p_destination: destination,
+        p_marketplace: selectedOffer.source,
+        p_source_url: selectedOffer.source_url,
+        p_quoted_total: selectedOffer.total_estimate,
+      });
+
+      if (error) throw error;
+
+      // Success - close modals and reset
+      setShowBuyModal(false);
+      setSelectedOffer(null);
+      setBuySize('');
+      handleCommandClear();
+
+      showAlert('Order Placed', `Your order for ${selectedOffer.title} has been submitted.`);
+    } catch (e) {
+      console.error('Purchase error:', e);
+      showAlert('Error', 'Failed to place order. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   const fetchPortfolio = useCallback(async (options?: { silent?: boolean }) => {
@@ -904,9 +1053,72 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Filter Tabs */}
-      <View style={styles.filterTabs}>
-        {(['bloom', 'home', 'watchlist'] as CustodyFilter[]).map((filter) => {
+      {/* Command Results - shown when command bar is active */}
+      {commandActive && (
+        <View style={styles.commandResultsSection}>
+          {commandLoading ? (
+            <View style={styles.commandLoadingContainer}>
+              <ActivityIndicator size="large" color={theme.accent} />
+              <Text style={styles.commandLoadingText}>Finding best prices...</Text>
+            </View>
+          ) : commandResults.length > 0 ? (
+            <FlatList
+              data={commandResults}
+              renderItem={({ item }) => {
+                const sourceConfig = SOURCE_CONFIG[item.source] || { label: item.source, color: '#888' };
+                return (
+                  <Pressable
+                    style={styles.offerCard}
+                    onPress={() => handleSelectOffer(item)}
+                  >
+                    <View style={[styles.offerSourceBadge, { backgroundColor: sourceConfig.color }]}>
+                      <Text style={styles.offerSourceText}>{sourceConfig.label}</Text>
+                    </View>
+                    <View style={styles.offerImageContainer}>
+                      {item.image ? (
+                        <Image
+                          source={{ uri: item.image }}
+                          style={styles.offerImage}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <View style={[styles.offerImage, styles.offerImagePlaceholder]}>
+                          <Text style={styles.offerImagePlaceholderText}>
+                            {item.title.charAt(0)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.offerTitle} numberOfLines={2}>{item.title}</Text>
+                    <Text style={styles.offerPrice}>{formatPrice(item.total_estimate)}</Text>
+                  </Pressable>
+                );
+              }}
+              keyExtractor={(item) => item.offer_id}
+              numColumns={2}
+              columnWrapperStyle={styles.commandGridRow}
+              contentContainerStyle={styles.commandGridContent}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : getSearchQuery(commandQuery) ? (
+            <View style={styles.commandNoResults}>
+              <Text style={styles.commandNoResultsTitle}>No matches</Text>
+              <Text style={styles.commandNoResultsSubtitle}>Try a different search</Text>
+            </View>
+          ) : (
+            <View style={styles.commandHint}>
+              <Text style={styles.commandHintText}>Search for sneakers, apparel, or type "sell" to list items</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Wallet Content - hidden when command bar is active */}
+      {!commandActive && (
+        <>
+          {/* Filter Tabs */}
+          <View style={styles.filterTabs}>
+            {(['bloom', 'home', 'watchlist'] as CustodyFilter[]).map((filter) => {
           const isActive = activeFilter === filter;
           const count = filter === 'bloom' ? bloomCount
             : filter === 'home' ? homeCount
@@ -1037,6 +1249,8 @@ export default function HomeScreen() {
           />
         )}
       </View>
+        </>
+      )}
 
       {/* Buy Intent Modal and Route Home Modal removed - now navigating to /buy */}
 
@@ -1405,20 +1619,107 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      {/* Fixed Bottom Bar - Buy and Sell only */}
-      <View style={styles.bottomBar}>
-        <Pressable style={styles.bottomButton} onPress={() => router.push('/buy')}>
-          <Text style={styles.bottomButtonText}>Buy</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.bottomButton, styles.bottomButtonSecondary]}
-          onPress={() => setShowSellModal(true)}
-        >
-          <Text style={[styles.bottomButtonText, styles.bottomButtonTextSecondary]}>
-            Sell
-          </Text>
-        </Pressable>
-      </View>
+      {/* Buy Modal */}
+      <Modal
+        visible={showBuyModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBuyModal(false)}
+      >
+        <View style={styles.buyModalOverlay}>
+          <View style={styles.buyModalContent}>
+            {selectedOffer && (
+              <>
+                <Pressable
+                  style={styles.buyModalClose}
+                  onPress={() => {
+                    setShowBuyModal(false);
+                    setSelectedOffer(null);
+                    setBuySize('');
+                  }}
+                >
+                  <Text style={styles.buyModalCloseText}>✕</Text>
+                </Pressable>
+
+                {selectedOffer.image && (
+                  <Image
+                    source={{ uri: selectedOffer.image }}
+                    style={styles.buyModalImage}
+                    resizeMode="contain"
+                  />
+                )}
+
+                <Text style={styles.buyModalTitle} numberOfLines={2}>
+                  {selectedOffer.title}
+                </Text>
+
+                <View style={styles.buyModalPriceRow}>
+                  <Text style={styles.buyModalPrice}>
+                    {formatPrice(selectedOffer.total_estimate)}
+                  </Text>
+                  <View
+                    style={[
+                      styles.buyModalSourceBadge,
+                      { backgroundColor: SOURCE_CONFIG[selectedOffer.source]?.color || '#888' },
+                    ]}
+                  >
+                    <Text style={styles.buyModalSourceText}>
+                      {SOURCE_CONFIG[selectedOffer.source]?.label || selectedOffer.source}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.buyModalSizeRow}>
+                  <Text style={styles.buyModalSizeLabel}>Size</Text>
+                  <TextInput
+                    style={styles.buyModalSizeInput}
+                    value={buySize}
+                    onChangeText={setBuySize}
+                    placeholder="10"
+                    placeholderTextColor={theme.textTertiary}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+
+                <Pressable
+                  style={[
+                    styles.buyModalButton,
+                    (!buySize.trim() || purchasing) && styles.buyModalButtonDisabled,
+                  ]}
+                  onPress={() => handleConfirmBuy('bloom')}
+                  disabled={!buySize.trim() || purchasing}
+                >
+                  <Text style={styles.buyModalButtonText}>
+                    {purchasing ? 'Placing Order...' : 'Ship to Bloom Vault'}
+                  </Text>
+                  <Text style={styles.buyModalButtonSubtext}>Store with us, sell anytime</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.buyModalButtonSecondary,
+                    (!buySize.trim() || purchasing) && styles.buyModalButtonDisabled,
+                  ]}
+                  onPress={() => handleConfirmBuy('home')}
+                  disabled={!buySize.trim() || purchasing}
+                >
+                  <Text style={styles.buyModalButtonTextSecondary}>Ship to My Address</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Command Bar */}
+      <CommandBar
+        query={commandQuery}
+        onChangeQuery={handleCommandQueryChange}
+        onFocus={handleCommandFocus}
+        onClear={handleCommandClear}
+        onSubmit={handleCommandSubmit}
+        isActive={commandActive}
+      />
     </SafeAreaView>
   );
 }
@@ -2352,37 +2653,221 @@ const styles = StyleSheet.create({
     backgroundColor: theme.border,
     marginVertical: 12,
   },
-  // Fixed Bottom Bar - floating on cream background
-  bottomBar: {
+  // Command Results Section
+  commandResultsSection: {
+    flex: 1,
+    backgroundColor: theme.background,
+    paddingTop: 80, // Space for command bar at top
+  },
+  commandLoadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+  },
+  commandLoadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: theme.textSecondary,
+  },
+  commandGridRow: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  commandGridContent: {
+    paddingBottom: 100,
+  },
+  commandNoResults: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+  },
+  commandNoResultsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  commandNoResultsSubtitle: {
+    marginTop: 8,
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
+  commandHint: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 40,
+  },
+  commandHintText: {
+    fontSize: 16,
+    color: theme.textTertiary,
+    textAlign: 'center',
+  },
+  // Offer Cards
+  offerCard: {
+    width: '48%',
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+  },
+  offerSourceBadge: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    zIndex: 1,
+  },
+  offerSourceText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  offerImageContainer: {
+    aspectRatio: 1,
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 12,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  offerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  offerImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.backgroundTertiary,
+  },
+  offerImagePlaceholderText: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: theme.textTertiary,
+  },
+  offerTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: theme.textPrimary,
+    marginBottom: 4,
+    minHeight: 36,
+  },
+  offerPrice: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  // Buy Modal
+  buyModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  buyModalContent: {
+    backgroundColor: theme.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  buyModalClose: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 1,
+    padding: 8,
+  },
+  buyModalCloseText: {
+    fontSize: 20,
+    color: theme.textSecondary,
+  },
+  buyModalImage: {
+    width: '100%',
+    height: 200,
+    marginBottom: 16,
+  },
+  buyModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  buyModalPriceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 34,
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 24,
   },
-  bottomButton: {
+  buyModalPrice: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  buyModalSourceBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  buyModalSourceText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  buyModalSizeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  buyModalSizeLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: theme.textPrimary,
+    marginRight: 16,
+  },
+  buyModalSizeInput: {
     flex: 1,
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: theme.textPrimary,
+  },
+  buyModalButton: {
     backgroundColor: theme.accent,
     borderRadius: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
+    marginBottom: 12,
   },
-  bottomButtonSecondary: {
-    backgroundColor: theme.card,
-    borderWidth: 1,
-    borderColor: theme.border,
+  buyModalButtonDisabled: {
+    opacity: 0.5,
   },
-  bottomButtonText: {
+  buyModalButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: theme.textInverse,
   },
-  bottomButtonTextSecondary: {
+  buyModalButtonSubtext: {
+    fontSize: 12,
+    color: theme.textInverse,
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  buyModalButtonSecondary: {
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  buyModalButtonTextSecondary: {
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.textPrimary,
   },
 });
