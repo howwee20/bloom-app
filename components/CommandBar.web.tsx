@@ -7,11 +7,8 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Animated,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../constants/Colors';
 
 // Re-export utilities from main file
 export type CommandIntent =
@@ -90,21 +87,21 @@ export function CommandBar({
     style.id = styleId;
     style.textContent = `
       .command-bar-glass {
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
         transition: all 0.2s ease;
       }
       .command-bar-glass:hover {
-        background: rgba(255, 255, 255, 0.85) !important;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
       }
       .command-bar-glass:focus-within {
-        background: rgba(255, 255, 255, 0.9) !important;
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15) !important;
-        border-color: rgba(0, 0, 0, 0.1) !important;
+        background: rgba(255, 255, 255, 0.98) !important;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.15) !important;
+        border-color: rgba(0, 0, 0, 0.08) !important;
       }
       .command-bar-input::placeholder {
-        color: #999 !important;
+        color: #9a9a9a !important;
       }
     `;
     document.head.appendChild(style);
@@ -123,22 +120,22 @@ export function CommandBar({
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: 'rgba(255, 255, 255, 0.75)',
-          borderRadius: 20,
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          borderRadius: 24,
           paddingLeft: 18,
           paddingRight: 14,
           paddingTop: 14,
           paddingBottom: 14,
           border: '1px solid rgba(0, 0, 0, 0.06)',
-          boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)',
+          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
           width: '100%',
-          maxWidth: 400,
+          maxWidth: 560,
         }}
       >
         <Ionicons
           name="search"
           size={20}
-          color="#999"
+          color="#9A9A9A"
           style={{ marginRight: 12 }}
         />
         <TextInput
@@ -150,14 +147,14 @@ export function CommandBar({
           onBlur={handleBlur}
           onSubmitEditing={handleSubmit}
           placeholder="Pay, buy, sell..."
-          placeholderTextColor="#999"
+          placeholderTextColor="#9A9A9A"
           returnKeyType="search"
           autoCapitalize="none"
           autoCorrect={false}
         />
         {(query.length > 0 || isFocused) && (
           <Pressable onPress={handleClear} style={styles.clearButton}>
-            <Ionicons name="close-circle" size={20} color="#999" />
+            <Ionicons name="close-circle" size={20} color="#9A9A9A" />
           </Pressable>
         )}
       </div>
@@ -167,17 +164,12 @@ export function CommandBar({
 
 const styles = StyleSheet.create({
   wrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 40,
+    width: '100%',
     alignItems: 'center',
-    paddingHorizontal: 24,
     zIndex: 100,
   },
   wrapperActive: {
-    top: 20,
-    bottom: 'auto' as any,
+    marginTop: 12,
   },
   input: {
     flex: 1,

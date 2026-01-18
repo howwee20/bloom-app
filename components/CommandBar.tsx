@@ -9,7 +9,6 @@ import {
   StyleSheet,
   Animated,
   Keyboard,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/Colors';
@@ -79,12 +78,7 @@ export function CommandBar({
   // Interpolate bottom position (bottom when idle, top when active)
   const bottomPosition = animatedPosition.interpolate({
     inputRange: [0, 1],
-    outputRange: [34, Platform.OS === 'ios' ? 60 : 40], // Safe area at top
-  });
-
-  const topPosition = animatedPosition.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1000, 0], // Off-screen when idle
+    outputRange: [0, 0],
   });
 
   const handleClear = () => {
@@ -108,7 +102,7 @@ export function CommandBar({
       <Ionicons
         name="search"
         size={20}
-        color={theme.textTertiary}
+        color="#9A9A9A"
         style={styles.searchIcon}
       />
       <TextInput
@@ -126,7 +120,7 @@ export function CommandBar({
       />
       {(query.length > 0 || isActive) && (
         <Pressable onPress={handleClear} style={styles.clearButton}>
-          <Ionicons name="close-circle" size={20} color={theme.textTertiary} />
+          <Ionicons name="close-circle" size={20} color="#9A9A9A" />
         </Pressable>
       )}
     </Animated.View>
@@ -136,26 +130,28 @@ export function CommandBar({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 20,
-    right: 20,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.card,
-    borderRadius: 16,
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 24,
+    paddingHorizontal: 18,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 6,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
     zIndex: 100,
   },
   containerActive: {
     position: 'relative',
-    marginHorizontal: 20,
     marginBottom: 10,
     left: 0,
     right: 0,
@@ -166,7 +162,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: theme.textPrimary,
+    color: '#1A1A1A',
     padding: 0,
   },
   clearButton: {

@@ -23,6 +23,7 @@ import {
 import { fonts, theme } from '../../constants/Colors';
 import { CommandBar, parseCommand, getSearchQuery } from '../../components/CommandBar';
 import { BloomCard } from '../../components/BloomCard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type CustodyFilter = 'bloom' | 'home' | 'watchlist';
 import { supabase } from '../../lib/supabase';
@@ -215,7 +216,6 @@ export default function HomeScreen() {
   const [isFocused, setIsFocused] = useState(true);
   const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false);
   const [activeFilter, setActiveFilter] = useState<CustodyFilter>('bloom');
-  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
 
   // Command bar state
   const [commandActive, setCommandActive] = useState(false);
@@ -227,17 +227,11 @@ export default function HomeScreen() {
   const [buySize, setBuySize] = useState('');
   const [purchasing, setPurchasing] = useState(false);
   const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isWeb = Platform.OS === 'web';
-  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
-  const stagePadding = viewportWidth < 640 ? 16 : 24;
-  const modalPadding = viewportWidth < 640 ? 20 : 32;
-  const deviceAspect = 19.5 / 9;
-  const maxWidthBySpace = viewportWidth - stagePadding * 2 - modalPadding * 2;
-  const maxHeightBySpace = viewportHeight - stagePadding * 2 - modalPadding * 2;
-  const deviceWidth = Math.max(
-    200,
-    Math.min(360, maxWidthBySpace, maxHeightBySpace / deviceAspect)
-  );
+  const insets = useSafeAreaInsets();
+  const { height: viewportHeight } = useWindowDimensions();
+  const commandBarReserve = 96 + insets.bottom;
+  const usableHeight = viewportHeight - insets.top - commandBarReserve;
+  const cardHeight = Math.max(320, Math.round(usableHeight * 0.76));
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1037,15 +1031,25 @@ export default function HomeScreen() {
     ? (now - lastUpdatedAt.getTime()) <= PRICE_FRESHNESS_MINUTES * 60 * 1000
     : false;
 
-  const content = (
+  return (
     <View style={styles.container}>
-      {/* The Bloom Card - Full screen gradient, tap to see breakdown */}
+      {/* Bloom Card - tap to flip breakdown */}
       {!commandActive && (
-        <BloomCard
-          totalValue={portfolioValue + homeValue}
-          dailyChange={displayedTotalPnl || 0}
-          onPress={() => setShowBreakdownModal(true)}
-        />
+        <View
+          style={[
+            styles.cardStage,
+            {
+              paddingTop: insets.top + 12,
+              paddingBottom: commandBarReserve,
+            },
+          ]}
+        >
+          <BloomCard
+            totalValue={portfolioValue + homeValue}
+            dailyChange={displayedTotalPnl || 0}
+            style={{ height: cardHeight, maxWidth: 560 }}
+          />
+        </View>
       )}
 
       {/* Command Results - shown when command bar is active */}
@@ -1111,7 +1115,7 @@ export default function HomeScreen() {
 
       {/* Command Bar - stays above keyboard */}
       <KeyboardAvoidingView
-        style={styles.commandBarWrapper}
+        style={[styles.commandBarWrapper, { paddingBottom: insets.bottom + 16 }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
       >
@@ -1126,208 +1130,6 @@ export default function HomeScreen() {
       </KeyboardAvoidingView>
 
       {/* Buy Intent Modal and Route Home Modal removed - now navigating to /buy */}
-
-      {/* Portfolio Breakdown Modal */}
-      <Modal
-        visible={showBreakdownModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowBreakdownModal(false)}
-      >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setShowBreakdownModal(false)}
-        >
-          <Pressable
-            style={styles.breakdownModal}
-            onPress={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <View style={styles.breakdownModalHeader}>
-              <Text style={styles.breakdownModalTitle}>Portfolio</Text>
-              <Pressable onPress={() => setShowBreakdownModal(false)}>
-                <Text style={styles.breakdownModalClose}>✕</Text>
-              </Pressable>
-            </View>
-
-            {/* Total Value */}
-            <Text style={styles.breakdownModalTotal}>{formatCurrency(portfolioValue + homeValue)}</Text>
-            {displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-              <Text style={[styles.breakdownModalPnl, { color: totalPnlColor }]}>
-                {formatPnL(displayedTotalPnl)}
-              </Text>
-            )}
-
-            <ScrollView style={styles.breakdownModalScroll} showsVerticalScrollIndicator={false}>
-              {/* Allocation Breakdown */}
-              {(portfolioValue > 0 || homeValue > 0) && (
-                <View style={styles.allocationSection}>
-                  {/* Bloom Custody */}
-                  {bloomTokens.length > 0 && (
-                    <View style={styles.allocationRow}>
-                      <View style={styles.allocationHeader}>
-                        <View style={styles.allocationLabelRow}>
-                          <View style={[styles.allocationDot, { backgroundColor: '#F5A623' }]} />
-                          <Text style={styles.allocationLabel}>In Bloom</Text>
-                          <Text style={styles.allocationCount}>{bloomTokens.length}</Text>
-                        </View>
-                        <Text style={styles.allocationValue}>{formatCurrency(portfolioValue)}</Text>
-                      </View>
-                      <View style={styles.allocationBar}>
-                        <View
-                          style={[
-                            styles.allocationFill,
-                            {
-                              width: `${Math.round((portfolioValue / (portfolioValue + homeValue)) * 100)}%`,
-                              backgroundColor: '#F5A623',
-                            },
-                          ]}
-                        />
-                      </View>
-                      {/* Mini tokens for Bloom */}
-                      <View style={styles.allocationTokens}>
-                        {bloomTokens.slice(0, 6).map(token => (
-                          <Pressable
-                            key={token.id}
-                            style={styles.tinyToken}
-                            onPress={() => {
-                              setShowBreakdownModal(false);
-                              router.push(`/token/${token.id}`);
-                            }}
-                          >
-                            {token.product_image_url && !failedImages.has(token.id) ? (
-                              <Image
-                                source={{ uri: token.product_image_url }}
-                                style={styles.tinyTokenImage}
-                                onError={() => handleImageError(token.id)}
-                              />
-                            ) : (
-                              <View style={[styles.tinyTokenImage, styles.tinyTokenPlaceholder]}>
-                                <Text style={styles.tinyTokenInitial}>
-                                  {token.product_name.charAt(0)}
-                                </Text>
-                              </View>
-                            )}
-                          </Pressable>
-                        ))}
-                        {bloomTokens.length > 6 && (
-                          <View style={styles.tinyTokenMore}>
-                            <Text style={styles.tinyTokenMoreText}>+{bloomTokens.length - 6}</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Home */}
-                  {(homeTokens.length > 0 || homeAssets.length > 0) && (
-                    <View style={styles.allocationRow}>
-                      <View style={styles.allocationHeader}>
-                        <View style={styles.allocationLabelRow}>
-                          <View style={[styles.allocationDot, { backgroundColor: theme.textSecondary }]} />
-                          <Text style={styles.allocationLabel}>At Home</Text>
-                          <Text style={styles.allocationCount}>{homeTokens.length + homeAssets.length}</Text>
-                        </View>
-                        <Text style={styles.allocationValue}>{formatCurrency(homeValue)}</Text>
-                      </View>
-                      <View style={styles.allocationBar}>
-                        <View
-                          style={[
-                            styles.allocationFill,
-                            {
-                              width: `${Math.round((homeValue / (portfolioValue + homeValue)) * 100)}%`,
-                              backgroundColor: theme.textSecondary,
-                            },
-                          ]}
-                        />
-                      </View>
-                      {/* Mini tokens for Home */}
-                      <View style={styles.allocationTokens}>
-                        {homeTokens.slice(0, 4).map(token => (
-                          <Pressable
-                            key={token.id}
-                            style={styles.tinyToken}
-                            onPress={() => {
-                              setShowBreakdownModal(false);
-                              router.push(`/token/${token.id}`);
-                            }}
-                          >
-                            {token.product_image_url && !failedImages.has(token.id) ? (
-                              <Image
-                                source={{ uri: token.product_image_url }}
-                                style={styles.tinyTokenImage}
-                                onError={() => handleImageError(token.id)}
-                              />
-                            ) : (
-                              <View style={[styles.tinyTokenImage, styles.tinyTokenPlaceholder]}>
-                                <Text style={styles.tinyTokenInitial}>
-                                  {token.product_name.charAt(0)}
-                                </Text>
-                              </View>
-                            )}
-                          </Pressable>
-                        ))}
-                        {homeAssets.slice(0, Math.max(0, 4 - homeTokens.length)).map(asset => (
-                          <Pressable
-                            key={asset.id}
-                            style={styles.tinyToken}
-                            onPress={() => {
-                              setShowBreakdownModal(false);
-                              router.push(`/asset/${asset.id}`);
-                            }}
-                          >
-                            {asset.image_url && !failedImages.has(asset.id) ? (
-                              <Image
-                                source={{ uri: asset.image_url }}
-                                style={styles.tinyTokenImage}
-                                onError={() => handleImageError(asset.id)}
-                              />
-                            ) : (
-                              <View style={[styles.tinyTokenImage, styles.tinyTokenPlaceholder]}>
-                                <Text style={styles.tinyTokenInitial}>
-                                  {asset.name.charAt(0)}
-                                </Text>
-                              </View>
-                            )}
-                          </Pressable>
-                        ))}
-                        {(homeTokens.length + homeAssets.length) > 4 && (
-                          <View style={styles.tinyTokenMore}>
-                            <Text style={styles.tinyTokenMoreText}>+{(homeTokens.length + homeAssets.length) - 4}</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Watchlist */}
-                  {watchlistAssets.length > 0 && (
-                    <View style={styles.allocationRow}>
-                      <View style={styles.allocationHeader}>
-                        <View style={styles.allocationLabelRow}>
-                          <View style={[styles.allocationDot, { backgroundColor: '#3B82F6' }]} />
-                          <Text style={styles.allocationLabel}>Watchlist</Text>
-                          <Text style={styles.allocationCount}>{watchlistAssets.length}</Text>
-                        </View>
-                        <Text style={[styles.allocationValue, { color: theme.textSecondary }]}>{formatCurrency(watchlistValue)}</Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {tokens.length === 0 && ownedAssets.length === 0 && (
-                <View style={styles.emptyBreakdown}>
-                  <Text style={styles.emptyBreakdownText}>No items yet</Text>
-                  <Text style={styles.emptyBreakdownSubtext}>
-                    Use the command bar to buy items
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       {/* Sell Modal */}
       <Modal
@@ -1787,61 +1589,18 @@ export default function HomeScreen() {
       </Modal>
     </View>
   );
-
-  if (isWeb) {
-    return (
-      <View style={[styles.webStage, { padding: stagePadding }]}>
-        <View style={[styles.webModal, { padding: modalPadding }]}>
-          <View style={[styles.webDevice, { width: deviceWidth }]}>
-            <View style={styles.webDeviceScreen}>{content}</View>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  return content;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F0',
+    backgroundColor: '#F6F3EE',
   },
-  webStage: {
+  cardStage: {
     flex: 1,
-    backgroundColor: '#4A4A4A',
-    alignItems: 'center',
+    paddingHorizontal: 22,
     justifyContent: 'center',
-    padding: 24,
-  },
-  webModal: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 32,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.2,
-    shadowRadius: 30,
-    elevation: 12,
-  },
-  webDevice: {
-    aspectRatio: 9 / 19.5,
-    backgroundColor: '#0B0B0B',
-    borderRadius: 42,
-    padding: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    elevation: 8,
-  },
-  webDeviceScreen: {
-    flex: 1,
-    borderRadius: 32,
-    overflow: 'hidden',
-    backgroundColor: '#F5F5F0',
   },
   keyboardAvoid: {
     flex: 1,
@@ -1852,7 +1611,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 34, // Safe area for iPhone
+    paddingHorizontal: 22,
+    alignItems: 'center',
   },
   // Breakdown header when coin is tapped
   breakdownHeader: {
@@ -2286,188 +2046,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 2,
-  },
-  // Breakdown Modal styles
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  breakdownModal: {
-    backgroundColor: theme.card,
-    borderRadius: 24,
-    padding: 24,
-    width: '88%',
-    maxHeight: '65%',
-  },
-  breakdownModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  breakdownModalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  breakdownModalClose: {
-    fontSize: 22,
-    color: theme.textTertiary,
-    padding: 4,
-  },
-  breakdownModalTotal: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: theme.textPrimary,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  breakdownModalPnl: {
-    fontSize: 16,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 20,
-  },
-  breakdownModalScroll: {
-    maxHeight: 300,
-  },
-  miniTokenGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-  },
-  miniToken: {
-    width: '25%',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  miniTokenImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: theme.backgroundSecondary,
-  },
-  miniTokenPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  miniTokenInitial: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: theme.textTertiary,
-  },
-  miniTokenValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.textPrimary,
-    marginTop: 6,
-  },
-  emptyBreakdown: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyBreakdownText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  emptyBreakdownSubtext: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginTop: 4,
-  },
-  // Allocation breakdown styles
-  allocationSection: {
-    marginTop: 8,
-  },
-  allocationRow: {
-    marginBottom: 20,
-  },
-  allocationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  allocationLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  allocationDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  allocationLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  allocationCount: {
-    fontSize: 13,
-    color: theme.textSecondary,
-    backgroundColor: theme.backgroundSecondary,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  allocationValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  allocationBar: {
-    height: 6,
-    backgroundColor: theme.backgroundSecondary,
-    borderRadius: 3,
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-  allocationFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  allocationTokens: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  tinyToken: {
-    width: 36,
-    height: 36,
-  },
-  tinyTokenImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: theme.backgroundSecondary,
-  },
-  tinyTokenPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tinyTokenInitial: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.textTertiary,
-  },
-  tinyTokenMore: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: theme.backgroundSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tinyTokenMoreText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: theme.textSecondary,
   },
   // Modal styles
   modalOverlay: {
