@@ -229,12 +229,11 @@ export default function HomeScreen() {
   const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const { height: viewportHeight } = useWindowDimensions();
-  // Reserve space for command bar (pill height ~56 + padding + safe area)
-  const commandBarHeight = 56 + 32 + insets.bottom;
-  // Calculate usable height for the card (total - top safe area - command bar area)
-  const usableHeight = viewportHeight - insets.top - 24 - commandBarHeight;
-  // Card takes ~70% of usable height, clamped between reasonable min/max
-  const cardHeight = Math.min(Math.max(400, Math.round(usableHeight * 0.72)), 640);
+  // Layout: card sits lower on screen with more presence
+  const topPadding = insets.top + 44;
+  const bottomPadding = insets.bottom + 110;
+  // Card takes 74% of viewport height, clamped between 560-690
+  const cardHeight = Math.min(Math.max(560, Math.round(viewportHeight * 0.74)), 690);
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1042,8 +1041,8 @@ export default function HomeScreen() {
           style={[
             styles.cardStage,
             {
-              paddingTop: insets.top + 16,
-              paddingBottom: commandBarHeight,
+              paddingTop: topPadding,
+              paddingBottom: bottomPadding,
             },
           ]}
         >
