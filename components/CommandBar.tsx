@@ -98,15 +98,13 @@ export function CommandBar({
     }
   };
 
+  // When active, use relative positioning so KeyboardAvoidingView works
+  const containerStyle = isActive
+    ? [styles.container, styles.containerActive]
+    : [styles.container, { bottom: bottomPosition }];
+
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        isActive
-          ? { top: topPosition, bottom: undefined }
-          : { bottom: bottomPosition, top: undefined },
-      ]}
-    >
+    <Animated.View style={containerStyle}>
       <Ionicons
         name="search"
         size={20}
@@ -154,6 +152,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     zIndex: 100,
+  },
+  containerActive: {
+    position: 'relative',
+    marginHorizontal: 20,
+    marginBottom: 10,
+    left: 0,
+    right: 0,
   },
   searchIcon: {
     marginRight: 12,

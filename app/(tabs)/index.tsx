@@ -4,11 +4,13 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   AppState,
   AppStateStatus,
   FlatList,
   Image,
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -1028,44 +1030,54 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* The Bloom Coin - shown when not in command mode and not expanded */}
-      {!commandActive && !coinExpanded && (
-        <View style={styles.coinContainer}>
-          <BloomCoin
-            totalValue={displayedTotalValue}
-            dailyChange={displayedTotalPnl || 0}
-            onPress={() => setCoinExpanded(true)}
-          />
-        </View>
-      )}
-
-      {/* Coin Breakdown Header - shown when expanded */}
-      {!commandActive && coinExpanded && (
-        <View style={styles.breakdownHeader}>
-          <Pressable style={styles.backToCoin} onPress={() => setCoinExpanded(false)}>
-            <Text style={styles.backToCoinText}>Tap to close</Text>
-          </Pressable>
-          <View style={styles.breakdownBalance}>
-            <Text style={styles.breakdownAmount}>{formatCurrency(displayedTotalValue)}</Text>
-            {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-              <Text style={[styles.breakdownPnl, { color: totalPnlColor }]}>
-                {formatPnL(displayedTotalPnl)}
-              </Text>
-            )}
-          </View>
-          <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
-            <View style={styles.profileIcon}>
-              <Text style={styles.profileIconText}>
-                {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
-              </Text>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        {/* The Bloom Coin - ALWAYS visible, shrinks when command active */}
+        {!coinExpanded && (
+          <View style={[
+            styles.coinContainer,
+            commandActive && styles.coinContainerMini
+          ]}>
+            <View style={commandActive ? styles.coinMiniWrapper : undefined}>
+              <BloomCoin
+                totalValue={displayedTotalValue}
+                dailyChange={displayedTotalPnl || 0}
+                onPress={() => !commandActive && setCoinExpanded(true)}
+              />
             </View>
-          </Pressable>
-        </View>
-      )}
+          </View>
+        )}
 
-      {/* Command Results - shown when command bar is active */}
-      {commandActive && (
-        <View style={styles.commandResultsSection}>
+        {/* Coin Breakdown Header - shown when expanded (not during command) */}
+        {!commandActive && coinExpanded && (
+          <View style={styles.breakdownHeader}>
+            <Pressable style={styles.backToCoin} onPress={() => setCoinExpanded(false)}>
+              <Text style={styles.backToCoinText}>Tap to close</Text>
+            </Pressable>
+            <View style={styles.breakdownBalance}>
+              <Text style={styles.breakdownAmount}>{formatCurrency(displayedTotalValue)}</Text>
+              {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
+                <Text style={[styles.breakdownPnl, { color: totalPnlColor }]}>
+                  {formatPnL(displayedTotalPnl)}
+                </Text>
+              )}
+            </View>
+            <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
+              <View style={styles.profileIcon}>
+                <Text style={styles.profileIconText}>
+                  {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Command Results - shown when command bar is active */}
+        {commandActive && (
+          <View style={styles.commandResultsSection}>
           {commandLoading ? (
             <View style={styles.commandLoadingContainer}>
               <ActivityIndicator size="large" color={theme.accent} />
@@ -1261,6 +1273,17 @@ export default function HomeScreen() {
       </View>
         </>
       )}
+
+        {/* Command Bar - inside KeyboardAvoidingView */}
+        <CommandBar
+          query={commandQuery}
+          onChangeQuery={handleCommandQueryChange}
+          onFocus={handleCommandFocus}
+          onClear={handleCommandClear}
+          onSubmit={handleCommandSubmit}
+          isActive={commandActive}
+        />
+      </KeyboardAvoidingView>
 
       {/* Buy Intent Modal and Route Home Modal removed - now navigating to /buy */}
 
@@ -1720,16 +1743,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Command Bar */}
-      <CommandBar
-        query={commandQuery}
-        onChangeQuery={handleCommandQueryChange}
-        onFocus={handleCommandFocus}
-        onClear={handleCommandClear}
-        onSubmit={handleCommandSubmit}
-        isActive={commandActive}
-      />
     </SafeAreaView>
   );
 }
@@ -1739,12 +1752,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F0', // Light cream background like the screenshot
   },
-  // Coin Container - centers the coin on screen
+  keyboardAvoid: {
+    flex: 1,
+  },
+  // Coin Container - centers the coin on screen (full size when idle)
   coinContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingBottom: 100, // Space for command bar
+  },
+  // Coin Container when command bar is active (mini at top)
+  coinContainerMini: {
+    flex: 0,
+    paddingTop: 20,
+    paddingBottom: 16,
+    justifyContent: 'flex-start',
+  },
+  // Wrapper to scale down the coin when in mini mode
+  coinMiniWrapper: {
+    transform: [{ scale: 0.4 }],
+    marginBottom: -80, // Compensate for scaled size
   },
   // Breakdown header when coin is tapped
   breakdownHeader: {
