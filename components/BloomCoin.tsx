@@ -88,11 +88,13 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         });
       },
       onPanResponderMove: (_event, gesture) => {
+        // Vertical drag tilts forward/back (rotateX)
         tilt.setValue({
-          x: -gesture.dy * 0.35,
-          y: gesture.dx * 0.35,
+          x: -gesture.dy * 0.2,
+          y: 0, // No Y tilt from drag, spin handles horizontal
         });
-        spin.setValue(gesture.dx * 0.85);
+        // Horizontal drag spins the coin around Y axis (like a coin on a table)
+        spin.setValue(gesture.dx * 1.2);
       },
       onPanResponderRelease: (_event, gesture) => {
         spin.flattenOffset();
@@ -175,12 +177,8 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     outputRange: ['-12deg', '12deg'],
     extrapolate: 'clamp',
   });
-  const rotateY = tilt.y.interpolate({
-    inputRange: [-120, 120],
-    outputRange: ['-12deg', '12deg'],
-    extrapolate: 'clamp',
-  });
-  const rotateZ = spin.interpolate({
+  // Spin around Y axis (horizontal coin flip, like a coin on a table)
+  const spinRotateY = spin.interpolate({
     inputRange: [-360, 360],
     outputRange: ['-360deg', '360deg'],
     extrapolate: 'extend',
@@ -190,12 +188,8 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     outputRange: ['12deg', '-12deg'],
     extrapolate: 'clamp',
   });
-  const textRotateY = tilt.y.interpolate({
-    inputRange: [-120, 120],
-    outputRange: ['12deg', '-12deg'],
-    extrapolate: 'clamp',
-  });
-  const textRotateZ = spin.interpolate({
+  // Counter-rotate text on Y axis to keep it readable during spin
+  const textSpinRotateY = spin.interpolate({
     inputRange: [-360, 360],
     outputRange: ['360deg', '-360deg'],
     extrapolate: 'extend',
@@ -258,8 +252,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
             transform: [
               { perspective: 900 },
               { rotateX },
-              { rotateY },
-              { rotateZ },
+              { rotateY: spinRotateY },
             ],
           },
         ]}
@@ -339,8 +332,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
                 {
                   transform: [
                     { rotateX: textRotateX },
-                    { rotateY: textRotateY },
-                    { rotateZ: textRotateZ },
+                    { rotateY: textSpinRotateY },
                   ],
                 },
               ]}

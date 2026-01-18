@@ -77,18 +77,17 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
       currentRotation.current.y += (targetRotation.current.y - currentRotation.current.y) * 0.1;
       currentRotation.current.z += (targetRotation.current.z - currentRotation.current.z) * 0.1;
 
-      // Apply transform
+      // Apply transform - spin around Y axis (like a coin on a table)
       coin.style.transform = `
         rotateX(${currentRotation.current.x}deg)
         rotateY(${currentRotation.current.y}deg)
-        rotateZ(${currentRotation.current.z}deg)
       `;
+      // Counter-rotate text to keep it readable during spin
       const text = textRef.current;
       if (text) {
         text.style.transform = `
           rotateX(${-currentRotation.current.x}deg)
           rotateY(${-currentRotation.current.y}deg)
-          rotateZ(${-currentRotation.current.z}deg)
         `;
       }
 
@@ -104,35 +103,24 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
 
     let velocityX = spinVelocityRef.current.x;
     let velocityY = spinVelocityRef.current.y;
-    let velocityZ = spinVelocityRef.current.z;
 
-    if (
-      Math.abs(velocityX) < 0.01 &&
-      Math.abs(velocityY) < 0.01 &&
-      Math.abs(velocityZ) < 0.01
-    ) return;
+    if (Math.abs(velocityX) < 0.01 && Math.abs(velocityY) < 0.01) return;
 
     isInertiaRef.current = true;
 
     const step = () => {
-      velocityX *= 0.94;
-      velocityY *= 0.94;
-      velocityZ *= 0.94;
+      velocityX *= 0.96;
+      velocityY *= 0.96;
 
       spinRotationRef.current.x += velocityX;
       spinRotationRef.current.y += velocityY;
-      spinRotationRef.current.z += velocityZ;
       targetRotation.current = {
         x: spinRotationRef.current.x,
         y: spinRotationRef.current.y,
-        z: spinRotationRef.current.z,
+        z: 0,
       };
 
-      if (
-        Math.abs(velocityX) < 0.02 &&
-        Math.abs(velocityY) < 0.02 &&
-        Math.abs(velocityZ) < 0.02
-      ) {
+      if (Math.abs(velocityX) < 0.02 && Math.abs(velocityY) < 0.02) {
         isInertiaRef.current = false;
         return;
       }
@@ -162,7 +150,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     const maxTilt = 12;
     targetRotation.current.x = spinRotationRef.current.x - normalizedY * maxTilt;
     targetRotation.current.y = spinRotationRef.current.y + normalizedX * maxTilt;
-    targetRotation.current.z = spinRotationRef.current.z;
+    targetRotation.current.z = 0;
   }, [prefersReducedMotion]);
 
   // Handle pointer leave - return to neutral
@@ -170,7 +158,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     if (isDraggingRef.current) return;
     targetRotation.current.x = spinRotationRef.current.x;
     targetRotation.current.y = spinRotationRef.current.y;
-    targetRotation.current.z = spinRotationRef.current.z;
+    targetRotation.current.z = 0;
   }, []);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -214,18 +202,20 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
 
     dragDistanceRef.current += Math.abs(dx) + Math.abs(dy);
 
-    spinRotationRef.current.z += dx * 0.75;
-    spinRotationRef.current.x -= dy * 0.25;
+    // Horizontal drag spins around Y axis (like a coin on a table)
+    spinRotationRef.current.y += dx * 1.0;
+    // Vertical drag tilts on X axis
+    spinRotationRef.current.x -= dy * 0.15;
     targetRotation.current = {
       x: spinRotationRef.current.x,
       y: spinRotationRef.current.y,
-      z: spinRotationRef.current.z,
+      z: 0, // No Z rotation
     };
 
     spinVelocityRef.current = {
-      x: (-dy / dt) * 10,
-      y: 0,
-      z: (dx / dt) * 18,
+      x: (-dy / dt) * 5,
+      y: (dx / dt) * 20,
+      z: 0,
     };
 
     lastPointerRef.current = { x: e.clientX, y: e.clientY, time: now };
