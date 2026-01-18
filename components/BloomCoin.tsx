@@ -185,6 +185,11 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     outputRange: ['-360deg', '360deg'],
     extrapolate: 'extend',
   });
+  const textRotateZ = spin.interpolate({
+    inputRange: [-360, 360],
+    outputRange: ['360deg', '-360deg'],
+    extrapolate: 'extend',
+  });
 
   return (
     <View style={styles.container}>
@@ -318,10 +323,10 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
             <View style={styles.innerRing} />
 
             {/* Value display */}
-            <View style={styles.textContainer}>
+            <Animated.View style={[styles.textContainer, { transform: [{ rotateZ: textRotateZ }] }]}>
               <Text style={styles.valueText}>{formatValue(totalValue)}</Text>
               <Text style={styles.changeText}>{formatChange(dailyChange)}</Text>
-            </View>
+            </Animated.View>
           </View>
         </LinearGradient>
       </Animated.View>

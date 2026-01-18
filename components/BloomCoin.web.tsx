@@ -16,6 +16,7 @@ const AURA_SIZE = Math.round(COIN_SIZE * 1.24);
 
 export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) {
   const coinRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const rafRef = useRef<number>(0);
@@ -82,6 +83,10 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         rotateY(${currentRotation.current.y}deg)
         rotateZ(${currentRotation.current.z}deg)
       `;
+      const text = textRef.current;
+      if (text) {
+        text.style.transform = `rotateZ(${-currentRotation.current.z}deg)`;
+      }
 
       rafRef.current = requestAnimationFrame(animate);
     };
@@ -540,6 +545,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
                   justifyContent: 'center',
                   zIndex: 10,
                 }}
+                ref={textRef}
               >
                 {/* Value */}
                 <span
