@@ -13,6 +13,7 @@ interface BloomCoinProps {
 
 const COIN_SIZE = 320;
 const AURA_SIZE = Math.round(COIN_SIZE * 1.24);
+const COIN_THICKNESS = 20; // Thickness for 3D edge
 
 export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) {
   const coinRef = useRef<HTMLDivElement>(null);
@@ -104,13 +105,17 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     let velocityX = spinVelocityRef.current.x;
     let velocityY = spinVelocityRef.current.y;
 
-    if (Math.abs(velocityX) < 0.01 && Math.abs(velocityY) < 0.01) return;
+    if (Math.abs(velocityX) < 0.01 && Math.abs(velocityY) < 0.01) {
+      // No velocity, spring back to neutral immediately
+      springBackToNeutral();
+      return;
+    }
 
     isInertiaRef.current = true;
 
     const step = () => {
-      velocityX *= 0.96;
-      velocityY *= 0.96;
+      velocityX *= 0.965;
+      velocityY *= 0.965;
 
       spinRotationRef.current.x += velocityX;
       spinRotationRef.current.y += velocityY;
@@ -120,8 +125,10 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         z: 0,
       };
 
-      if (Math.abs(velocityX) < 0.02 && Math.abs(velocityY) < 0.02) {
+      if (Math.abs(velocityX) < 0.015 && Math.abs(velocityY) < 0.015) {
         isInertiaRef.current = false;
+        // Spring back to face-forward after inertia ends
+        springBackToNeutral();
         return;
       }
 
@@ -130,6 +137,39 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
 
     inertiaRef.current = requestAnimationFrame(step);
   }, [prefersReducedMotion]);
+
+  // Spring back to neutral (face-forward) position
+  const springBackToNeutral = useCallback(() => {
+    const targetX = 0;
+    // Normalize Y to nearest 360 degrees
+    const currentY = spinRotationRef.current.y;
+    const targetY = Math.round(currentY / 360) * 360;
+
+    const springStep = () => {
+      const dx = targetX - spinRotationRef.current.x;
+      const dy = targetY - spinRotationRef.current.y;
+
+      // Spring physics
+      spinRotationRef.current.x += dx * 0.08;
+      spinRotationRef.current.y += dy * 0.08;
+      targetRotation.current = {
+        x: spinRotationRef.current.x,
+        y: spinRotationRef.current.y,
+        z: 0,
+      };
+
+      if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) {
+        spinRotationRef.current.x = targetX;
+        spinRotationRef.current.y = targetY;
+        targetRotation.current = { x: targetX, y: targetY, z: 0 };
+        return;
+      }
+
+      requestAnimationFrame(springStep);
+    };
+
+    requestAnimationFrame(springStep);
+  }, []);
 
   // Handle pointer move for tilt effect
   const handlePointerMove = useCallback((e: React.PointerEvent | PointerEvent) => {
@@ -387,7 +427,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
 
         {/* Float container */}
         <div className="coin-float" style={{ position: 'relative', zIndex: 2 }}>
-          {/* The 3D Coin */}
+          {/* The 3D Coin with thickness */}
           <div
             ref={coinRef}
             style={{
@@ -396,33 +436,65 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
               borderRadius: '50%',
               position: 'relative',
               transformStyle: 'preserve-3d',
-              transition: 'transform 0.1s ease-out',
+              transition: 'transform 0.08s ease-out',
             }}
           >
-            {/* Outer metallic rim */}
+            {/* 3D Edge layers for thickness */}
+            {[...Array(10)].map((_, i) => (
+              <div
+                key={`edge-${i}`}
+                style={{
+                  position: 'absolute',
+                  inset: 2,
+                  borderRadius: '50%',
+                  background: `linear-gradient(145deg,
+                    #B8942A ${10 + i * 2}%,
+                    #8B7020 ${30 + i}%,
+                    #A68628 ${60 - i}%,
+                    #C9A227 ${85 - i * 2}%
+                  )`,
+                  transform: `translateZ(${-COIN_THICKNESS + i * 2}px)`,
+                  boxShadow: i === 0 ? '0 2px 8px rgba(0,0,0,0.3)' : 'none',
+                }}
+              />
+            ))}
+
+            {/* Main coin face (front) */}
             <div
               style={{
                 position: 'absolute',
                 inset: 0,
                 borderRadius: '50%',
-                background: `
-                  linear-gradient(145deg,
-                    #E8D5A3 0%,
-                    #C9A227 15%,
-                    #F5E6A3 30%,
-                    #D4AF37 50%,
-                    #B8942A 70%,
-                    #D4AF37 85%,
-                    #E8D5A3 100%
-                  )
-                `,
-                boxShadow: `
-                  inset 0 2px 4px rgba(255,255,255,0.5),
-                  inset 0 -2px 4px rgba(0,0,0,0.15),
-                  0 4px 12px rgba(0,0,0,0.15)
-                `,
+                transformStyle: 'preserve-3d',
+                transform: 'translateZ(0px)',
               }}
-            />
+            >
+              {/* Outer metallic rim */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: '50%',
+                  background: `
+                    linear-gradient(145deg,
+                      #F0E2B8 0%,
+                      #D4AF37 10%,
+                      #F5E6A3 25%,
+                      #E8C84A 40%,
+                      #D4AF37 55%,
+                      #B8942A 70%,
+                      #D4AF37 85%,
+                      #F0E2B8 100%
+                    )
+                  `,
+                  boxShadow: `
+                    inset 0 3px 6px rgba(255,255,255,0.6),
+                    inset 0 -3px 6px rgba(0,0,0,0.2),
+                    0 8px 24px rgba(0,0,0,0.25)
+                  `,
+                }}
+              />
+            </div>
 
             {/* Inner coin face */}
             <div

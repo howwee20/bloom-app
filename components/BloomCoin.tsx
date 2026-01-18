@@ -107,15 +107,30 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
           return;
         }
 
+        // Decay the spin, then spring back to face-forward
         Animated.decay(spin, {
-          velocity: gesture.vx * 200,
-          deceleration: 0.992,
+          velocity: gesture.vx * 180,
+          deceleration: 0.985,
           useNativeDriver: true,
-        }).start();
+        }).start(({ finished }) => {
+          if (finished) {
+            // Get current spin value and normalize to nearest 360
+            spin.stopAnimation((currentValue) => {
+              const normalizedTarget = Math.round(currentValue / 360) * 360;
+              Animated.spring(spin, {
+                toValue: normalizedTarget,
+                friction: 12,
+                tension: 40,
+                useNativeDriver: true,
+              }).start();
+            });
+          }
+        });
+        // Spring tilt back to neutral
         Animated.spring(tilt, {
           toValue: { x: 0, y: 0 },
-          friction: 7,
-          tension: 60,
+          friction: 10,
+          tension: 50,
           useNativeDriver: true,
         }).start();
       },
@@ -244,13 +259,13 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         </Animated.View>
       </View>
 
-      {/* The Coin */}
+      {/* The Coin with 3D depth */}
       <Animated.View
         style={[
-          styles.coinOuter,
+          styles.coin3DContainer,
           {
             transform: [
-              { perspective: 900 },
+              { perspective: 1200 },
               { rotateX },
               { rotateY: spinRotateY },
             ],
@@ -258,12 +273,24 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         ]}
         {...panResponder.panHandlers}
       >
-        <LinearGradient
-          colors={['#F8E7B3', '#E3C86B', '#D8B14A', '#F3D996']}
-          start={{ x: 0.1, y: 0 }}
-          end={{ x: 0.9, y: 1 }}
-          style={[styles.coinRim, { padding: rimSize }]}
-        >
+        {/* Thick rim/edge effect using shadows */}
+        <View style={styles.coinEdgeOuter}>
+          <LinearGradient
+            colors={['#8B7020', '#B8942A', '#A68628', '#7A6018']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.coinEdgeFill}
+          />
+        </View>
+
+        {/* Main coin face */}
+        <View style={styles.coinOuter}>
+          <LinearGradient
+            colors={['#F8E7B3', '#E3C86B', '#D8B14A', '#F3D996']}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={[styles.coinRim, { padding: rimSize }]}
+          >
           <View style={styles.coinFace}>
             <LinearGradient
               colors={['#F7EDBC', '#E3C874', '#D9B353', '#F5E1A2']}
@@ -342,6 +369,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
             </Animated.View>
           </View>
         </LinearGradient>
+        </View>
       </Animated.View>
     </View>
   );
@@ -351,6 +379,27 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  coin3DContainer: {
+    width: COIN_SIZE,
+    height: COIN_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coinEdgeOuter: {
+    position: 'absolute',
+    width: COIN_SIZE + 8,
+    height: COIN_SIZE + 8,
+    borderRadius: (COIN_SIZE + 8) / 2,
+    shadowColor: '#5A4510',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 12,
+  },
+  coinEdgeFill: {
+    flex: 1,
+    borderRadius: (COIN_SIZE + 8) / 2,
   },
   shadow: {
     position: 'absolute',
