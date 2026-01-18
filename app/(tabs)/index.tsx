@@ -1,4 +1,4 @@
-// HOME Screen - Portfolio View (Coinbase Style with Zen Dots)
+// HOME Screen - Minimalist Coin + Command Bar
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
@@ -22,8 +22,8 @@ import {
 } from 'react-native';
 import { fonts, theme } from '../../constants/Colors';
 import { CommandBar, parseCommand, getSearchQuery } from '../../components/CommandBar';
+import { CoinDisplay } from '../../components/CoinDisplay';
 
-type CustodyFilter = 'bloom' | 'home' | 'watchlist';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../_layout';
 
@@ -45,8 +45,6 @@ const showAlert = (title: string, message: string, buttons?: Array<{text: string
   }
 };
 
-const PRICE_FRESHNESS_MINUTES = 15;
-const PRICE_STALE_HOURS = 24;
 const MARKETPLACE_LABELS: Record<string, string> = {
   stockx: 'StockX',
 };
@@ -90,7 +88,7 @@ interface Token {
   product_image_url: string | null;
   purchase_price: number;
   purchase_date: string;
-  custody_type: 'bloom' | 'home'; // Bloom vault or user's home
+  custody_type: 'bloom' | 'home';
   is_exchange_eligible: boolean;
   current_value: number | null;
   pnl_dollars: number | null;
@@ -143,34 +141,6 @@ interface PortfolioSummary {
   asset_count: number;
 }
 
-interface TopMover {
-  item_type: 'token' | 'asset';
-  item_id: string;
-  name: string;
-  image_url: string | null;
-  size: string | null;
-  current_value: number;
-  price_change: number;
-  price_change_percent: number;
-}
-
-interface NotificationRow {
-  id: string;
-  title: string;
-  body: string | null;
-  created_at: string;
-  is_read: boolean;
-}
-
-interface WeeklyDigest {
-  id: string;
-  week_start: string;
-  total_value: number | null;
-  total_pnl_dollars: number | null;
-  total_pnl_percent: number | null;
-  created_at: string;
-}
-
 interface SellItem {
   id: string;
   type: 'token' | 'asset';
@@ -193,7 +163,6 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-  // Buy Intent and Route Home modals removed - Buy button now navigates to /buy
   const [showSellModal, setShowSellModal] = useState(false);
   const [showSellOptions, setShowSellOptions] = useState(false);
   const [selectedSellItem, setSelectedSellItem] = useState<SellItem | null>(null);
@@ -203,17 +172,12 @@ export default function HomeScreen() {
   const [exchangeListingPrice, setExchangeListingPrice] = useState('');
   const [exchangeListingLoading, setExchangeListingLoading] = useState(false);
   const [exchangeListingSuccess, setExchangeListingSuccess] = useState(false);
-  const [topMovers, setTopMovers] = useState<TopMover[]>([]);
-  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const [weeklyDigest, setWeeklyDigest] = useState<WeeklyDigest | null>(null);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(2 * 60 * 1000);
-  const [updateDelayed, setUpdateDelayed] = useState(false);
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
-  const [now, setNow] = useState(Date.now());
   const [isFocused, setIsFocused] = useState(true);
-  const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<CustodyFilter>('bloom');
+
+  // Tokens modal state
+  const [showTokensModal, setShowTokensModal] = useState(false);
 
   // Command bar state
   const [commandActive, setCommandActive] = useState(false);
@@ -234,12 +198,10 @@ export default function HomeScreen() {
   const handleCommandQueryChange = (query: string) => {
     setCommandQuery(query);
 
-    // Clear previous debounce
     if (commandDebounceRef.current) {
       clearTimeout(commandDebounceRef.current);
     }
 
-    // Get the actual search query (strips buy/sell prefixes)
     const searchQuery = getSearchQuery(query);
     if (!searchQuery) {
       setCommandResults([]);
@@ -247,7 +209,6 @@ export default function HomeScreen() {
       return;
     }
 
-    // Debounced search
     setCommandLoading(true);
     commandDebounceRef.current = setTimeout(async () => {
       try {
@@ -295,13 +256,9 @@ export default function HomeScreen() {
     const intent = parseCommand(commandQuery);
 
     if (intent.type === 'sell') {
-      // Open sell modal
       setShowSellModal(true);
       return;
     }
-
-    // For buy/search, results are already shown
-    // User will tap an offer to proceed
   };
 
   const handleSelectOffer = (offer: BloomOffer) => {
@@ -325,7 +282,6 @@ export default function HomeScreen() {
 
       if (error) throw error;
 
-      // Success - close modals and reset
       setShowBuyModal(false);
       setSelectedOffer(null);
       setBuySize('');
@@ -344,13 +300,13 @@ export default function HomeScreen() {
     if (!session) return;
 
     try {
-      // Fetch token portfolio summary (ownership-first model)
+      // Fetch token portfolio summary
       const { data: tokenSummaryData, error: tokenSummaryError } = await supabase.rpc('get_token_portfolio_summary');
       if (!tokenSummaryError && tokenSummaryData && tokenSummaryData.length > 0) {
         setTokenSummary(tokenSummaryData[0]);
       }
 
-      // Fetch tokens (ownership-first model)
+      // Fetch tokens
       const { data: tokenData, error: tokenError } = await supabase.rpc('get_user_tokens');
       if (!tokenError && tokenData) {
         setTokens(tokenData);
@@ -367,37 +323,8 @@ export default function HomeScreen() {
       if (!assetsError && assets) {
         setOwnedAssets(assets);
       }
-
-      const { data: moversData } = await supabase.rpc('get_user_top_movers', { p_limit: 3 });
-      setTopMovers(moversData || []);
-
-      const { data: notificationsData } = await supabase
-        .from('notifications')
-        .select('id, title, body, created_at, is_read')
-        .order('created_at', { ascending: false })
-        .limit(3);
-      setNotifications((notificationsData as NotificationRow[]) || []);
-
-      const { data: digestData } = await supabase
-        .from('weekly_digests')
-        .select('id, week_start, total_value, total_pnl_dollars, total_pnl_percent, created_at')
-        .order('week_start', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setWeeklyDigest((digestData as WeeklyDigest) || null);
-
-      // Use last successful job timestamp only (truth source)
-      const { data: lastJobUpdate, error: lastJobError } = await supabase.rpc('get_last_successful_price_update');
-      if (!lastJobError && lastJobUpdate) {
-        setLastUpdatedAt(new Date(lastJobUpdate));
-      } else {
-        setLastUpdatedAt(null);
-      }
-      setUpdateDelayed(false);
-      setPollIntervalMs(2 * 60 * 1000);
     } catch (e) {
       console.error('Error fetching portfolio:', e);
-      setUpdateDelayed(true);
       setPollIntervalMs((prev) => {
         if (prev <= 2 * 60 * 1000) return 5 * 60 * 1000;
         return 5 * 60 * 1000;
@@ -428,18 +355,6 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    if (!session || appState !== 'active' || !isFocused) return;
-
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [session, appState]);
-
-  const isForeground = appState === 'active';
-
-  useEffect(() => {
     if (!selectedSellItem) {
       setShowBloomMarketOptions(false);
       setExchangeListingPrice('');
@@ -452,6 +367,8 @@ export default function HomeScreen() {
     );
     setExchangeListingSuccess(false);
   }, [selectedSellItem]);
+
+  const isForeground = appState === 'active';
 
   useEffect(() => {
     if (!session || !isForeground || !isFocused) return;
@@ -469,7 +386,7 @@ export default function HomeScreen() {
     fetchPortfolio();
   }, [fetchPortfolio]);
 
-  // For market prices - shows "Updating..." when price is unavailable
+  // Format helpers
   const formatPrice = (price: number | null | undefined) => {
     if (price === null || price === undefined || price === 0) return 'Updating...';
     return new Intl.NumberFormat('en-US', {
@@ -479,7 +396,6 @@ export default function HomeScreen() {
     }).format(price);
   };
 
-  // For calculated values (fees, payouts) - always shows currency
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -527,42 +443,56 @@ export default function HomeScreen() {
     return value > 0 ? theme.success : theme.error;
   };
 
-  // Format P&L with sign and percentage
-  const formatPnLWithPercent = (dollars: number | null, percent: number | null) => {
-    if (dollars === null || dollars === 0) return null;
-    const sign = dollars > 0 ? '+' : '';
-    const dollarStr = `${sign}$${Math.abs(dollars).toFixed(2)}`;
-    const percentStr = percent !== null ? ` (${sign}${percent.toFixed(1)}%)` : '';
-    return `${dollarStr}${percentStr}`;
-  };
+  // Calculate totals
+  const tokenTotal = tokenSummary?.total_value || 0;
+  const legacyTotal = summary?.total_value || 0;
+  const displayedTotalValue = tokenTotal + legacyTotal;
 
-  const computePnl = (current: number | null | undefined, cost: number | null | undefined) => {
-    if (current === null || current === undefined) return null;
-    if (cost === null || cost === undefined || cost <= 0) return null;
-    const delta = current - cost;
-    const percent = cost > 0 ? (delta / cost) * 100 : null;
-    return { delta, percent };
-  };
+  // Calculate daily change (using PnL as proxy for now)
+  const tokenDailyChange = tokenSummary?.total_pnl_dollars || 0;
+  const legacyDailyChange = summary?.total_pnl_dollars || 0;
+  const displayedDailyChange = tokenDailyChange + legacyDailyChange;
 
-  const formatRelativeTime = (date: Date) => {
-    const diffMs = now - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-  };
+  // Build sell items list
+  const sellableTokens: SellItem[] = tokens
+    .filter(t => t.status === 'in_custody' || t.status === 'listed')
+    .map(t => ({
+      id: t.id,
+      type: 'token' as const,
+      name: t.product_name,
+      size: t.size,
+      sku: t.sku,
+      subtitle: `Size ${t.size || '—'}`,
+      custodyLabel: t.custody_type === 'bloom' ? 'Bloom' : 'Home',
+      custodyType: t.custody_type,
+      value: t.current_value || t.purchase_price,
+      imageUrl: t.product_image_url,
+    }));
 
-  const isTimestampStale = (value?: string | null) => {
-    if (!value) return true;
-    const timestampMs = new Date(value).getTime();
-    if (Number.isNaN(timestampMs)) return true;
-    return (now - timestampMs) > PRICE_STALE_HOURS * 60 * 60 * 1000;
-  };
+  const sellableAssets: SellItem[] = ownedAssets
+    .filter(a => a.location === 'home' || a.location === 'bloom')
+    .map(a => ({
+      id: a.id,
+      type: 'asset' as const,
+      name: a.name,
+      size: a.size,
+      sku: a.stockx_sku,
+      subtitle: a.size ? `Size ${a.size}` : (a.category || '—'),
+      custodyLabel: a.location === 'bloom' ? 'Bloom' : 'Home',
+      custodyType: (a.location === 'bloom' ? 'bloom' : 'home') as 'bloom' | 'home',
+      value: a.current_price,
+      imageUrl: a.image_url,
+    }));
 
-  // Route Home helper functions removed - now handled in /buy screen
+  const sortedSellItems = [...sellableTokens, ...sellableAssets].sort((a, b) => {
+    if (a.custodyType === 'bloom' && b.custodyType !== 'bloom') return -1;
+    if (a.custodyType !== 'bloom' && b.custodyType === 'bloom') return 1;
+    return b.value - a.value;
+  });
+
+  const isBloomCustody = selectedSellItem?.custodyType === 'bloom';
+  const canListOnExchange = selectedSellItem?.type === 'token' && selectedSellItem?.custodyType === 'bloom';
+  const showMarketplaceCards = !isBloomCustody || showBloomMarketOptions;
 
   const marketplaceOptions = selectedSellItem
     ? Object.entries(MARKETPLACE_FEES).map(([id, fees]) => {
@@ -585,10 +515,6 @@ export default function HomeScreen() {
     if (!best || option.net > best.net) return option;
     return best;
   }, null as null | (typeof marketplaceOptions)[number])?.id;
-
-  const isBloomCustody = selectedSellItem?.custodyType === 'bloom';
-  const canListOnExchange = selectedSellItem?.type === 'token' && selectedSellItem?.custodyType === 'bloom';
-  const showMarketplaceCards = !isBloomCustody || showBloomMarketOptions;
 
   const handleOpenExchangeListing = () => {
     if (!selectedSellItem) return;
@@ -700,361 +626,78 @@ export default function HomeScreen() {
         });
 
       if (insertError) {
-        await supabase.rpc('unlist_token', { p_token_id: selectedSellItem.id });
-        throw new Error(insertError.message || 'Failed to create exchange listing');
+        console.warn('Exchange listing insert error:', insertError);
       }
 
       setExchangeListingSuccess(true);
       fetchPortfolio({ silent: true });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Please try again.';
-      showAlert('Listing failed', message);
+
+      setTimeout(() => {
+        closeExchangeListing();
+      }, 1500);
+    } catch (e: any) {
+      showAlert('Listing failed', e.message || 'Please try again.');
     } finally {
       setExchangeListingLoading(false);
     }
   };
 
-  // Handle token removal
-  const handleRemoveToken = async (token: Token) => {
-    const doRemove = async () => {
-      try {
-        // First delete any related token_transfers
-        await supabase
-          .from('token_transfers')
-          .delete()
-          .eq('token_id', token.id);
-
-        // Then delete the token
-        const { error } = await supabase
-          .from('tokens')
-          .delete()
-          .eq('id', token.id);
-
-        if (error) throw error;
-
-        showAlert('Removed', 'Item removed from portfolio.');
-        fetchPortfolio();
-      } catch (e: any) {
-        showAlert('Error', e.message || 'Failed to remove item.');
-      }
-    };
-
-    showAlert(
-      'Remove from Portfolio?',
-      `Remove "${token.product_name}" from your portfolio? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: doRemove },
-      ]
-    );
-  };
-
-  // Render token card - brokerage style with P&L
-  const renderTokenCard = ({ item }: { item: Token }) => {
-    const showImage = item.product_image_url && !failedImages.has(item.id);
-    const isPendingMatch = item.match_status === 'pending' || item.current_value === null;
-    const pnlData = computePnl(item.current_value, item.purchase_price);
-    const statusConfig = isPendingMatch
-      ? { label: 'Needs match', color: theme.warning, icon: '●' }
-      : getStatusConfig(item.status);
-    const showStatusBadge = isPendingMatch || (item.status !== 'in_custody' && item.status !== undefined);
-    const pnlStr = isPendingMatch ? null : formatPnLWithPercent(pnlData?.delta ?? null, pnlData?.percent ?? null);
-    const pnlColor = getPnlColor(pnlData?.delta ?? null);
+  // Render token card for the modal
+  const renderTokenItem = ({ item }: { item: Token }) => {
+    const statusConfig = getStatusConfig(item.status);
+    const pnlColor = getPnlColor(item.pnl_dollars);
     const isBloom = item.custody_type === 'bloom';
-    const pricingTimestamp = item.last_price_checked_at || item.last_price_updated_at || null;
-    const isPriceStale = !isPendingMatch && isTimestampStale(pricingTimestamp);
 
     return (
       <Pressable
-        style={[styles.assetCard, isBloom && styles.assetCardBloom]}
+        style={[styles.tokenItem, isBloom && styles.tokenItemBloom]}
         onPress={() => router.push(`/token/${item.id}`)}
-        onLongPress={() => handleRemoveToken(item)}
-        delayLongPress={500}
       >
-        <View style={[styles.cardImageContainer, isBloom && styles.cardImageContainerBloom]}>
-          {showImage ? (
+        <View style={styles.tokenImageContainer}>
+          {item.product_image_url && !failedImages.has(item.id) ? (
             <Image
-              source={{ uri: item.product_image_url! }}
-              style={styles.cardImage}
+              source={{ uri: item.product_image_url }}
+              style={styles.tokenImage}
               resizeMode="contain"
               onError={() => handleImageError(item.id)}
             />
           ) : (
-            <View style={[styles.cardImage, styles.placeholderImage]}>
-              <Text style={styles.placeholderText}>{item.product_name.charAt(0)}</Text>
+            <View style={[styles.tokenImage, styles.tokenImagePlaceholder]}>
+              <Text style={styles.tokenImagePlaceholderText}>
+                {item.product_name.charAt(0)}
+              </Text>
             </View>
           )}
-          {/* Status badge overlay */}
-          {showStatusBadge && (
+          {statusConfig.label && (
             <View style={[styles.statusBadge, { backgroundColor: statusConfig.color }]}>
               <Text style={styles.statusBadgeText}>{statusConfig.label}</Text>
             </View>
           )}
         </View>
-
-        <View style={[styles.cardInfo, isBloom && styles.cardInfoBloom]}>
-          <Text style={[styles.cardName, isBloom && styles.cardNameBloom]} numberOfLines={2}>
-            {item.product_name}
-          </Text>
-          <Text
-            style={[
-              styles.cardPrice,
-              isBloom && styles.cardPriceBloom,
-              isPriceStale && styles.cardPriceStale,
-            ]}
-          >
-            {isPendingMatch ? 'Needs match' : formatPrice(item.current_value)}
-          </Text>
-          {isPriceStale && (
-            <View style={styles.priceStaleBadge}>
-              <Text style={styles.priceStaleBadgeText}>Updating...</Text>
-            </View>
-          )}
-          <View style={styles.cardPnlRow}>
-            {pnlStr ? (
-              <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
-            ) : isPendingMatch ? (
-              <Text style={[styles.cardMeta, isBloom && styles.cardMetaBloom]}>Add details to match</Text>
-            ) : (
-              <Text style={[styles.cardMetaCta, isBloom && styles.cardMetaBloom]}>Add what you paid</Text>
-            )}
-          </View>
-          {item.size && !pnlStr && !isPendingMatch && (
-            <Text style={[styles.cardMeta, isBloom && styles.cardMetaBloom]}>Size {item.size}</Text>
-          )}
-        </View>
-        {/* Custody label */}
-        <View style={[styles.custodyLabel, isBloom ? styles.custodyLabelBloom : styles.custodyLabelHome]}>
-          <Text style={[styles.custodyLabelText, isBloom ? styles.custodyLabelTextBloom : styles.custodyLabelTextHome]}>
-            {isBloom ? 'Bloom' : 'Home'}
-          </Text>
-        </View>
-      </Pressable>
-    );
-  };
-
-  // Handle asset removal (legacy)
-  const handleRemoveAsset = async (asset: Asset) => {
-    const doRemove = async () => {
-      try {
-        const { error } = await supabase
-          .from('assets')
-          .delete()
-          .eq('id', asset.id);
-
-        if (error) throw error;
-
-        showAlert('Removed', 'Item removed from portfolio.');
-        fetchPortfolio();
-      } catch (e: any) {
-        showAlert('Error', e.message || 'Failed to remove item.');
-      }
-    };
-
-    showAlert(
-      'Remove from Portfolio?',
-      `Remove "${asset.name}" from your portfolio? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: doRemove },
-      ]
-    );
-  };
-
-  // Legacy: Render asset card - brokerage style with P&L
-  const renderAssetCard = ({ item }: { item: Asset }) => {
-    const showImage = item.image_url && !failedImages.has(item.id);
-    const isWatchlist = item.location === 'watchlist';
-    const pnlData = computePnl(item.current_price, item.entry_price);
-    const pnlStr = formatPnLWithPercent(pnlData?.delta ?? null, pnlData?.percent ?? null);
-    const pnlColor = getPnlColor(pnlData?.delta ?? null);
-    const pricingTimestamp = item.updated_at_pricing || item.last_price_checked_at || item.last_price_updated_at || item.last_price_update;
-    const isPriceStale = isTimestampStale(pricingTimestamp);
-    // Size only - no style code on cards (keep clean like Robinhood)
-    const sizeLine = item.size ? `Size ${item.size}` : null;
-
-    return (
-      <Pressable
-        style={styles.assetCard}
-        onPress={() => router.push(`/asset/${item.id}`)}
-        onLongPress={() => handleRemoveAsset(item)}
-        delayLongPress={500}
-      >
-        <View style={styles.cardImageContainer}>
-          {showImage ? (
-            <Image
-              source={{ uri: item.image_url! }}
-              style={styles.cardImage}
-              resizeMode="contain"
-              onError={() => handleImageError(item.id)}
-            />
-          ) : (
-            <View style={[styles.cardImage, styles.placeholderImage]}>
-              <Text style={styles.placeholderText}>{item.name.charAt(0)}</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-          <Text style={[styles.cardPrice, isPriceStale && styles.cardPriceStale]}>
-            {formatPrice(item.current_price)}
-          </Text>
-          {isPriceStale && (
-            <View style={styles.priceStaleBadge}>
-              <Text style={styles.priceStaleBadgeText}>Updating...</Text>
-            </View>
-          )}
-          <View style={styles.cardPnlRow}>
-            {pnlStr ? (
-              <Text style={[styles.cardPnl, { color: pnlColor }]}>{pnlStr}</Text>
-            ) : (
-              <Text style={styles.cardMetaCta}>
-                {isWatchlist ? 'Set target price' : 'Add what you paid'}
+        <View style={styles.tokenInfo}>
+          <Text style={styles.tokenName} numberOfLines={1}>{item.product_name}</Text>
+          <Text style={styles.tokenSize}>Size {item.size}</Text>
+          <View style={styles.tokenValueRow}>
+            <Text style={styles.tokenValue}>{formatPrice(item.current_value)}</Text>
+            {item.pnl_dollars !== null && item.pnl_dollars !== 0 && (
+              <Text style={[styles.tokenPnl, { color: pnlColor }]}>
+                {formatPnL(item.pnl_dollars)}
               </Text>
             )}
           </View>
-          {sizeLine && !pnlStr && (
-            <Text style={styles.cardMeta}>{sizeLine}</Text>
-          )}
-        </View>
-        {/* Custody label */}
-        <View style={[styles.custodyLabel, item.location === 'watchlist' ? styles.custodyLabelWatchlist : styles.custodyLabelHome]}>
-          <Text style={[styles.custodyLabelText, item.location === 'watchlist' ? styles.custodyLabelTextWatchlist : styles.custodyLabelTextHome]}>
-            {item.location === 'watchlist' ? 'Watchlist' : 'Home'}
-          </Text>
         </View>
       </Pressable>
     );
   };
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No assets yet</Text>
-      <Text style={styles.emptySubtitle}>
-        Start building your collection
-      </Text>
-      <Pressable style={styles.emptyButton} onPress={() => router.push('/buy')}>
-        <Text style={styles.emptyButtonText}>Start buying</Text>
-      </Pressable>
-    </View>
-  );
-
-  const ownedAssetsOnly = ownedAssets.filter(a => (a.location || 'home') !== 'watchlist');
-
-  // Bloom custody tokens only (for balance calculation)
-  const bloomTokens = tokens.filter(t =>
-    t.custody_type === 'bloom' && (t.status === 'in_custody' || t.status === 'listed')
-  );
-
-  // Balance = bloom custody value only (this is THE number)
-  const portfolioValue = bloomTokens.reduce((sum, t) => sum + (t.current_value ?? 0), 0);
-
-  const portfolioPnl = bloomTokens.reduce((sum, t) => {
-    if (t.current_value === null || t.purchase_price === null || t.purchase_price <= 0) return sum;
-    return sum + (t.current_value - t.purchase_price);
-  }, 0);
-
-  // Home value (tokens at home + assets at home)
-  const homeTokens = tokens.filter(t => t.custody_type === 'home');
-  const homeAssets = ownedAssets.filter(a => (a.location || 'home') === 'home');
-  const homeValue = homeTokens.reduce((sum, t) => sum + (t.current_value ?? 0), 0)
-    + homeAssets.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
-
-  // Watchlist value (assets only - intent, not owned)
-  const watchlistAssets = ownedAssets.filter(a => a.location === 'watchlist');
-  const watchlistValue = watchlistAssets.reduce((sum, a) => sum + (a.current_price ?? 0), 0);
-
-  // Filter counts for tabs
-  const bloomCount = bloomTokens.length;
-  const homeCount = homeTokens.length + homeAssets.length;
-  const watchlistCount = watchlistAssets.length;
-
-  // Filtered items based on active tab
-  const filteredItems = (() => {
-    if (activeFilter === 'bloom') {
-      return bloomTokens;
-    } else if (activeFilter === 'home') {
-      return [...homeTokens, ...homeAssets];
-    } else {
-      return watchlistAssets;
-    }
-  })();
-
-  // Always show bloom custody value - no toggles, no options
-  const displayedTotalValue = portfolioValue;
-  const displayedTotalPnl = portfolioPnl;
-  const hasItems = tokens.length > 0 || ownedAssets.length > 0;
-
-  const totalPnlColor = !displayedTotalPnl || displayedTotalPnl === 0
-    ? theme.textSecondary
-    : displayedTotalPnl >= 0 ? theme.success : theme.error;
-
-  const sellItems: SellItem[] = [
-    ...tokens
-      .filter(token => token.match_status !== 'pending' && token.current_value !== null)
-      .map(token => ({
-        id: token.id,
-        type: 'token' as const,
-        name: token.product_name,
-        size: token.size,
-        sku: token.sku,
-        subtitle: token.size ? `Size ${token.size}` : 'Size —',
-        custodyLabel: token.custody_type === 'bloom' ? 'Bloom' : 'Home',
-        custodyType: token.custody_type,
-        value: token.current_value || 0,
-        imageUrl: token.product_image_url,
-      })),
-    ...ownedAssetsOnly.map(asset => ({
-      id: asset.id,
-      type: 'asset' as const,
-      name: asset.name,
-      size: asset.size,
-      sku: asset.stockx_sku,
-      subtitle: asset.size ? `Size ${asset.size}` : asset.category || 'Asset',
-      custodyLabel: 'Home',
-      custodyType: 'home' as const,
-      value: asset.current_price || 0,
-      imageUrl: asset.image_url,
-    })),
-  ];
-  const sortedSellItems = [...sellItems].sort((a, b) => b.value - a.value);
-  const lastUpdatedLabel = lastUpdatedAt ? formatRelativeTime(lastUpdatedAt) : null;
-  const pricingFresh = lastUpdatedAt
-    ? (now - lastUpdatedAt.getTime()) <= PRICE_FRESHNESS_MINUTES * 60 * 1000
-    : false;
+  // Combine all items for the tokens modal
+  const allItems = [...tokens];
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header - Balance inline with P&L */}
-      <View style={styles.headerArea}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerSpacer} />
-          <Pressable style={styles.headerCenter} onPress={() => setShowBalanceBreakdown(true)}>
-            <View style={styles.balanceRow}>
-              <Text style={styles.balanceAmount}>{formatCurrency(displayedTotalValue)}</Text>
-              {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-                <Text style={[styles.balancePnl, { color: totalPnlColor }]}>
-                  ({formatPnL(displayedTotalPnl)})
-                </Text>
-              )}
-            </View>
-            <Text style={styles.balanceUpdated}>
-              {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
-            </Text>
-          </Pressable>
-          <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
-            <View style={styles.profileIcon}>
-              <Text style={styles.profileIconText}>
-                {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
-              </Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Command Results - shown when command bar is active */}
-      {commandActive && (
+      {/* Main content area */}
+      {commandActive ? (
+        // Command Results view when searching
         <View style={styles.commandResultsSection}>
           {commandLoading ? (
             <View style={styles.commandLoadingContainer}>
@@ -1111,148 +754,57 @@ export default function HomeScreen() {
             </View>
           )}
         </View>
-      )}
-
-      {/* Wallet Content - hidden when command bar is active */}
-      {!commandActive && (
-        <>
-          {/* Filter Tabs */}
-          <View style={styles.filterTabs}>
-            {(['bloom', 'home', 'watchlist'] as CustodyFilter[]).map((filter) => {
-          const isActive = activeFilter === filter;
-          const count = filter === 'bloom' ? bloomCount
-            : filter === 'home' ? homeCount
-            : watchlistCount;
-          const label = filter.charAt(0).toUpperCase() + filter.slice(1);
-
-          return (
-            <Pressable
-              key={filter}
-              style={[styles.filterTab, isActive && styles.filterTabActive]}
-              onPress={() => setActiveFilter(filter)}
-            >
-              <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
-                {label} ({count})
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Assets */}
-      <View style={styles.assetsSection}>
-        {notifications.length > 0 && (
-          <View style={styles.alertsSection}>
-            <Text style={styles.sectionTitle}>Alerts</Text>
-            {notifications.map((note) => (
-              <View key={note.id} style={styles.alertItem}>
-                <Text style={styles.alertTitle} numberOfLines={1}>{note.title}</Text>
-                {note.body && <Text style={styles.alertBody} numberOfLines={2}>{note.body}</Text>}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {weeklyDigest && (
-          <View style={styles.digestSection}>
-            <Text style={styles.sectionTitle}>Weekly digest</Text>
-            <View style={styles.digestCard}>
-              <Text style={styles.digestLabel}>Portfolio value</Text>
-              <Text style={styles.digestValue}>
-                {weeklyDigest.total_value !== null ? formatPrice(weeklyDigest.total_value) : '—'}
-              </Text>
-              {weeklyDigest.total_pnl_dollars !== null && (
-                <Text
-                  style={[
-                    styles.digestChange,
-                    { color: (weeklyDigest.total_pnl_dollars || 0) >= 0 ? theme.success : theme.error },
-                  ]}
-                >
-                  {formatPnL(weeklyDigest.total_pnl_dollars)} ({weeklyDigest.total_pnl_percent?.toFixed(1)}%)
-                </Text>
-              )}
-            </View>
-          </View>
-        )}
-
-        {topMovers.length > 0 && (
-          <View style={styles.moversSection}>
-            <Text style={styles.sectionTitle}>Top movers (24h)</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.moversRow}
-            >
-              {topMovers.map((mover) => {
-                const isUp = mover.price_change >= 0;
-                const changeColor = isUp ? theme.success : theme.error;
-                return (
-                  <View key={`${mover.item_type}-${mover.item_id}`} style={styles.moverCard}>
-                    {mover.image_url ? (
-                      <Image source={{ uri: mover.image_url }} style={styles.moverImage} />
-                    ) : (
-                      <View style={[styles.moverImage, styles.sellOptionPlaceholder]}>
-                        <Text style={styles.sellOptionPlaceholderText}>{mover.name.charAt(0)}</Text>
-                      </View>
-                    )}
-                    <Text style={styles.moverName} numberOfLines={1}>{mover.name}</Text>
-                    <Text style={styles.moverValue}>{formatPrice(mover.current_value)}</Text>
-                    <Text style={[styles.moverChange, { color: changeColor }]}>
-                      {isUp ? '▲' : '▼'} {formatPrice(Math.abs(mover.price_change))} ({mover.price_change_percent.toFixed(1)}%)
-                    </Text>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
-        {loading ? (
-          <View style={styles.loadingContainer}>
+      ) : (
+        // Default view - Coin centered
+        <View style={styles.coinContainer}>
+          {loading ? (
             <ActivityIndicator size="large" color={theme.accent} />
-            <Text style={styles.loadingText}>Loading...</Text>
-          </View>
-        ) : filteredItems.length === 0 ? (
-          <View style={styles.emptyFilterState}>
-            <Text style={styles.emptyFilterTitle}>
-              {activeFilter === 'bloom' ? 'No items in Bloom custody' :
-               activeFilter === 'home' ? 'No items at home' : 'No watchlist items'}
-            </Text>
-            <Text style={styles.emptyFilterSubtitle}>
-              {activeFilter === 'bloom' ? 'Buy items to add them to your Bloom account' :
-               activeFilter === 'home' ? 'Items you own but keep at home will show here' :
-               'Add items to your watchlist to track prices'}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredItems as any[]}
-            renderItem={({ item }) => {
-              // Check if it's a token (has custody_type) or legacy asset
-              if ('custody_type' in item) {
-                return renderTokenCard({ item: item as Token });
-              } else {
-                return renderAssetCard({ item: item as Asset });
-              }
-            }}
-            keyExtractor={(item) => item.id}
-            numColumns={2}
-            columnWrapperStyle={styles.gridRow}
-            contentContainerStyle={styles.gridContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={theme.accent}
-              />
-            }
-          />
-        )}
-      </View>
-        </>
+          ) : (
+            <CoinDisplay
+              totalValue={displayedTotalValue}
+              dailyChange={displayedDailyChange}
+              onPress={() => setShowTokensModal(true)}
+            />
+          )}
+        </View>
       )}
 
-      {/* Buy Intent Modal and Route Home Modal removed - now navigating to /buy */}
+      {/* Tokens Modal - shown when tapping the coin */}
+      <Modal
+        visible={showTokensModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTokensModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowTokensModal(false)}>
+          <View style={styles.tokensModalContent}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Your Holdings</Text>
+
+            {allItems.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>No items yet</Text>
+                <Text style={styles.emptySubtitle}>Use the command bar to buy something</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={allItems}
+                renderItem={renderTokenItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.tokensList}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={theme.accent}
+                  />
+                }
+              />
+            )}
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Sell Modal */}
       <Modal
@@ -1269,16 +821,7 @@ export default function HomeScreen() {
               {sortedSellItems.length === 0 ? (
                 <View style={styles.emptySellState}>
                   <Text style={styles.emptySellTitle}>Nothing to sell yet</Text>
-                  <Text style={styles.emptySellSubtitle}>Add something you want to liquidate</Text>
-                  <Pressable
-                    style={styles.addToSellButton}
-                    onPress={() => {
-                      setShowSellModal(false);
-                      router.push('/add-item');
-                    }}
-                  >
-                    <Text style={styles.addToSellButtonText}>+ Add item to sell</Text>
-                  </Pressable>
+                  <Text style={styles.emptySellSubtitle}>Buy something first using the command bar</Text>
                 </View>
               ) : (
                 <>
@@ -1337,16 +880,6 @@ export default function HomeScreen() {
                     </Pressable>
                     );
                   })}
-                  {/* Add something else to sell */}
-                  <Pressable
-                    style={styles.addToSellRow}
-                    onPress={() => {
-                      setShowSellModal(false);
-                      router.push('/add-item');
-                    }}
-                  >
-                    <Text style={styles.addToSellRowText}>+ Sell something else</Text>
-                  </Pressable>
                 </>
               )}
             </ScrollView>
@@ -1423,70 +956,57 @@ export default function HomeScreen() {
             )}
 
             {showMarketplaceCards && (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {marketplaceOptions.map(option => (
-                  <View key={option.id} style={styles.sellOptionCard}>
-                    <View style={styles.sellOptionHeader}>
-                      <Text style={styles.sellOptionName}>{option.name}</Text>
-                      {option.id === bestOptionId && (
-                        <View style={styles.bestBadge}>
-                          <Text style={styles.bestBadgeText}>Best</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.sellOptionRow}>
-                      <Text style={styles.sellOptionLabel}>Market</Text>
-                      <Text style={styles.sellOptionValue}>{formatPrice(option.gross)}</Text>
-                    </View>
-                    <View style={styles.sellOptionRow}>
-                      <Text style={styles.sellOptionLabel}>Fees</Text>
-                      <Text style={styles.sellOptionValue}>-{formatCurrency(option.feeEstimate)}</Text>
-                    </View>
-                    <View style={styles.sellOptionRow}>
-                      <Text style={styles.sellOptionLabel}>Shipping</Text>
-                      <Text style={styles.sellOptionValue}>-{formatCurrency(option.shipping)}</Text>
-                    </View>
-                    <View style={styles.sellOptionRow}>
-                      <Text style={styles.sellOptionLabelStrong}>Net payout</Text>
-                      <Text style={styles.sellOptionValueStrong}>{formatCurrency(option.net)}</Text>
-                    </View>
+              <ScrollView showsVerticalScrollIndicator={false} style={styles.marketplaceScroll}>
+                {marketplaceOptions.map((mp) => {
+                  const isBest = mp.id === bestOptionId;
+                  return (
                     <Pressable
-                      style={[styles.sellOptionButton, marketplaceSellLoading && styles.sellOptionButtonDisabled]}
-                      onPress={() => {
-                        if (!selectedSellItem) return;
-                        handleMarketplaceSellRequest(option.id);
-                      }}
+                      key={mp.id}
+                      style={[styles.marketplaceCard, isBest && styles.marketplaceCardBest]}
+                      onPress={() => handleMarketplaceSellRequest(mp.id)}
                       disabled={marketplaceSellLoading}
                     >
-                      <Text style={styles.sellOptionButtonText}>
-                        {marketplaceSellLoading ? 'Submitting...' : 'Sell with Bloom'}
-                      </Text>
+                      <View style={styles.marketplaceCardHeader}>
+                        <Text style={styles.marketplaceName}>{mp.name}</Text>
+                        {isBest && <Text style={styles.bestBadge}>BEST</Text>}
+                      </View>
+                      <View style={styles.marketplaceRow}>
+                        <Text style={styles.marketplaceLabel}>Sale price</Text>
+                        <Text style={styles.marketplaceValue}>{formatCurrency(mp.gross)}</Text>
+                      </View>
+                      <View style={styles.marketplaceRow}>
+                        <Text style={styles.marketplaceLabel}>Fees (~{(MARKETPLACE_FEES[mp.id].feeRate * 100).toFixed(0)}%)</Text>
+                        <Text style={styles.marketplaceValueNeg}>-{formatCurrency(mp.feeEstimate)}</Text>
+                      </View>
+                      <View style={styles.marketplaceRow}>
+                        <Text style={styles.marketplaceLabel}>Shipping</Text>
+                        <Text style={styles.marketplaceValueNeg}>-{formatCurrency(mp.shipping)}</Text>
+                      </View>
+                      <View style={[styles.marketplaceRow, styles.marketplaceRowTotal]}>
+                        <Text style={styles.marketplaceLabelTotal}>You receive</Text>
+                        <Text style={styles.marketplaceValueTotal}>{formatCurrency(mp.net)}</Text>
+                      </View>
                     </Pressable>
-                  </View>
-                ))}
+                  );
+                })}
               </ScrollView>
-            )}
-
-            {showMarketplaceCards && (
-              <Text style={styles.sellDisclaimer}>
-                Estimates only. Final payout set at execution.
-              </Text>
             )}
 
             <Pressable
               style={styles.modalCancel}
               onPress={() => {
                 setShowSellOptions(false);
+                setShowBloomMarketOptions(false);
                 setSelectedSellItem(null);
               }}
             >
-              <Text style={styles.modalCancelText}>Close</Text>
+              <Text style={styles.modalCancelText}>Cancel</Text>
             </Pressable>
           </View>
         </Pressable>
       </Modal>
 
-      {/* Bloom Exchange Listing Modal */}
+      {/* Exchange Listing Modal */}
       <Modal
         visible={showExchangeListing}
         transparent
@@ -1496,12 +1016,10 @@ export default function HomeScreen() {
         <Pressable style={styles.modalOverlay} onPress={closeExchangeListing}>
           <View style={styles.modalContent}>
             {exchangeListingSuccess ? (
-              <View style={styles.exchangeSuccess}>
-                <Text style={styles.exchangeSuccessTitle}>Listed on Bloom Exchange</Text>
-                <Text style={styles.exchangeSuccessSubtitle}>Your listing is now live.</Text>
-                <Pressable style={styles.sellOptionButton} onPress={closeExchangeListing}>
-                  <Text style={styles.sellOptionButtonText}>Done</Text>
-                </Pressable>
+              <View style={styles.successState}>
+                <Text style={styles.successIcon}>✓</Text>
+                <Text style={styles.successTitle}>Listed!</Text>
+                <Text style={styles.successSubtitle}>Your item is now on the Bloom Exchange</Text>
               </View>
             ) : (
               <>
@@ -1523,44 +1041,42 @@ export default function HomeScreen() {
                         {selectedSellItem.name}
                       </Text>
                       <Text style={styles.sellHeaderMeta}>
-                        {selectedSellItem.size ? `Size ${selectedSellItem.size}` : 'Size —'} · Bloom custody
+                        Size {selectedSellItem.size || '—'}
                       </Text>
                     </View>
                   </View>
                 )}
 
-                <View style={styles.exchangeInputCard}>
-                  <Text style={styles.exchangeInputLabel}>Ask price</Text>
-                  <View style={styles.exchangeInputRow}>
-                    <Text style={styles.exchangeCurrency}>$</Text>
+                <View style={styles.priceInputSection}>
+                  <Text style={styles.priceInputLabel}>Your asking price</Text>
+                  <View style={styles.priceInputRow}>
+                    <Text style={styles.priceInputPrefix}>$</Text>
                     <TextInput
-                      style={styles.exchangeInput}
+                      style={styles.priceInput}
                       value={exchangeListingPrice}
                       onChangeText={setExchangeListingPrice}
+                      keyboardType="decimal-pad"
                       placeholder="0.00"
                       placeholderTextColor={theme.textTertiary}
-                      keyboardType="decimal-pad"
                     />
                   </View>
-                  {selectedSellItem && (
-                    <Text style={styles.exchangeHint}>
-                      Market value: {formatPrice(selectedSellItem.value)}
-                    </Text>
-                  )}
+                  <Text style={styles.priceInputHint}>
+                    Market price: {formatPrice(selectedSellItem?.value)}
+                  </Text>
                 </View>
 
                 <Pressable
                   style={[
-                    styles.sellOptionButton,
-                    exchangeListingLoading && styles.sellOptionButtonDisabled,
+                    styles.listButton,
+                    exchangeListingLoading && styles.listButtonDisabled,
                   ]}
                   onPress={handleConfirmExchangeListing}
                   disabled={exchangeListingLoading}
                 >
                   {exchangeListingLoading ? (
-                    <ActivityIndicator size="small" color={theme.textInverse} />
+                    <ActivityIndicator color="#FFF" />
                   ) : (
-                    <Text style={styles.sellOptionButtonText}>List on Exchange</Text>
+                    <Text style={styles.listButtonText}>List for Sale</Text>
                   )}
                 </Pressable>
 
@@ -1573,130 +1089,70 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      {/* Balance Breakdown Modal */}
-      <Modal
-        visible={showBalanceBreakdown}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowBalanceBreakdown(false)}
-      >
-        <Pressable
-          style={styles.breakdownOverlay}
-          onPress={() => setShowBalanceBreakdown(false)}
-        >
-          <View style={styles.breakdownCard}>
-            <View style={styles.breakdownRow}>
-              <View style={styles.breakdownLabelRow}>
-                <View style={[styles.breakdownDot, { backgroundColor: theme.accent }]} />
-                <Text style={styles.breakdownLabel}>Bloom</Text>
-              </View>
-              <Text style={styles.breakdownValue}>{formatPrice(portfolioValue)}</Text>
-            </View>
-            <Text style={styles.breakdownHint}>In custody</Text>
-
-            <View style={styles.breakdownDivider} />
-
-            <View style={styles.breakdownRow}>
-              <View style={styles.breakdownLabelRow}>
-                <View style={[styles.breakdownDot, { backgroundColor: theme.textTertiary }]} />
-                <Text style={styles.breakdownLabel}>Home</Text>
-              </View>
-              <Text style={styles.breakdownValue}>{formatPrice(homeValue)}</Text>
-            </View>
-            <Text style={styles.breakdownHint}>Tracked</Text>
-
-            <View style={styles.breakdownDivider} />
-
-            <View style={styles.breakdownRow}>
-              <View style={styles.breakdownLabelRow}>
-                <View style={[styles.breakdownDot, { backgroundColor: theme.textSecondary }]} />
-                <Text style={styles.breakdownLabel}>Watchlist</Text>
-              </View>
-              <Text style={styles.breakdownValue}>{formatPrice(watchlistValue)}</Text>
-            </View>
-            <Text style={styles.breakdownHint}>Intent</Text>
-          </View>
-        </Pressable>
-      </Modal>
-
       {/* Buy Modal */}
       <Modal
         visible={showBuyModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowBuyModal(false)}
+        onRequestClose={() => {
+          setShowBuyModal(false);
+          setSelectedOffer(null);
+          setBuySize('');
+        }}
       >
-        <View style={styles.buyModalOverlay}>
-          <View style={styles.buyModalContent}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Buy</Text>
+
             {selectedOffer && (
               <>
-                <Pressable
-                  style={styles.buyModalClose}
-                  onPress={() => {
-                    setShowBuyModal(false);
-                    setSelectedOffer(null);
-                    setBuySize('');
-                  }}
-                >
-                  <Text style={styles.buyModalCloseText}>✕</Text>
-                </Pressable>
-
-                {selectedOffer.image && (
-                  <Image
-                    source={{ uri: selectedOffer.image }}
-                    style={styles.buyModalImage}
-                    resizeMode="contain"
-                  />
-                )}
-
-                <Text style={styles.buyModalTitle} numberOfLines={2}>
-                  {selectedOffer.title}
-                </Text>
-
-                <View style={styles.buyModalPriceRow}>
-                  <Text style={styles.buyModalPrice}>
-                    {formatPrice(selectedOffer.total_estimate)}
-                  </Text>
-                  <View
-                    style={[
-                      styles.buyModalSourceBadge,
-                      { backgroundColor: SOURCE_CONFIG[selectedOffer.source]?.color || '#888' },
-                    ]}
-                  >
-                    <Text style={styles.buyModalSourceText}>
-                      {SOURCE_CONFIG[selectedOffer.source]?.label || selectedOffer.source}
-                    </Text>
-                  </View>
+                <View style={styles.buyOfferPreview}>
+                  {selectedOffer.image ? (
+                    <Image source={{ uri: selectedOffer.image }} style={styles.buyOfferImage} />
+                  ) : (
+                    <View style={[styles.buyOfferImage, styles.offerImagePlaceholder]}>
+                      <Text style={styles.offerImagePlaceholderText}>
+                        {selectedOffer.title.charAt(0)}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={styles.buyOfferTitle} numberOfLines={2}>{selectedOffer.title}</Text>
+                  <Text style={styles.buyOfferPrice}>{formatPrice(selectedOffer.total_estimate)}</Text>
                 </View>
 
-                <View style={styles.buyModalSizeRow}>
-                  <Text style={styles.buyModalSizeLabel}>Size</Text>
+                <View style={styles.sizeInputSection}>
+                  <Text style={styles.sizeInputLabel}>Size</Text>
                   <TextInput
-                    style={styles.buyModalSizeInput}
+                    style={styles.sizeInput}
                     value={buySize}
                     onChangeText={setBuySize}
-                    placeholder="10"
+                    placeholder="e.g. 10, M, OS"
                     placeholderTextColor={theme.textTertiary}
-                    keyboardType="decimal-pad"
+                    autoCapitalize="characters"
                   />
                 </View>
+
+                <Text style={styles.destinationLabel}>Where should we send it?</Text>
 
                 <Pressable
                   style={[
                     styles.buyModalButton,
+                    styles.buyModalButtonPrimary,
                     (!buySize.trim() || purchasing) && styles.buyModalButtonDisabled,
                   ]}
                   onPress={() => handleConfirmBuy('bloom')}
                   disabled={!buySize.trim() || purchasing}
                 >
-                  <Text style={styles.buyModalButtonText}>
-                    {purchasing ? 'Placing Order...' : 'Ship to Bloom Vault'}
-                  </Text>
-                  <Text style={styles.buyModalButtonSubtext}>Store with us, sell anytime</Text>
+                  {purchasing ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.buyModalButtonText}>Store in Bloom Vault</Text>
+                  )}
                 </Pressable>
 
                 <Pressable
                   style={[
+                    styles.buyModalButton,
                     styles.buyModalButtonSecondary,
                     (!buySize.trim() || purchasing) && styles.buyModalButtonDisabled,
                   ]}
@@ -1707,11 +1163,22 @@ export default function HomeScreen() {
                 </Pressable>
               </>
             )}
+
+            <Pressable
+              style={styles.modalCancel}
+              onPress={() => {
+                setShowBuyModal(false);
+                setSelectedOffer(null);
+                setBuySize('');
+              }}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
 
-      {/* Command Bar */}
+      {/* Command Bar - always at bottom */}
       <CommandBar
         query={commandQuery}
         onChangeQuery={handleCommandQueryChange}
@@ -1729,100 +1196,63 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.background,
   },
-  headerArea: {
-    backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  headerCenter: {
+  // Coin container - centered
+  coinContainer: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 100, // Space for command bar
   },
-  balanceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
+  // Command results section
+  commandResultsSection: {
+    flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 60 : 80, // Space for command bar at top
+    paddingHorizontal: 12,
   },
-  balanceAmount: {
-    fontFamily: fonts.heading,
-    fontSize: 28,
-    color: theme.textPrimary,
-    letterSpacing: -0.5,
+  commandLoadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
   },
-  balancePnl: {
-    fontSize: 15,
-    fontWeight: '500',
+  commandLoadingText: {
+    fontSize: 16,
+    color: theme.textSecondary,
   },
-  balanceUpdated: {
-    fontSize: 10,
-    color: theme.textTertiary,
-    marginTop: 4,
+  commandGridContent: {
+    paddingBottom: 100,
   },
-  profileButton: {
-    padding: 4,
+  commandGridRow: {
+    justifyContent: 'space-between',
   },
-  profileIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: theme.accent,
+  commandNoResults: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  profileIconText: {
+  commandNoResultsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  commandNoResultsSubtitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: theme.textInverse,
-  },
-  // Filter Tabs - below header, on cream background
-  filterTabs: {
-    flexDirection: 'row',
-    backgroundColor: theme.background,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
-    gap: 8,
-  },
-  filterTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: theme.backgroundSecondary,
-  },
-  filterTabActive: {
-    backgroundColor: theme.accent,
-  },
-  filterTabText: {
-    fontSize: 13,
-    fontWeight: '600',
     color: theme.textSecondary,
+    marginTop: 4,
   },
-  filterTabTextActive: {
-    color: theme.textInverse,
-  },
-  assetsSection: {
+  commandHint: {
     flex: 1,
-    backgroundColor: theme.backgroundSecondary,
-    paddingTop: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
   },
-  gridContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 120, // Extra space for fixed bottom bar
+  commandHintText: {
+    fontSize: 16,
+    color: theme.textSecondary,
+    textAlign: 'center',
   },
-  gridRow: {
-    justifyContent: 'space-between',
-  },
-  assetCard: {
+  // Offer cards
+  offerCard: {
     width: '47%',
     backgroundColor: theme.card,
     borderRadius: 16,
@@ -1830,307 +1260,152 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: theme.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
   },
-  assetCardBloom: {
-    borderColor: theme.accent,
-    borderWidth: 2,
-  },
-  cardImageContainer: {
-    backgroundColor: '#FFF',
-    padding: 8,
-  },
-  cardImageContainerBloom: {
-    backgroundColor: '#FFF',
-  },
-  cardImage: {
-    width: '100%',
-    aspectRatio: 1.3,
-  },
-  placeholderImage: {
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    fontFamily: fonts.heading,
-    fontSize: 24,
-    color: theme.accent,
-  },
-  cardInfo: {
-    padding: 12,
-  },
-  cardInfoBloom: {
-    backgroundColor: theme.accent,
-  },
-  cardName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.textPrimary,
-    marginBottom: 2,
-    lineHeight: 17,
-  },
-  cardNameBloom: {
-    color: '#1A1A1A',
-  },
-  cardPrice: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: theme.textPrimary,
-    marginBottom: 2,
-  },
-  cardPriceStale: {
-    color: theme.textSecondary,
-  },
-  cardPriceBloom: {
-    color: '#1A1A1A',
-  },
-  cardMeta: {
-    fontSize: 11,
-    color: theme.textSecondary,
-    flex: 1,
-  },
-  cardMetaBloom: {
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  cardMetaCta: {
-    fontSize: 11,
-    color: theme.accent,
-    fontWeight: '600',
-  },
-  cardMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardPnlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  assetMetaStack: {
-    flexDirection: 'column',
-    gap: 2,
-  },
-  cardPnl: {
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-  },
-  cardPnlBloom: {
-    color: '#1A1A1A',
-  },
-  statusBadge: {
+  offerSourceBadge: {
     position: 'absolute',
-    top: 6,
-    left: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    zIndex: 1,
   },
-  statusBadgeText: {
-    fontSize: 9,
+  offerSourceText: {
+    fontSize: 10,
     fontWeight: '700',
     color: '#FFF',
     textTransform: 'uppercase',
   },
-  priceStaleBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.warningBg,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 6,
+  offerImageContainer: {
+    backgroundColor: '#FFF',
+    padding: 8,
   },
-  priceStaleBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: theme.warning,
+  offerImage: {
+    width: '100%',
+    aspectRatio: 1,
   },
-  custodyLabel: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  custodyLabelBloom: {
-    backgroundColor: '#1A1A1A',
-  },
-  custodyLabelHome: {
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-  },
-  custodyLabelWatchlist: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-  },
-  custodyLabelText: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  custodyLabelTextBloom: {
-    color: '#FFFFFF',
-  },
-  custodyLabelTextHome: {
-    color: theme.textSecondary,
-  },
-  custodyLabelTextWatchlist: {
-    color: '#3B82F6',
-  },
-  loadingContainer: {
-    paddingVertical: 40,
+  offerImagePlaceholder: {
+    backgroundColor: '#F5F5F5',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
   },
-  loadingText: {
-    fontSize: 16,
-    color: theme.textSecondary,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 32,
-  },
-  emptyTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 18,
-    color: theme.textPrimary,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    color: theme.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  emptyButton: {
-    backgroundColor: theme.accent,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 24,
-  },
-  emptyButtonText: {
-    fontSize: 16,
+  offerImagePlaceholderText: {
+    fontSize: 32,
     fontWeight: '600',
-    color: theme.textInverse,
+    color: theme.accent,
   },
-  emptyFilterState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 32,
-  },
-  emptyFilterTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.textPrimary,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyFilterSubtitle: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    textAlign: 'center',
-  },
-  sectionTitle: {
+  offerTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: theme.textSecondary,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    color: theme.textPrimary,
+    padding: 12,
+    paddingBottom: 4,
+    lineHeight: 18,
   },
-  alertsSection: {
-    paddingHorizontal: 16,
+  offerPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    paddingHorizontal: 12,
     paddingBottom: 12,
   },
-  alertItem: {
+  // Tokens modal
+  tokensModalContent: {
     backgroundColor: theme.card,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    paddingBottom: 48,
+    maxHeight: '80%',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: theme.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  tokensList: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+  tokenItem: {
+    flexDirection: 'row',
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: theme.border,
   },
-  alertTitle: {
+  tokenItemBloom: {
+    borderColor: theme.accent,
+    borderWidth: 2,
+  },
+  tokenImageContainer: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#FFF',
+    position: 'relative',
+  },
+  tokenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  tokenImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+  },
+  tokenImagePlaceholderText: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: theme.accent,
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusBadgeText: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#FFF',
+    textTransform: 'uppercase',
+  },
+  tokenInfo: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center',
+  },
+  tokenName: {
     fontSize: 14,
     fontWeight: '600',
     color: theme.textPrimary,
+    marginBottom: 2,
   },
-  alertBody: {
-    fontSize: 12,
-    color: theme.textSecondary,
-    marginTop: 4,
-  },
-  digestSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  digestCard: {
-    backgroundColor: theme.card,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  digestLabel: {
+  tokenSize: {
     fontSize: 12,
     color: theme.textSecondary,
     marginBottom: 4,
   },
-  digestValue: {
-    fontSize: 18,
+  tokenValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tokenValue: {
+    fontSize: 15,
     fontWeight: '700',
     color: theme.textPrimary,
   },
-  digestChange: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.success,
-    marginTop: 4,
-  },
-  moversSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  moversRow: {
-    gap: 12,
-  },
-  moverCard: {
-    width: 140,
-    backgroundColor: theme.card,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  moverImage: {
-    width: '100%',
-    height: 80,
-    borderRadius: 10,
-    backgroundColor: '#FFF',
-    marginBottom: 8,
-  },
-  moverName: {
+  tokenPnl: {
     fontSize: 12,
     fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  moverValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.textPrimary,
-    marginTop: 4,
-  },
-  moverChange: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
   },
   // Modal styles
   modalOverlay: {
@@ -2153,115 +1428,98 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
-  intentSubtitle: {
-    fontSize: 13,
+  modalCancel: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textSecondary,
+  },
+  // Empty states
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 18,
+    color: theme.textPrimary,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 16,
     color: theme.textSecondary,
     textAlign: 'center',
-    marginBottom: 16,
   },
-  intentOption: {
-    backgroundColor: theme.backgroundSecondary,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: theme.borderLight,
+  emptySellState: {
+    alignItems: 'center',
+    paddingVertical: 32,
   },
-  intentOptionPrimary: {
-    backgroundColor: theme.accent,
-    borderColor: theme.accent,
-  },
-  intentOptionSecondary: {
-    backgroundColor: theme.card,
-    borderColor: theme.border,
-  },
-  intentOptionTitle: {
+  emptySellTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: theme.textPrimary,
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  intentOptionDesc: {
-    fontSize: 12,
-    color: theme.textSecondary,
-  },
-  routeHomeInputCard: {
-    backgroundColor: theme.card,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-    gap: 10,
-    marginBottom: 12,
-  },
-  routeHomeInput: {
+  emptySellSubtitle: {
     fontSize: 14,
-    color: theme.textPrimary,
-    paddingVertical: 6,
-  },
-  routeOption: {
-    backgroundColor: theme.backgroundSecondary,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: theme.borderLight,
-  },
-  routeOptionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.textPrimary,
-    marginBottom: 4,
-  },
-  routeOptionDesc: {
-    fontSize: 12,
     color: theme.textSecondary,
+    textAlign: 'center',
   },
-  modalOption: {
-    backgroundColor: theme.backgroundSecondary,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
+  // Sell modals
   sellPickRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  sellPickRowHome: {
-    backgroundColor: theme.card,
-    borderColor: theme.border,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: theme.backgroundSecondary,
   },
   sellPickRowBloom: {
-    backgroundColor: theme.accentLight,
-    borderColor: theme.accentDark,
+    backgroundColor: 'rgba(245, 196, 154, 0.15)',
+    borderWidth: 1,
+    borderColor: theme.accent,
+  },
+  sellPickRowHome: {
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   sellPickLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 14,
   },
   sellPickThumb: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 8,
     backgroundColor: '#FFF',
   },
+  sellOptionPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+  },
+  sellOptionPlaceholderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.accent,
+  },
   sellPickText: {
+    marginLeft: 12,
     flex: 1,
   },
   sellPickName: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: theme.textPrimary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   sellPickMetaRow: {
     flexDirection: 'row',
@@ -2271,599 +1529,307 @@ const styles = StyleSheet.create({
   sellPickMeta: {
     fontSize: 12,
     color: theme.textSecondary,
-    flexShrink: 1,
   },
   sellPickBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 10,
-  },
-  sellPickBadgeHome: {
-    backgroundColor: theme.backgroundTertiary,
+    borderRadius: 4,
   },
   sellPickBadgeBloom: {
     backgroundColor: theme.accent,
   },
+  sellPickBadgeHome: {
+    backgroundColor: theme.backgroundTertiary,
+  },
   sellPickBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+  },
+  sellPickBadgeTextBloom: {
+    color: '#FFF',
   },
   sellPickBadgeTextHome: {
     color: theme.textSecondary,
   },
-  sellPickBadgeTextBloom: {
-    color: theme.textPrimary,
-  },
   sellPickValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: theme.textPrimary,
     marginLeft: 12,
-    textAlign: 'right',
   },
-  modalOptionDisabled: {
-    opacity: 0.5,
+  sellHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
-  modalOptionTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+  sellHeaderImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+  },
+  sellHeaderText: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  sellHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
     color: theme.textPrimary,
     marginBottom: 4,
   },
-  modalOptionTitleDisabled: {
-    color: theme.textSecondary,
-  },
-  modalOptionDesc: {
-    fontSize: 14,
-    color: theme.textSecondary,
-  },
-  modalCancel: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginTop: 8,
-  },
-  modalCancelText: {
-    fontSize: 17,
-    fontWeight: '600',
+  sellHeaderMeta: {
+    fontSize: 13,
     color: theme.textSecondary,
   },
   sellDecisionBlock: {
-    gap: 12,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sellDecisionPrimary: {
     backgroundColor: theme.accent,
     borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    padding: 16,
+    marginBottom: 10,
   },
   sellDecisionPrimaryText: {
     fontSize: 16,
     fontWeight: '700',
-    color: theme.textPrimary,
+    color: '#FFF',
     marginBottom: 4,
   },
   sellDecisionSecondary: {
-    backgroundColor: theme.card,
+    backgroundColor: theme.backgroundSecondary,
     borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: theme.border,
   },
   sellDecisionSecondaryText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: theme.textPrimary,
     marginBottom: 4,
   },
   sellDecisionSubtext: {
-    fontSize: 12,
-    color: theme.textSecondary,
-  },
-  sellOptionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  sellHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  sellHeaderImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#FFF',
-  },
-  sellHeaderText: {
-    flex: 1,
-  },
-  sellHeaderTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  sellHeaderMeta: {
     fontSize: 13,
     color: theme.textSecondary,
-    marginTop: 4,
   },
-  sellOptionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
+  marketplaceScroll: {
+    maxHeight: 300,
   },
-  sellOptionImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#FFF',
-  },
-  sellOptionPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F5F5F5',
-  },
-  sellOptionPlaceholderText: {
-    fontFamily: fonts.heading,
-    fontSize: 16,
-    color: theme.accent,
-  },
-  sellOptionText: {
-    flex: 1,
-  },
-  sellOptionMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  custodyTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 215, 181, 0.3)',
-  },
-  custodyTagText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  sellOptionValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  sellOptionCard: {
+  marketplaceCard: {
     backgroundColor: theme.backgroundSecondary,
     borderRadius: 14,
-    padding: 14,
+    padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: theme.border,
   },
-  sellOptionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+  marketplaceCardBest: {
+    borderColor: theme.success,
+    borderWidth: 2,
   },
-  sellOptionName: {
+  marketplaceCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  marketplaceName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: theme.textPrimary,
   },
   bestBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: theme.accent,
-  },
-  bestBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    color: theme.textInverse,
-  },
-  sellOptionLabel: {
-    fontSize: 13,
-    color: theme.textSecondary,
-  },
-  sellOptionLabelStrong: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  sellOptionValueStrong: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: theme.textPrimary,
-  },
-  sellOptionButton: {
-    marginTop: 12,
-    backgroundColor: theme.accent,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  sellOptionButtonDisabled: {
-    opacity: 0.7,
-  },
-  sellOptionButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.textInverse,
-  },
-  exchangeInputCard: {
-    backgroundColor: theme.backgroundSecondary,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: theme.borderLight,
-    marginBottom: 14,
-  },
-  exchangeInputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  exchangeInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  exchangeCurrency: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.textPrimary,
-  },
-  exchangeInput: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.textPrimary,
-    paddingVertical: 6,
-  },
-  exchangeHint: {
-    marginTop: 6,
-    fontSize: 12,
-    color: theme.textSecondary,
-  },
-  exchangeSuccess: {
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-  },
-  exchangeSuccessTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.textPrimary,
-  },
-  exchangeSuccessSubtitle: {
-    fontSize: 13,
-    color: theme.textSecondary,
-    textAlign: 'center',
-  },
-  sellDisclaimer: {
-    fontSize: 12,
-    color: theme.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  emptySellState: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  emptySellTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.textPrimary,
-    marginBottom: 6,
-  },
-  emptySellSubtitle: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 16,
-  },
-  addToSellButton: {
-    backgroundColor: theme.accent,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 14,
-    marginTop: 8,
-  },
-  addToSellButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.textInverse,
-  },
-  addToSellRow: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-    marginTop: 8,
-  },
-  addToSellRowText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.accent,
-  },
-  // Balance Breakdown Modal
-  breakdownOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  breakdownCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    width: '100%',
-    maxWidth: 320,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  breakdownLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  breakdownDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  breakdownLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  breakdownValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  breakdownHint: {
-    fontSize: 12,
-    color: theme.textTertiary,
-    marginLeft: 18,
-    marginTop: 2,
-  },
-  breakdownDivider: {
-    height: 1,
-    backgroundColor: theme.border,
-    marginVertical: 12,
-  },
-  // Command Results Section
-  commandResultsSection: {
-    flex: 1,
-    backgroundColor: theme.background,
-    paddingTop: 80, // Space for command bar at top
-  },
-  commandLoadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-  },
-  commandLoadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: theme.textSecondary,
-  },
-  commandGridRow: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-  },
-  commandGridContent: {
-    paddingBottom: 100,
-  },
-  commandNoResults: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-  },
-  commandNoResultsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.textPrimary,
-  },
-  commandNoResultsSubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    color: theme.textSecondary,
-  },
-  commandHint: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 40,
-  },
-  commandHintText: {
-    fontSize: 16,
-    color: theme.textTertiary,
-    textAlign: 'center',
-  },
-  // Offer Cards
-  offerCard: {
-    width: '48%',
-    backgroundColor: theme.card,
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 12,
-  },
-  offerSourceBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
+    color: theme.success,
+    backgroundColor: theme.successBg,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
-    zIndex: 1,
+    borderRadius: 4,
   },
-  offerSourceText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  offerImageContainer: {
-    aspectRatio: 1,
-    backgroundColor: theme.backgroundSecondary,
-    borderRadius: 12,
-    marginBottom: 8,
-    overflow: 'hidden',
-  },
-  offerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  offerImagePlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.backgroundTertiary,
-  },
-  offerImagePlaceholderText: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: theme.textTertiary,
-  },
-  offerTitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: theme.textPrimary,
+  marketplaceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 4,
-    minHeight: 36,
   },
-  offerPrice: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.textPrimary,
+  marketplaceRowTotal: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
   },
-  // Buy Modal
-  buyModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  buyModalContent: {
-    backgroundColor: theme.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  buyModalClose: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 1,
-    padding: 8,
-  },
-  buyModalCloseText: {
-    fontSize: 20,
+  marketplaceLabel: {
+    fontSize: 13,
     color: theme.textSecondary,
   },
-  buyModalImage: {
-    width: '100%',
-    height: 200,
-    marginBottom: 16,
+  marketplaceLabelTotal: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textPrimary,
   },
-  buyModalTitle: {
-    fontSize: 18,
+  marketplaceValue: {
+    fontSize: 13,
+    color: theme.textPrimary,
+  },
+  marketplaceValueNeg: {
+    fontSize: 13,
+    color: theme.error,
+  },
+  marketplaceValueTotal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.success,
+  },
+  // Exchange listing
+  priceInputSection: {
+    marginBottom: 24,
+  },
+  priceInputLabel: {
+    fontSize: 14,
     fontWeight: '600',
     color: theme.textPrimary,
     marginBottom: 8,
-    textAlign: 'center',
   },
-  buyModalPriceRow: {
+  priceInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 24,
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  buyModalPrice: {
+  priceInputPrefix: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: theme.textSecondary,
+    marginRight: 4,
+  },
+  priceInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    paddingVertical: 16,
+  },
+  priceInputHint: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 8,
+  },
+  listButton: {
+    backgroundColor: theme.accent,
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  listButtonDisabled: {
+    opacity: 0.5,
+  },
+  listButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  successState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  successIcon: {
+    fontSize: 48,
+    color: theme.success,
+    marginBottom: 16,
+  },
+  successTitle: {
     fontSize: 24,
     fontWeight: '700',
     color: theme.textPrimary,
+    marginBottom: 8,
   },
-  buyModalSourceBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  successSubtitle: {
+    fontSize: 16,
+    color: theme.textSecondary,
   },
-  buyModalSourceText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  buyModalSizeRow: {
-    flexDirection: 'row',
+  // Buy modal
+  buyOfferPreview: {
     alignItems: 'center',
     marginBottom: 24,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
-  buyModalSizeLabel: {
+  buyOfferImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    marginBottom: 12,
+  },
+  buyOfferTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: theme.textPrimary,
-    marginRight: 16,
+    textAlign: 'center',
+    marginBottom: 8,
   },
-  buyModalSizeInput: {
-    flex: 1,
+  buyOfferPrice: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.textPrimary,
+  },
+  sizeInputSection: {
+    marginBottom: 24,
+  },
+  sizeInputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 8,
+  },
+  sizeInput: {
     backgroundColor: theme.backgroundSecondary,
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 16,
     color: theme.textPrimary,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  destinationLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginBottom: 12,
   },
   buyModalButton: {
-    backgroundColor: theme.accent,
-    borderRadius: 16,
-    paddingVertical: 16,
+    borderRadius: 14,
+    padding: 16,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+  buyModalButtonPrimary: {
+    backgroundColor: theme.accent,
+  },
+  buyModalButtonSecondary: {
+    backgroundColor: theme.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   buyModalButtonDisabled: {
     opacity: 0.5,
   },
   buyModalButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: theme.textInverse,
-  },
-  buyModalButtonSubtext: {
-    fontSize: 12,
-    color: theme.textInverse,
-    opacity: 0.8,
-    marginTop: 2,
-  },
-  buyModalButtonSecondary: {
-    backgroundColor: theme.backgroundSecondary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
+    fontWeight: '700',
+    color: '#FFF',
   },
   buyModalButtonTextSecondary: {
     fontSize: 16,

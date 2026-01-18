@@ -120,7 +120,7 @@ export function CommandBar({
         onChangeText={onChangeQuery}
         onFocus={onFocus}
         onSubmitEditing={handleSubmit}
-        placeholder="Buy, sell, search..."
+        placeholder="Pay, buy, sell..."
         placeholderTextColor={theme.textTertiary}
         returnKeyType="search"
         autoCapitalize="none"
