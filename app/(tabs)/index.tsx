@@ -17,6 +17,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -227,6 +228,17 @@ export default function HomeScreen() {
   const [buySize, setBuySize] = useState('');
   const [purchasing, setPurchasing] = useState(false);
   const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isWeb = Platform.OS === 'web';
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const stagePadding = viewportWidth < 640 ? 16 : 24;
+  const modalPadding = viewportWidth < 640 ? 20 : 32;
+  const deviceAspect = 19.5 / 9;
+  const maxWidthBySpace = viewportWidth - stagePadding * 2 - modalPadding * 2;
+  const maxHeightBySpace = viewportHeight - stagePadding * 2 - modalPadding * 2;
+  const deviceWidth = Math.max(
+    200,
+    Math.min(360, maxWidthBySpace, maxHeightBySpace / deviceAspect)
+  );
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1026,7 +1038,7 @@ export default function HomeScreen() {
     ? (now - lastUpdatedAt.getTime()) <= PRICE_FRESHNESS_MINUTES * 60 * 1000
     : false;
 
-  return (
+  const content = (
     <View style={styles.container}>
       {/* The Bloom Card - Full screen gradient, tap to see breakdown */}
       {!commandActive && (
@@ -1781,11 +1793,60 @@ export default function HomeScreen() {
       </Modal>
     </View>
   );
+
+  if (isWeb) {
+    return (
+      <View style={[styles.webStage, { padding: stagePadding }]}>
+        <View style={[styles.webModal, { padding: modalPadding }]}>
+          <View style={[styles.webDevice, { width: deviceWidth }]}>
+            <View style={styles.webDeviceScreen}>{content}</View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return content;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  webStage: {
+    flex: 1,
+    backgroundColor: '#4A4A4A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  webModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.2,
+    shadowRadius: 30,
+    elevation: 12,
+  },
+  webDevice: {
+    aspectRatio: 9 / 19.5,
+    backgroundColor: '#0B0B0B',
+    borderRadius: 42,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  webDeviceScreen: {
+    flex: 1,
+    borderRadius: 32,
+    overflow: 'hidden',
+    backgroundColor: '#000000',
   },
   keyboardAvoid: {
     flex: 1,
