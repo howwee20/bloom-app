@@ -20,7 +20,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { fonts, theme } from '../../constants/Colors';
 import { CommandBar, parseCommand, getSearchQuery } from '../../components/CommandBar';
 import { BloomCard } from '../../components/BloomCard';
@@ -1051,15 +1050,10 @@ export default function HomeScreen() {
 
       {/* Command Results - shown when command bar is active */}
       {commandActive && (
-        <LinearGradient
-          colors={['#E8A4C9', '#C9A4E8', '#A4C4E8']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.commandResultsSection}
-        >
+        <View style={styles.commandResultsSection}>
           {commandLoading ? (
             <View style={styles.commandLoadingContainer}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
+              <ActivityIndicator size="large" color={theme.textSecondary} />
               <Text style={styles.commandLoadingText}>Finding best prices...</Text>
             </View>
           ) : commandResults.length > 0 ? (
@@ -1112,7 +1106,7 @@ export default function HomeScreen() {
               <Text style={styles.commandHintText}>Search for sneakers, apparel, or type "sell" to list items</Text>
             </View>
           )}
-        </LinearGradient>
+        </View>
       )}
 
       {/* Command Bar - stays above keyboard */}
@@ -1812,6 +1806,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F5F5F0',
   },
   webStage: {
     flex: 1,
@@ -1846,7 +1841,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 32,
     overflow: 'hidden',
-    backgroundColor: '#000000',
+    backgroundColor: '#F5F5F0',
   },
   keyboardAvoid: {
     flex: 1,
@@ -3009,7 +3004,7 @@ const styles = StyleSheet.create({
   commandLoadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: theme.textSecondary,
   },
   commandGridRow: {
     justifyContent: 'space-between',
@@ -3026,12 +3021,12 @@ const styles = StyleSheet.create({
   commandNoResultsTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: theme.textPrimary,
   },
   commandNoResultsSubtitle: {
     marginTop: 8,
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: theme.textSecondary,
   },
   commandHint: {
     flex: 1,
@@ -3041,7 +3036,7 @@ const styles = StyleSheet.create({
   },
   commandHintText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: theme.textSecondary,
     textAlign: 'center',
   },
   // Offer Cards

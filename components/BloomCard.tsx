@@ -7,11 +7,8 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface BloomCardProps {
   totalValue: number;
@@ -59,7 +56,16 @@ export function BloomCard({ totalValue, dailyChange, onPress }: BloomCardProps) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    width: '100%',
+    marginHorizontal: 16,
+    marginTop: 60,
+    marginBottom: 100,
+    borderRadius: 32,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
   },
   gradient: {
     flex: 1,
@@ -70,22 +76,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   valueText: {
-    fontSize: 56,
+    fontSize: 48,
     fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -1,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   changeText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
 });
 
