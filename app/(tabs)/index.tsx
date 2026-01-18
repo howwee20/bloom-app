@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   AppState,
   AppStateStatus,
   FlatList,
@@ -14,17 +13,16 @@ import {
   Modal,
   Platform,
   Pressable,
-  RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { fonts, theme } from '../../constants/Colors';
 import { CommandBar, parseCommand, getSearchQuery } from '../../components/CommandBar';
-import { BloomCoin } from '../../components/BloomCoin';
+import { BloomCard } from '../../components/BloomCard';
 
 type CustodyFilter = 'bloom' | 'home' | 'watchlist';
 import { supabase } from '../../lib/supabase';
@@ -1029,27 +1027,27 @@ export default function HomeScreen() {
     : false;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* The Bloom Coin - ALWAYS visible, at top when command active */}
-      <View style={[
-        styles.coinContainer,
-        commandActive && styles.coinContainerMini
-      ]}>
-        <View style={commandActive ? styles.coinMiniWrapper : undefined}>
-          <BloomCoin
-            totalValue={displayedTotalValue}
-            dailyChange={displayedTotalPnl || 0}
-            onPress={() => !commandActive && setShowBreakdownModal(true)}
-          />
-        </View>
-      </View>
+    <View style={styles.container}>
+      {/* The Bloom Card - Full screen gradient, tap to see breakdown */}
+      {!commandActive && (
+        <BloomCard
+          totalValue={portfolioValue + homeValue}
+          dailyChange={displayedTotalPnl || 0}
+          onPress={() => setShowBreakdownModal(true)}
+        />
+      )}
 
-      {/* Command Results - shown when command bar is active (fills middle) */}
+      {/* Command Results - shown when command bar is active */}
       {commandActive && (
-        <View style={styles.commandResultsSection}>
+        <LinearGradient
+          colors={['#E8A4C9', '#C9A4E8', '#A4C4E8']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.commandResultsSection}
+        >
           {commandLoading ? (
             <View style={styles.commandLoadingContainer}>
-              <ActivityIndicator size="large" color={theme.accent} />
+              <ActivityIndicator size="large" color="#FFFFFF" />
               <Text style={styles.commandLoadingText}>Finding best prices...</Text>
             </View>
           ) : commandResults.length > 0 ? (
@@ -1102,7 +1100,7 @@ export default function HomeScreen() {
               <Text style={styles.commandHintText}>Search for sneakers, apparel, or type "sell" to list items</Text>
             </View>
           )}
-        </View>
+        </LinearGradient>
       )}
 
       {/* Command Bar - stays above keyboard */}
@@ -1781,14 +1779,13 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F0', // Light cream background like the screenshot
   },
   keyboardAvoid: {
     flex: 1,
@@ -1799,27 +1796,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#F5F5F0',
-  },
-  // Coin Container - centers the coin on screen (full size when idle)
-  coinContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 100, // Space for command bar
-  },
-  // Coin Container when command bar is active (mini at top)
-  coinContainerMini: {
-    flex: 0,
-    paddingTop: 8,
-    paddingBottom: 0,
-    justifyContent: 'flex-start',
-  },
-  // Wrapper to scale down the coin when in mini mode
-  coinMiniWrapper: {
-    transform: [{ scale: 0.35 }],
-    marginTop: -60,
-    marginBottom: -100, // Compensate for scaled size
+    paddingBottom: 34, // Safe area for iPhone
   },
   // Breakdown header when coin is tapped
   breakdownHeader: {
@@ -2960,8 +2937,8 @@ const styles = StyleSheet.create({
   // Command Results Section
   commandResultsSection: {
     flex: 1,
-    backgroundColor: theme.background,
-    paddingBottom: 80, // Space for command bar at bottom
+    paddingTop: 60, // Safe area
+    paddingBottom: 100, // Space for command bar at bottom
   },
   commandLoadingContainer: {
     flex: 1,
@@ -2971,7 +2948,7 @@ const styles = StyleSheet.create({
   commandLoadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: theme.textSecondary,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   commandGridRow: {
     justifyContent: 'space-between',
@@ -2984,28 +2961,26 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 60,
   },
   commandNoResultsTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme.textPrimary,
+    color: '#FFFFFF',
   },
   commandNoResultsSubtitle: {
     marginTop: 8,
     fontSize: 14,
-    color: theme.textSecondary,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   commandHint: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 60,
     paddingHorizontal: 40,
   },
   commandHintText: {
     fontSize: 16,
-    color: theme.textTertiary,
+    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
   },
   // Offer Cards
