@@ -3,7 +3,7 @@
 // One object. All value. Always growing.
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
 interface BloomCoinProps {
   totalValue: number;
@@ -17,11 +17,18 @@ const AURA_SIZE = Math.round(COIN_SIZE * 1.24);
 export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) {
   const coinRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isSpinning, setIsSpinning] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const rafRef = useRef<number>(0);
-  const currentRotation = useRef({ x: 0, y: 0 });
-  const targetRotation = useRef({ x: 0, y: 0 });
+  const inertiaRef = useRef<number>(0);
+  const isDraggingRef = useRef(false);
+  const isInertiaRef = useRef(false);
+  const dragDistanceRef = useRef(0);
+  const suppressClickRef = useRef(false);
+  const lastPointerRef = useRef({ x: 0, y: 0, time: 0 });
+  const spinVelocityRef = useRef({ x: 0, y: 0, z: 0 });
+  const spinRotationRef = useRef({ x: 0, y: 0, z: 0 });
+  const currentRotation = useRef({ x: 0, y: 0, z: 0 });
+  const targetRotation = useRef({ x: 0, y: 0, z: 0 });
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -67,11 +74,13 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
       // Lerp towards target
       currentRotation.current.x += (targetRotation.current.x - currentRotation.current.x) * 0.1;
       currentRotation.current.y += (targetRotation.current.y - currentRotation.current.y) * 0.1;
+      currentRotation.current.z += (targetRotation.current.z - currentRotation.current.z) * 0.1;
 
       // Apply transform
       coin.style.transform = `
         rotateX(${currentRotation.current.x}deg)
         rotateY(${currentRotation.current.y}deg)
+        rotateZ(${currentRotation.current.z}deg)
       `;
 
       rafRef.current = requestAnimationFrame(animate);
@@ -81,9 +90,53 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     return () => cancelAnimationFrame(rafRef.current);
   }, [prefersReducedMotion]);
 
+  const startInertia = useCallback(() => {
+    if (prefersReducedMotion) return;
+
+    let velocityX = spinVelocityRef.current.x;
+    let velocityY = spinVelocityRef.current.y;
+    let velocityZ = spinVelocityRef.current.z;
+
+    if (
+      Math.abs(velocityX) < 0.01 &&
+      Math.abs(velocityY) < 0.01 &&
+      Math.abs(velocityZ) < 0.01
+    ) return;
+
+    isInertiaRef.current = true;
+
+    const step = () => {
+      velocityX *= 0.94;
+      velocityY *= 0.94;
+      velocityZ *= 0.94;
+
+      spinRotationRef.current.x += velocityX;
+      spinRotationRef.current.y += velocityY;
+      spinRotationRef.current.z += velocityZ;
+      targetRotation.current = {
+        x: spinRotationRef.current.x,
+        y: spinRotationRef.current.y,
+        z: spinRotationRef.current.z,
+      };
+
+      if (
+        Math.abs(velocityX) < 0.02 &&
+        Math.abs(velocityY) < 0.02 &&
+        Math.abs(velocityZ) < 0.02
+      ) {
+        isInertiaRef.current = false;
+        return;
+      }
+
+      inertiaRef.current = requestAnimationFrame(step);
+    };
+
+    inertiaRef.current = requestAnimationFrame(step);
+  }, [prefersReducedMotion]);
+
   // Handle pointer move for tilt effect
   const handlePointerMove = useCallback((e: React.PointerEvent | PointerEvent) => {
-    if (prefersReducedMotion || isSpinning) return;
+    if (prefersReducedMotion || isDraggingRef.current || isInertiaRef.current) return;
 
     const container = containerRef.current;
     if (!container) return;
@@ -98,36 +151,86 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
 
     // Set target rotation (inverted for natural feel)
     const maxTilt = 12;
-    targetRotation.current.x = -normalizedY * maxTilt;
-    targetRotation.current.y = normalizedX * maxTilt;
-  }, [prefersReducedMotion, isSpinning]);
+    targetRotation.current.x = spinRotationRef.current.x - normalizedY * maxTilt;
+    targetRotation.current.y = spinRotationRef.current.y + normalizedX * maxTilt;
+    targetRotation.current.z = spinRotationRef.current.z;
+  }, [prefersReducedMotion]);
 
   // Handle pointer leave - return to neutral
   const handlePointerLeave = useCallback(() => {
-    targetRotation.current.x = 0;
-    targetRotation.current.y = 0;
+    if (isDraggingRef.current) return;
+    targetRotation.current.x = spinRotationRef.current.x;
+    targetRotation.current.y = spinRotationRef.current.y;
+    targetRotation.current.z = spinRotationRef.current.z;
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    isDraggingRef.current = true;
+    suppressClickRef.current = false;
+    dragDistanceRef.current = 0;
+    spinVelocityRef.current = { x: 0, y: 0, z: 0 };
+
+    if (inertiaRef.current) {
+      cancelAnimationFrame(inertiaRef.current);
+    }
+
+    if (e.currentTarget && e.currentTarget.setPointerCapture) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+
+    lastPointerRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      time: performance.now(),
+    };
+  }, []);
+
+  const handlePointerUp = useCallback((e?: React.PointerEvent) => {
+    isDraggingRef.current = false;
+    suppressClickRef.current = dragDistanceRef.current > 6;
+    startInertia();
+    if (e?.currentTarget && e.currentTarget.releasePointerCapture) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  }, [startInertia]);
+
+  const handlePointerDrag = useCallback((e: React.PointerEvent) => {
+    if (!isDraggingRef.current) return;
+
+    const now = performance.now();
+    const last = lastPointerRef.current;
+    const dx = e.clientX - last.x;
+    const dy = e.clientY - last.y;
+    const dt = Math.max(now - last.time, 16);
+
+    dragDistanceRef.current += Math.abs(dx) + Math.abs(dy);
+
+    spinRotationRef.current.z += dx * 0.75;
+    spinRotationRef.current.x -= dy * 0.25;
+    targetRotation.current = {
+      x: spinRotationRef.current.x,
+      y: spinRotationRef.current.y,
+      z: spinRotationRef.current.z,
+    };
+
+    spinVelocityRef.current = {
+      x: (-dy / dt) * 10,
+      y: 0,
+      z: (dx / dt) * 18,
+    };
+
+    lastPointerRef.current = { x: e.clientX, y: e.clientY, time: now };
   }, []);
 
   // Handle click - spin animation
   const handleClick = useCallback(() => {
-    if (isSpinning) return;
-
-    setIsSpinning(true);
-    const coin = coinRef.current;
-    if (coin) {
-      coin.classList.add('coin-spinning');
-
-      setTimeout(() => {
-        coin.classList.remove('coin-spinning');
-        setIsSpinning(false);
-        // Reset rotation after spin
-        currentRotation.current = { x: 0, y: 0 };
-        targetRotation.current = { x: 0, y: 0 };
-      }, 1000);
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
     }
 
     onPress();
-  }, [isSpinning, onPress]);
+  }, [onPress]);
 
   // Inject CSS for animations and page vignette
   useEffect(() => {
@@ -139,11 +242,6 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     const style = document.createElement('style');
     style.id = styleId;
     style.textContent = `
-      @keyframes coinSpin {
-        0% { transform: rotateY(0deg); }
-        100% { transform: rotateY(720deg); }
-      }
-
       @keyframes subtleFloat {
         0%, 100% { transform: translateY(0px); }
         50% { transform: translateY(-4px); }
@@ -171,10 +269,6 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         100% { transform: translateX(25%) translateY(-20%) rotate(15deg); opacity: 0; }
       }
 
-      .coin-spinning {
-        animation: coinSpin 1s cubic-bezier(0.23, 1, 0.32, 1) forwards !important;
-      }
-
       .coin-container:not(.reduced-motion) .coin-float {
         animation: subtleFloat 4s ease-in-out infinite;
       }
@@ -197,9 +291,6 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
 
       @media (prefers-reduced-motion: reduce) {
         .coin-container .coin-float {
-          animation: none !important;
-        }
-        .coin-spinning {
           animation: none !important;
         }
         .coin-container .aura-gold,
@@ -235,7 +326,13 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
       <div
         ref={containerRef}
         className={`coin-container ${prefersReducedMotion ? 'reduced-motion' : ''}`}
-        onPointerMove={handlePointerMove as any}
+        onPointerMove={(e) => {
+          handlePointerMove(e as any);
+          handlePointerDrag(e);
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         onClick={handleClick}
         style={{
@@ -300,7 +397,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
               borderRadius: '50%',
               position: 'relative',
               transformStyle: 'preserve-3d',
-              transition: isSpinning ? 'none' : 'transform 0.1s ease-out',
+              transition: 'transform 0.1s ease-out',
             }}
           >
             {/* Outer metallic rim */}

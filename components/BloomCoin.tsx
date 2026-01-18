@@ -5,14 +5,13 @@ import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  Pressable,
   StyleSheet,
   Dimensions,
   Animated,
   Easing,
+  PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme } from '../constants/Colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COIN_SIZE = Math.min(SCREEN_WIDTH * 0.8, 360);
@@ -27,7 +26,10 @@ interface BloomCoinProps {
 export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) {
   const shimmer = useRef(new Animated.Value(0)).current;
   const auraShift = useRef(new Animated.Value(0)).current;
+  const tilt = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const spin = useRef(new Animated.Value(0)).current;
   const rimSize = COIN_SIZE * 0.075;
+  const dragThreshold = 6;
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -72,6 +74,54 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     auraAnimation.start();
     return () => auraAnimation.stop();
   }, [auraShift]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2,
+      onPanResponderGrant: () => {
+        tilt.stopAnimation();
+        spin.stopAnimation((value) => {
+          spin.setOffset(value);
+          spin.setValue(0);
+        });
+      },
+      onPanResponderMove: (_event, gesture) => {
+        tilt.setValue({
+          x: -gesture.dy * 0.35,
+          y: gesture.dx * 0.35,
+        });
+        spin.setValue(gesture.dx * 0.85);
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        spin.flattenOffset();
+        const isTap =
+          Math.abs(gesture.dx) < dragThreshold &&
+          Math.abs(gesture.dy) < dragThreshold;
+
+        if (isTap) {
+          onPress();
+          return;
+        }
+
+        Animated.decay(spin, {
+          velocity: gesture.vx * 200,
+          deceleration: 0.992,
+          useNativeDriver: true,
+        }).start();
+        Animated.spring(tilt, {
+          toValue: { x: 0, y: 0 },
+          friction: 7,
+          tension: 60,
+          useNativeDriver: true,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        spin.flattenOffset();
+      },
+    })
+  ).current;
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -120,9 +170,24 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     inputRange: [0, 1],
     outputRange: [1, 1.05],
   });
+  const rotateX = tilt.x.interpolate({
+    inputRange: [-120, 120],
+    outputRange: ['-12deg', '12deg'],
+    extrapolate: 'clamp',
+  });
+  const rotateY = tilt.y.interpolate({
+    inputRange: [-120, 120],
+    outputRange: ['-12deg', '12deg'],
+    extrapolate: 'clamp',
+  });
+  const rotateZ = spin.interpolate({
+    inputRange: [-360, 360],
+    outputRange: ['-360deg', '360deg'],
+    extrapolate: 'extend',
+  });
 
   return (
-    <Pressable onPress={onPress} style={styles.container}>
+    <View style={styles.container}>
       {/* Coin shadow */}
       <View style={styles.shadow} />
 
@@ -171,7 +236,20 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
       </View>
 
       {/* The Coin */}
-      <View style={styles.coinOuter}>
+      <Animated.View
+        style={[
+          styles.coinOuter,
+          {
+            transform: [
+              { perspective: 900 },
+              { rotateX },
+              { rotateY },
+              { rotateZ },
+            ],
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
         <LinearGradient
           colors={['#F8E7B3', '#E3C86B', '#D8B14A', '#F3D996']}
           start={{ x: 0.1, y: 0 }}
@@ -246,8 +324,8 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
             </View>
           </View>
         </LinearGradient>
-      </View>
-    </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
