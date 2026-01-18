@@ -15,7 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../constants/Colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const COIN_SIZE = SCREEN_WIDTH * 0.7;
+const COIN_SIZE = Math.min(SCREEN_WIDTH * 0.8, 360);
+const AURA_SIZE = COIN_SIZE * 1.24;
 
 interface BloomCoinProps {
   totalValue: number;
@@ -25,7 +26,8 @@ interface BloomCoinProps {
 
 export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) {
   const shimmer = useRef(new Animated.Value(0)).current;
-  const rimSize = COIN_SIZE * 0.06;
+  const auraShift = useRef(new Animated.Value(0)).current;
+  const rimSize = COIN_SIZE * 0.075;
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -48,6 +50,28 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     animation.start();
     return () => animation.stop();
   }, [shimmer]);
+
+  useEffect(() => {
+    const auraAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(auraShift, {
+          toValue: 1,
+          duration: 9000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(auraShift, {
+          toValue: 0,
+          duration: 9000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    auraAnimation.start();
+    return () => auraAnimation.stop();
+  }, [auraShift]);
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -84,11 +108,67 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     inputRange: [0, 0.5, 1],
     outputRange: [0.35, 0.6, 0.35],
   });
+  const goldAuraOpacity = auraShift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.65, 0.18],
+  });
+  const silverAuraOpacity = auraShift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.18, 0.65],
+  });
+  const auraScale = auraShift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.05],
+  });
 
   return (
     <Pressable onPress={onPress} style={styles.container}>
       {/* Coin shadow */}
       <View style={styles.shadow} />
+
+      {/* Aura glow */}
+      <View style={styles.auraWrapper} pointerEvents="none">
+        <Animated.View
+          style={[
+            styles.auraLayer,
+            {
+              opacity: goldAuraOpacity,
+              transform: [{ scale: auraScale }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[
+              'rgba(255, 226, 160, 0.65)',
+              'rgba(255, 226, 160, 0.25)',
+              'rgba(255, 226, 160, 0)',
+            ]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.auraGradient}
+          />
+        </Animated.View>
+        <Animated.View
+          style={[
+            styles.auraLayer,
+            {
+              opacity: silverAuraOpacity,
+              transform: [{ scale: auraScale }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[
+              'rgba(230, 236, 255, 0.65)',
+              'rgba(230, 236, 255, 0.25)',
+              'rgba(230, 236, 255, 0)',
+            ]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.auraGradient}
+          />
+        </Animated.View>
+      </View>
 
       {/* The Coin */}
       <View style={styles.coinOuter}>
@@ -178,12 +258,30 @@ const styles = StyleSheet.create({
   },
   shadow: {
     position: 'absolute',
-    bottom: -20,
-    width: COIN_SIZE * 0.8,
-    height: 30,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    borderRadius: COIN_SIZE * 0.4,
-    transform: [{ scaleY: 0.3 }],
+    bottom: -22,
+    width: COIN_SIZE * 0.78,
+    height: 32,
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
+    borderRadius: COIN_SIZE * 0.39,
+    transform: [{ scaleY: 0.25 }],
+  },
+  auraWrapper: {
+    position: 'absolute',
+    width: AURA_SIZE,
+    height: AURA_SIZE,
+    borderRadius: AURA_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  auraLayer: {
+    position: 'absolute',
+    width: AURA_SIZE,
+    height: AURA_SIZE,
+    borderRadius: AURA_SIZE / 2,
+  },
+  auraGradient: {
+    flex: 1,
+    borderRadius: AURA_SIZE / 2,
   },
   coinOuter: {
     width: COIN_SIZE,
@@ -232,11 +330,11 @@ const styles = StyleSheet.create({
   },
   innerRing: {
     position: 'absolute',
-    width: COIN_SIZE * 0.82,
-    height: COIN_SIZE * 0.82,
-    borderRadius: (COIN_SIZE * 0.82) / 2,
-    borderWidth: 2.5,
-    borderColor: 'rgba(180, 140, 35, 0.4)',
+    width: COIN_SIZE * 0.84,
+    height: COIN_SIZE * 0.84,
+    borderRadius: (COIN_SIZE * 0.84) / 2,
+    borderWidth: 3,
+    borderColor: 'rgba(170, 130, 35, 0.35)',
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -246,7 +344,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   valueText: {
-    fontSize: 44,
+    fontSize: 48,
     fontWeight: '700',
     color: '#5B4716',
     textShadowColor: 'rgba(255, 255, 255, 0.45)',
@@ -254,7 +352,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   changeText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '500',
     color: '#6C551C',
     marginTop: 4,

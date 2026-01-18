@@ -11,7 +11,8 @@ interface BloomCoinProps {
   onPress: () => void;
 }
 
-const COIN_SIZE = 280;
+const COIN_SIZE = 320;
+const AURA_SIZE = Math.round(COIN_SIZE * 1.24);
 
 export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) {
   const coinRef = useRef<HTMLDivElement>(null);
@@ -148,6 +149,16 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         50% { transform: translateY(-4px); }
       }
 
+      @keyframes auraGold {
+        0%, 100% { opacity: 0.65; transform: scale(1); }
+        50% { opacity: 0.18; transform: scale(1.05); }
+      }
+
+      @keyframes auraSilver {
+        0%, 100% { opacity: 0.18; transform: scale(1.05); }
+        50% { opacity: 0.65; transform: scale(1); }
+      }
+
       @keyframes holoShift {
         0% { transform: rotate(0deg); opacity: 0.55; }
         50% { transform: rotate(180deg); opacity: 0.8; }
@@ -168,6 +179,14 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         animation: subtleFloat 4s ease-in-out infinite;
       }
 
+      .coin-container:not(.reduced-motion) .aura-gold {
+        animation: auraGold 10s ease-in-out infinite;
+      }
+
+      .coin-container:not(.reduced-motion) .aura-silver {
+        animation: auraSilver 10s ease-in-out infinite;
+      }
+
       .coin-container:not(.reduced-motion) .holo-overlay {
         animation: holoShift 9s linear infinite;
       }
@@ -181,6 +200,10 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
           animation: none !important;
         }
         .coin-spinning {
+          animation: none !important;
+        }
+        .coin-container .aura-gold,
+        .coin-container .aura-silver {
           animation: none !important;
         }
         .coin-container .holo-overlay,
@@ -223,6 +246,34 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
           justifyContent: 'center',
         }}
       >
+        {/* Aura glow */}
+        <div
+          className="aura-gold"
+          style={{
+            position: 'absolute',
+            width: AURA_SIZE,
+            height: AURA_SIZE,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle at 40% 35%, rgba(255, 224, 160, 0.75) 0%, rgba(255, 224, 160, 0) 70%)',
+            mixBlendMode: 'screen',
+            filter: 'blur(6px)',
+            zIndex: 1,
+          }}
+        />
+        <div
+          className="aura-silver"
+          style={{
+            position: 'absolute',
+            width: AURA_SIZE,
+            height: AURA_SIZE,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle at 60% 55%, rgba(220, 230, 255, 0.75) 0%, rgba(220, 230, 255, 0) 70%)',
+            mixBlendMode: 'screen',
+            filter: 'blur(7px)',
+            zIndex: 1,
+          }}
+        />
+
         {/* Shadow */}
         <div
           style={{
@@ -239,7 +290,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         />
 
         {/* Float container */}
-        <div className="coin-float">
+        <div className="coin-float" style={{ position: 'relative', zIndex: 2 }}>
           {/* The 3D Coin */}
           <div
             ref={coinRef}
