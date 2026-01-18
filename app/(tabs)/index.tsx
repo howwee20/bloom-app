@@ -1030,28 +1030,23 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        {/* The Bloom Coin - ALWAYS visible, shrinks when command active */}
-        <View style={[
-          styles.coinContainer,
-          commandActive && styles.coinContainerMini
-        ]}>
-          <View style={commandActive ? styles.coinMiniWrapper : undefined}>
-            <BloomCoin
-              totalValue={displayedTotalValue}
-              dailyChange={displayedTotalPnl || 0}
-              onPress={() => !commandActive && setShowBreakdownModal(true)}
-            />
-          </View>
+      {/* The Bloom Coin - ALWAYS visible, at top when command active */}
+      <View style={[
+        styles.coinContainer,
+        commandActive && styles.coinContainerMini
+      ]}>
+        <View style={commandActive ? styles.coinMiniWrapper : undefined}>
+          <BloomCoin
+            totalValue={displayedTotalValue}
+            dailyChange={displayedTotalPnl || 0}
+            onPress={() => !commandActive && setShowBreakdownModal(true)}
+          />
         </View>
+      </View>
 
-        {/* Command Results - shown when command bar is active */}
-        {commandActive && (
-          <View style={styles.commandResultsSection}>
+      {/* Command Results - shown when command bar is active (fills middle) */}
+      {commandActive && (
+        <View style={styles.commandResultsSection}>
           {commandLoading ? (
             <View style={styles.commandLoadingContainer}>
               <ActivityIndicator size="large" color={theme.accent} />
@@ -1095,6 +1090,7 @@ export default function HomeScreen() {
               columnWrapperStyle={styles.commandGridRow}
               contentContainerStyle={styles.commandGridContent}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             />
           ) : getSearchQuery(commandQuery) ? (
             <View style={styles.commandNoResults}>
@@ -1109,7 +1105,12 @@ export default function HomeScreen() {
         </View>
       )}
 
-        {/* Command Bar - inside KeyboardAvoidingView */}
+      {/* Command Bar - stays above keyboard */}
+      <KeyboardAvoidingView
+        style={styles.commandBarWrapper}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
+      >
         <CommandBar
           query={commandQuery}
           onChangeQuery={handleCommandQueryChange}
@@ -1792,6 +1793,14 @@ const styles = StyleSheet.create({
   keyboardAvoid: {
     flex: 1,
   },
+  // Command bar wrapper - keeps it at bottom, above keyboard
+  commandBarWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#F5F5F0',
+  },
   // Coin Container - centers the coin on screen (full size when idle)
   coinContainer: {
     flex: 1,
@@ -1802,14 +1811,15 @@ const styles = StyleSheet.create({
   // Coin Container when command bar is active (mini at top)
   coinContainerMini: {
     flex: 0,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingTop: 8,
+    paddingBottom: 0,
     justifyContent: 'flex-start',
   },
   // Wrapper to scale down the coin when in mini mode
   coinMiniWrapper: {
-    transform: [{ scale: 0.4 }],
-    marginBottom: -80, // Compensate for scaled size
+    transform: [{ scale: 0.35 }],
+    marginTop: -60,
+    marginBottom: -100, // Compensate for scaled size
   },
   // Breakdown header when coin is tapped
   breakdownHeader: {
@@ -2951,13 +2961,12 @@ const styles = StyleSheet.create({
   commandResultsSection: {
     flex: 1,
     backgroundColor: theme.background,
-    paddingTop: 80, // Space for command bar at top
+    paddingBottom: 80, // Space for command bar at bottom
   },
   commandLoadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 60,
   },
   commandLoadingText: {
     marginTop: 16,
