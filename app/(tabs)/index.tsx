@@ -217,7 +217,7 @@ export default function HomeScreen() {
   const [isFocused, setIsFocused] = useState(true);
   const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false);
   const [activeFilter, setActiveFilter] = useState<CustodyFilter>('bloom');
-  const [coinExpanded, setCoinExpanded] = useState(false);
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
 
   // Command bar state
   const [commandActive, setCommandActive] = useState(false);
@@ -1036,44 +1036,18 @@ export default function HomeScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         {/* The Bloom Coin - ALWAYS visible, shrinks when command active */}
-        {!coinExpanded && (
-          <View style={[
-            styles.coinContainer,
-            commandActive && styles.coinContainerMini
-          ]}>
-            <View style={commandActive ? styles.coinMiniWrapper : undefined}>
-              <BloomCoin
-                totalValue={displayedTotalValue}
-                dailyChange={displayedTotalPnl || 0}
-                onPress={() => !commandActive && setCoinExpanded(true)}
-              />
-            </View>
+        <View style={[
+          styles.coinContainer,
+          commandActive && styles.coinContainerMini
+        ]}>
+          <View style={commandActive ? styles.coinMiniWrapper : undefined}>
+            <BloomCoin
+              totalValue={displayedTotalValue}
+              dailyChange={displayedTotalPnl || 0}
+              onPress={() => !commandActive && setShowBreakdownModal(true)}
+            />
           </View>
-        )}
-
-        {/* Coin Breakdown Header - shown when expanded (not during command) */}
-        {!commandActive && coinExpanded && (
-          <View style={styles.breakdownHeader}>
-            <Pressable style={styles.backToCoin} onPress={() => setCoinExpanded(false)}>
-              <Text style={styles.backToCoinText}>Tap to close</Text>
-            </Pressable>
-            <View style={styles.breakdownBalance}>
-              <Text style={styles.breakdownAmount}>{formatCurrency(displayedTotalValue)}</Text>
-              {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-                <Text style={[styles.breakdownPnl, { color: totalPnlColor }]}>
-                  {formatPnL(displayedTotalPnl)}
-                </Text>
-              )}
-            </View>
-            <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
-              <View style={styles.profileIcon}>
-                <Text style={styles.profileIconText}>
-                  {session?.user?.email?.charAt(0).toUpperCase() || 'U'}
-                </Text>
-              </View>
-            </Pressable>
-          </View>
-        )}
+        </View>
 
         {/* Command Results - shown when command bar is active */}
         {commandActive && (
@@ -1135,145 +1109,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Wallet Content - shown when coin is expanded */}
-      {!commandActive && coinExpanded && (
-        <>
-          {/* Filter Tabs */}
-          <View style={styles.filterTabs}>
-            {(['bloom', 'home', 'watchlist'] as CustodyFilter[]).map((filter) => {
-          const isActive = activeFilter === filter;
-          const count = filter === 'bloom' ? bloomCount
-            : filter === 'home' ? homeCount
-            : watchlistCount;
-          const label = filter.charAt(0).toUpperCase() + filter.slice(1);
-
-          return (
-            <Pressable
-              key={filter}
-              style={[styles.filterTab, isActive && styles.filterTabActive]}
-              onPress={() => setActiveFilter(filter)}
-            >
-              <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
-                {label} ({count})
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Assets */}
-      <View style={styles.assetsSection}>
-        {notifications.length > 0 && (
-          <View style={styles.alertsSection}>
-            <Text style={styles.sectionTitle}>Alerts</Text>
-            {notifications.map((note) => (
-              <View key={note.id} style={styles.alertItem}>
-                <Text style={styles.alertTitle} numberOfLines={1}>{note.title}</Text>
-                {note.body && <Text style={styles.alertBody} numberOfLines={2}>{note.body}</Text>}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {weeklyDigest && (
-          <View style={styles.digestSection}>
-            <Text style={styles.sectionTitle}>Weekly digest</Text>
-            <View style={styles.digestCard}>
-              <Text style={styles.digestLabel}>Portfolio value</Text>
-              <Text style={styles.digestValue}>
-                {weeklyDigest.total_value !== null ? formatPrice(weeklyDigest.total_value) : '—'}
-              </Text>
-              {weeklyDigest.total_pnl_dollars !== null && (
-                <Text
-                  style={[
-                    styles.digestChange,
-                    { color: (weeklyDigest.total_pnl_dollars || 0) >= 0 ? theme.success : theme.error },
-                  ]}
-                >
-                  {formatPnL(weeklyDigest.total_pnl_dollars)} ({weeklyDigest.total_pnl_percent?.toFixed(1)}%)
-                </Text>
-              )}
-            </View>
-          </View>
-        )}
-
-        {topMovers.length > 0 && (
-          <View style={styles.moversSection}>
-            <Text style={styles.sectionTitle}>Top movers (24h)</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.moversRow}
-            >
-              {topMovers.map((mover) => {
-                const isUp = mover.price_change >= 0;
-                const changeColor = isUp ? theme.success : theme.error;
-                return (
-                  <View key={`${mover.item_type}-${mover.item_id}`} style={styles.moverCard}>
-                    {mover.image_url ? (
-                      <Image source={{ uri: mover.image_url }} style={styles.moverImage} />
-                    ) : (
-                      <View style={[styles.moverImage, styles.sellOptionPlaceholder]}>
-                        <Text style={styles.sellOptionPlaceholderText}>{mover.name.charAt(0)}</Text>
-                      </View>
-                    )}
-                    <Text style={styles.moverName} numberOfLines={1}>{mover.name}</Text>
-                    <Text style={styles.moverValue}>{formatPrice(mover.current_value)}</Text>
-                    <Text style={[styles.moverChange, { color: changeColor }]}>
-                      {isUp ? '▲' : '▼'} {formatPrice(Math.abs(mover.price_change))} ({mover.price_change_percent.toFixed(1)}%)
-                    </Text>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.accent} />
-            <Text style={styles.loadingText}>Loading...</Text>
-          </View>
-        ) : filteredItems.length === 0 ? (
-          <View style={styles.emptyFilterState}>
-            <Text style={styles.emptyFilterTitle}>
-              {activeFilter === 'bloom' ? 'No items in Bloom custody' :
-               activeFilter === 'home' ? 'No items at home' : 'No watchlist items'}
-            </Text>
-            <Text style={styles.emptyFilterSubtitle}>
-              {activeFilter === 'bloom' ? 'Buy items to add them to your Bloom account' :
-               activeFilter === 'home' ? 'Items you own but keep at home will show here' :
-               'Add items to your watchlist to track prices'}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredItems as any[]}
-            renderItem={({ item }) => {
-              // Check if it's a token (has custody_type) or legacy asset
-              if ('custody_type' in item) {
-                return renderTokenCard({ item: item as Token });
-              } else {
-                return renderAssetCard({ item: item as Asset });
-              }
-            }}
-            keyExtractor={(item) => item.id}
-            numColumns={2}
-            columnWrapperStyle={styles.gridRow}
-            contentContainerStyle={styles.gridContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={theme.accent}
-              />
-            }
-          />
-        )}
-      </View>
-        </>
-      )}
-
         {/* Command Bar - inside KeyboardAvoidingView */}
         <CommandBar
           query={commandQuery}
@@ -1286,6 +1121,208 @@ export default function HomeScreen() {
       </KeyboardAvoidingView>
 
       {/* Buy Intent Modal and Route Home Modal removed - now navigating to /buy */}
+
+      {/* Portfolio Breakdown Modal */}
+      <Modal
+        visible={showBreakdownModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBreakdownModal(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setShowBreakdownModal(false)}
+        >
+          <Pressable
+            style={styles.breakdownModal}
+            onPress={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <View style={styles.breakdownModalHeader}>
+              <Text style={styles.breakdownModalTitle}>Portfolio</Text>
+              <Pressable onPress={() => setShowBreakdownModal(false)}>
+                <Text style={styles.breakdownModalClose}>✕</Text>
+              </Pressable>
+            </View>
+
+            {/* Total Value */}
+            <Text style={styles.breakdownModalTotal}>{formatCurrency(portfolioValue + homeValue)}</Text>
+            {displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
+              <Text style={[styles.breakdownModalPnl, { color: totalPnlColor }]}>
+                {formatPnL(displayedTotalPnl)}
+              </Text>
+            )}
+
+            <ScrollView style={styles.breakdownModalScroll} showsVerticalScrollIndicator={false}>
+              {/* Allocation Breakdown */}
+              {(portfolioValue > 0 || homeValue > 0) && (
+                <View style={styles.allocationSection}>
+                  {/* Bloom Custody */}
+                  {bloomTokens.length > 0 && (
+                    <View style={styles.allocationRow}>
+                      <View style={styles.allocationHeader}>
+                        <View style={styles.allocationLabelRow}>
+                          <View style={[styles.allocationDot, { backgroundColor: '#F5A623' }]} />
+                          <Text style={styles.allocationLabel}>In Bloom</Text>
+                          <Text style={styles.allocationCount}>{bloomTokens.length}</Text>
+                        </View>
+                        <Text style={styles.allocationValue}>{formatCurrency(portfolioValue)}</Text>
+                      </View>
+                      <View style={styles.allocationBar}>
+                        <View
+                          style={[
+                            styles.allocationFill,
+                            {
+                              width: `${Math.round((portfolioValue / (portfolioValue + homeValue)) * 100)}%`,
+                              backgroundColor: '#F5A623',
+                            },
+                          ]}
+                        />
+                      </View>
+                      {/* Mini tokens for Bloom */}
+                      <View style={styles.allocationTokens}>
+                        {bloomTokens.slice(0, 6).map(token => (
+                          <Pressable
+                            key={token.id}
+                            style={styles.tinyToken}
+                            onPress={() => {
+                              setShowBreakdownModal(false);
+                              router.push(`/token/${token.id}`);
+                            }}
+                          >
+                            {token.product_image_url && !failedImages.has(token.id) ? (
+                              <Image
+                                source={{ uri: token.product_image_url }}
+                                style={styles.tinyTokenImage}
+                                onError={() => handleImageError(token.id)}
+                              />
+                            ) : (
+                              <View style={[styles.tinyTokenImage, styles.tinyTokenPlaceholder]}>
+                                <Text style={styles.tinyTokenInitial}>
+                                  {token.product_name.charAt(0)}
+                                </Text>
+                              </View>
+                            )}
+                          </Pressable>
+                        ))}
+                        {bloomTokens.length > 6 && (
+                          <View style={styles.tinyTokenMore}>
+                            <Text style={styles.tinyTokenMoreText}>+{bloomTokens.length - 6}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Home */}
+                  {(homeTokens.length > 0 || homeAssets.length > 0) && (
+                    <View style={styles.allocationRow}>
+                      <View style={styles.allocationHeader}>
+                        <View style={styles.allocationLabelRow}>
+                          <View style={[styles.allocationDot, { backgroundColor: theme.textSecondary }]} />
+                          <Text style={styles.allocationLabel}>At Home</Text>
+                          <Text style={styles.allocationCount}>{homeTokens.length + homeAssets.length}</Text>
+                        </View>
+                        <Text style={styles.allocationValue}>{formatCurrency(homeValue)}</Text>
+                      </View>
+                      <View style={styles.allocationBar}>
+                        <View
+                          style={[
+                            styles.allocationFill,
+                            {
+                              width: `${Math.round((homeValue / (portfolioValue + homeValue)) * 100)}%`,
+                              backgroundColor: theme.textSecondary,
+                            },
+                          ]}
+                        />
+                      </View>
+                      {/* Mini tokens for Home */}
+                      <View style={styles.allocationTokens}>
+                        {homeTokens.slice(0, 4).map(token => (
+                          <Pressable
+                            key={token.id}
+                            style={styles.tinyToken}
+                            onPress={() => {
+                              setShowBreakdownModal(false);
+                              router.push(`/token/${token.id}`);
+                            }}
+                          >
+                            {token.product_image_url && !failedImages.has(token.id) ? (
+                              <Image
+                                source={{ uri: token.product_image_url }}
+                                style={styles.tinyTokenImage}
+                                onError={() => handleImageError(token.id)}
+                              />
+                            ) : (
+                              <View style={[styles.tinyTokenImage, styles.tinyTokenPlaceholder]}>
+                                <Text style={styles.tinyTokenInitial}>
+                                  {token.product_name.charAt(0)}
+                                </Text>
+                              </View>
+                            )}
+                          </Pressable>
+                        ))}
+                        {homeAssets.slice(0, Math.max(0, 4 - homeTokens.length)).map(asset => (
+                          <Pressable
+                            key={asset.id}
+                            style={styles.tinyToken}
+                            onPress={() => {
+                              setShowBreakdownModal(false);
+                              router.push(`/asset/${asset.id}`);
+                            }}
+                          >
+                            {asset.image_url && !failedImages.has(asset.id) ? (
+                              <Image
+                                source={{ uri: asset.image_url }}
+                                style={styles.tinyTokenImage}
+                                onError={() => handleImageError(asset.id)}
+                              />
+                            ) : (
+                              <View style={[styles.tinyTokenImage, styles.tinyTokenPlaceholder]}>
+                                <Text style={styles.tinyTokenInitial}>
+                                  {asset.name.charAt(0)}
+                                </Text>
+                              </View>
+                            )}
+                          </Pressable>
+                        ))}
+                        {(homeTokens.length + homeAssets.length) > 4 && (
+                          <View style={styles.tinyTokenMore}>
+                            <Text style={styles.tinyTokenMoreText}>+{(homeTokens.length + homeAssets.length) - 4}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Watchlist */}
+                  {watchlistAssets.length > 0 && (
+                    <View style={styles.allocationRow}>
+                      <View style={styles.allocationHeader}>
+                        <View style={styles.allocationLabelRow}>
+                          <View style={[styles.allocationDot, { backgroundColor: '#3B82F6' }]} />
+                          <Text style={styles.allocationLabel}>Watchlist</Text>
+                          <Text style={styles.allocationCount}>{watchlistAssets.length}</Text>
+                        </View>
+                        <Text style={[styles.allocationValue, { color: theme.textSecondary }]}>{formatCurrency(watchlistValue)}</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {tokens.length === 0 && ownedAssets.length === 0 && (
+                <View style={styles.emptyBreakdown}>
+                  <Text style={styles.emptyBreakdownText}>No items yet</Text>
+                  <Text style={styles.emptyBreakdownSubtext}>
+                    Use the command bar to buy items
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Sell Modal */}
       <Modal
@@ -2206,6 +2243,188 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 2,
+  },
+  // Breakdown Modal styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  breakdownModal: {
+    backgroundColor: theme.card,
+    borderRadius: 24,
+    padding: 24,
+    width: '88%',
+    maxHeight: '65%',
+  },
+  breakdownModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  breakdownModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  breakdownModalClose: {
+    fontSize: 22,
+    color: theme.textTertiary,
+    padding: 4,
+  },
+  breakdownModalTotal: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: theme.textPrimary,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  breakdownModalPnl: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  breakdownModalScroll: {
+    maxHeight: 300,
+  },
+  miniTokenGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  miniToken: {
+    width: '25%',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  miniTokenImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: theme.backgroundSecondary,
+  },
+  miniTokenPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  miniTokenInitial: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: theme.textTertiary,
+  },
+  miniTokenValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.textPrimary,
+    marginTop: 6,
+  },
+  emptyBreakdown: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyBreakdownText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  emptyBreakdownSubtext: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    marginTop: 4,
+  },
+  // Allocation breakdown styles
+  allocationSection: {
+    marginTop: 8,
+  },
+  allocationRow: {
+    marginBottom: 20,
+  },
+  allocationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  allocationLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  allocationDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  allocationLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  allocationCount: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    backgroundColor: theme.backgroundSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  allocationValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.textPrimary,
+  },
+  allocationBar: {
+    height: 6,
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 3,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  allocationFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  allocationTokens: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  tinyToken: {
+    width: 36,
+    height: 36,
+  },
+  tinyTokenImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: theme.backgroundSecondary,
+  },
+  tinyTokenPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tinyTokenInitial: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.textTertiary,
+  },
+  tinyTokenMore: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: theme.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tinyTokenMoreText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.textSecondary,
   },
   // Modal styles
   modalOverlay: {
