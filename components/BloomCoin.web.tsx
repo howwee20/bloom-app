@@ -148,6 +148,18 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         50% { transform: translateY(-4px); }
       }
 
+      @keyframes holoShift {
+        0% { transform: rotate(0deg); opacity: 0.55; }
+        50% { transform: rotate(180deg); opacity: 0.8; }
+        100% { transform: rotate(360deg); opacity: 0.55; }
+      }
+
+      @keyframes holoSweep {
+        0% { transform: translateX(-25%) translateY(20%) rotate(15deg); opacity: 0; }
+        45% { opacity: 0.7; }
+        100% { transform: translateX(25%) translateY(-20%) rotate(15deg); opacity: 0; }
+      }
+
       .coin-spinning {
         animation: coinSpin 1s cubic-bezier(0.23, 1, 0.32, 1) forwards !important;
       }
@@ -156,11 +168,23 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
         animation: subtleFloat 4s ease-in-out infinite;
       }
 
+      .coin-container:not(.reduced-motion) .holo-overlay {
+        animation: holoShift 9s linear infinite;
+      }
+
+      .coin-container:not(.reduced-motion) .holo-sweep {
+        animation: holoSweep 6s ease-in-out infinite;
+      }
+
       @media (prefers-reduced-motion: reduce) {
         .coin-container .coin-float {
           animation: none !important;
         }
         .coin-spinning {
+          animation: none !important;
+        }
+        .coin-container .holo-overlay,
+        .coin-container .holo-sweep {
           animation: none !important;
         }
       }
@@ -276,6 +300,7 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
             >
               {/* Iridescent overlay */}
               <div
+                className="holo-overlay"
                 style={{
                   position: 'absolute',
                   inset: 0,
@@ -291,8 +316,28 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
                       rgba(255, 200, 200, 0.15) 360deg
                     )
                   `,
-                  mixBlendMode: 'overlay',
-                  opacity: 0.8,
+                  mixBlendMode: 'screen',
+                  opacity: 0.85,
+                }}
+              />
+
+              {/* Animated holographic sweep */}
+              <div
+                className="holo-sweep"
+                style={{
+                  position: 'absolute',
+                  inset: '-20%',
+                  background: `
+                    linear-gradient(120deg,
+                      rgba(255, 255, 255, 0) 0%,
+                      rgba(255, 220, 160, 0.35) 30%,
+                      rgba(170, 235, 255, 0.5) 50%,
+                      rgba(255, 210, 235, 0.45) 70%,
+                      rgba(255, 255, 255, 0) 100%
+                    )
+                  `,
+                  mixBlendMode: 'screen',
+                  filter: 'blur(2px)',
                 }}
               />
 
