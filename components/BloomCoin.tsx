@@ -185,6 +185,16 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
     outputRange: ['-360deg', '360deg'],
     extrapolate: 'extend',
   });
+  const textRotateX = tilt.x.interpolate({
+    inputRange: [-120, 120],
+    outputRange: ['12deg', '-12deg'],
+    extrapolate: 'clamp',
+  });
+  const textRotateY = tilt.y.interpolate({
+    inputRange: [-120, 120],
+    outputRange: ['12deg', '-12deg'],
+    extrapolate: 'clamp',
+  });
   const textRotateZ = spin.interpolate({
     inputRange: [-360, 360],
     outputRange: ['360deg', '-360deg'],
@@ -323,7 +333,18 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
             <View style={styles.innerRing} />
 
             {/* Value display */}
-            <Animated.View style={[styles.textContainer, { transform: [{ rotateZ: textRotateZ }] }]}>
+            <Animated.View
+              style={[
+                styles.textContainer,
+                {
+                  transform: [
+                    { rotateX: textRotateX },
+                    { rotateY: textRotateY },
+                    { rotateZ: textRotateZ },
+                  ],
+                },
+              ]}
+            >
               <Text style={styles.valueText}>{formatValue(totalValue)}</Text>
               <Text style={styles.changeText}>{formatChange(dailyChange)}</Text>
             </Animated.View>

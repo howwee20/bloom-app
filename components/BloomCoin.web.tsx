@@ -85,7 +85,11 @@ export function BloomCoin({ totalValue, dailyChange, onPress }: BloomCoinProps) 
       `;
       const text = textRef.current;
       if (text) {
-        text.style.transform = `rotateZ(${-currentRotation.current.z}deg)`;
+        text.style.transform = `
+          rotateX(${-currentRotation.current.x}deg)
+          rotateY(${-currentRotation.current.y}deg)
+          rotateZ(${-currentRotation.current.z}deg)
+        `;
       }
 
       rafRef.current = requestAnimationFrame(animate);
