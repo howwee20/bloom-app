@@ -1,17 +1,15 @@
 // components/CommandBar.tsx
 // The Universal Input - Buy, sell, search anything
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   TextInput,
   Pressable,
   StyleSheet,
-  Animated,
   Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../constants/Colors';
 
 // Intent types
 export type CommandIntent =
@@ -63,23 +61,6 @@ export function CommandBar({
   isActive,
 }: CommandBarProps) {
   const inputRef = useRef<TextInput>(null);
-  const animatedPosition = useRef(new Animated.Value(0)).current;
-
-  // Animate position when active state changes
-  useEffect(() => {
-    Animated.spring(animatedPosition, {
-      toValue: isActive ? 1 : 0,
-      useNativeDriver: false,
-      tension: 100,
-      friction: 12,
-    }).start();
-  }, [isActive]);
-
-  // Interpolate bottom position (bottom when idle, top when active)
-  const bottomPosition = animatedPosition.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0],
-  });
 
   const handleClear = () => {
     onClear();
@@ -92,13 +73,12 @@ export function CommandBar({
     }
   };
 
-  // When active, use relative positioning so KeyboardAvoidingView works
   const containerStyle = isActive
     ? [styles.container, styles.containerActive]
-    : [styles.container, { bottom: bottomPosition }];
+    : styles.container;
 
   return (
-    <Animated.View style={containerStyle}>
+    <View style={containerStyle}>
       <Ionicons
         name="search"
         size={20}
@@ -113,7 +93,7 @@ export function CommandBar({
         onFocus={onFocus}
         onSubmitEditing={handleSubmit}
         placeholder="Pay, buy, sell..."
-        placeholderTextColor={theme.textTertiary}
+        placeholderTextColor="#9A9A9A"
         returnKeyType="search"
         autoCapitalize="none"
         autoCorrect={false}
@@ -123,38 +103,28 @@ export function CommandBar({
           <Ionicons name="close-circle" size={20} color="#9A9A9A" />
         </Pressable>
       )}
-    </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 28,
     paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.06)',
+    borderColor: 'rgba(0, 0, 0, 0.05)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
     elevation: 6,
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    zIndex: 100,
   },
   containerActive: {
-    position: 'relative',
     marginBottom: 10,
-    left: 0,
-    right: 0,
   },
   searchIcon: {
     marginRight: 12,

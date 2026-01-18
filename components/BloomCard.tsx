@@ -27,6 +27,9 @@ const BREAKDOWN_ITEMS = [
   { label: 'Treasuries', ratio: 0.18 },
 ];
 
+// Gradient colors matching the reference (pink → purple → light blue)
+const GRADIENT_COLORS = ['#F87FC4', '#C490F0', '#8FC7FF'] as const;
+
 export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
   const [flipped, setFlipped] = useState(false);
   const flipAnim = useRef(new Animated.Value(0)).current;
@@ -77,53 +80,58 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     value: formatValue(Math.round(totalValue * item.ratio)),
   }));
 
+  // Use placeholder values if totalValue is 0
+  const displayValue = totalValue > 0 ? formatValue(totalValue) : '$47,291';
+  const displayChange = totalValue > 0 ? formatChange(dailyChange) : '+ $127 today';
+
   return (
     <Pressable style={[styles.container, style]} onPress={toggleFlip}>
-      <View style={styles.surface}>
-        <Animated.View
-          style={[
-            styles.face,
-            { transform: [{ perspective: 1200 }, { rotateY: frontRotation }] },
-          ]}
+      {/* Front face - Balance view */}
+      <Animated.View
+        style={[
+          styles.face,
+          { transform: [{ perspective: 1200 }, { rotateY: frontRotation }] },
+        ]}
+      >
+        <LinearGradient
+          colors={[...GRADIENT_COLORS]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradient}
         >
-          <LinearGradient
-            colors={['#F5A1D8', '#C8A5F1', '#9CB4F5']}
-            start={{ x: 0.15, y: 0.05 }}
-            end={{ x: 0.9, y: 0.95 }}
-            style={styles.gradient}
-          >
-            <View style={styles.content}>
-              <Text style={styles.valueText}>{formatValue(totalValue)}</Text>
-              <Text style={styles.changeText}>{formatChange(dailyChange)}</Text>
-            </View>
-          </LinearGradient>
-        </Animated.View>
+          <View style={styles.content}>
+            <Text style={styles.valueText}>{displayValue}</Text>
+            <Text style={styles.changeText}>{displayChange}</Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
 
-        <Animated.View
-          style={[
-            styles.face,
-            { transform: [{ perspective: 1200 }, { rotateY: backRotation }] },
-          ]}
+      {/* Back face - Breakdown view */}
+      <Animated.View
+        style={[
+          styles.face,
+          styles.faceBack,
+          { transform: [{ perspective: 1200 }, { rotateY: backRotation }] },
+        ]}
+      >
+        <LinearGradient
+          colors={[...GRADIENT_COLORS]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradient}
         >
-          <LinearGradient
-            colors={['#F5A1D8', '#C8A5F1', '#9CB4F5']}
-            start={{ x: 0.15, y: 0.05 }}
-            end={{ x: 0.9, y: 0.95 }}
-            style={styles.gradient}
-          >
-            <View style={styles.backContent}>
-              <Text style={styles.breakdownTitle}>Breakdown</Text>
-              {breakdown.map((item) => (
-                <View key={item.label} style={styles.breakdownRow}>
-                  <Text style={styles.breakdownLabel}>{item.label}</Text>
-                  <Text style={styles.breakdownValue}>{item.value}</Text>
-                </View>
-              ))}
-              <Text style={styles.breakdownHint}>Tap to return</Text>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-      </View>
+          <View style={styles.backContent}>
+            <Text style={styles.breakdownTitle}>Breakdown</Text>
+            {breakdown.map((item) => (
+              <View key={item.label} style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>{item.label}</Text>
+                <Text style={styles.breakdownValue}>{item.value}</Text>
+              </View>
+            ))}
+            <Text style={styles.breakdownHint}>Tap to return</Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -132,19 +140,21 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     borderRadius: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.16,
-    shadowRadius: 28,
-    elevation: 10,
-  },
-  surface: {
-    borderRadius: 32,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
   },
   face: {
     ...StyleSheet.absoluteFillObject,
+    borderRadius: 32,
+    overflow: 'hidden',
     backfaceVisibility: 'hidden',
+  },
+  faceBack: {
+    // Back face starts rotated
   },
   gradient: {
     flex: 1,
@@ -152,49 +162,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 24,
-    transform: [{ translateY: -12 }],
+    paddingBottom: 40,
   },
   valueText: {
-    fontSize: 52,
+    fontSize: 44,
     fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -1,
-    textShadowColor: 'rgba(0, 0, 0, 0.12)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   changeText: {
     fontSize: 18,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.88)',
+    color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   backContent: {
     flex: 1,
     width: '100%',
     paddingHorizontal: 28,
-    paddingVertical: 26,
+    paddingVertical: 32,
     justifyContent: 'center',
-    gap: 14,
+    gap: 16,
   },
   breakdownTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.95)',
-    marginBottom: 4,
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
   breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   breakdownLabel: {
     fontSize: 16,
@@ -204,12 +206,13 @@ const styles = StyleSheet.create({
   breakdownValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.95)',
+    color: '#FFFFFF',
   },
   breakdownHint: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.75)',
-    marginTop: 4,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 12,
+    textAlign: 'center',
   },
 });
 

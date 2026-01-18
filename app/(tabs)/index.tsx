@@ -229,9 +229,12 @@ export default function HomeScreen() {
   const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const { height: viewportHeight } = useWindowDimensions();
-  const commandBarReserve = 96 + insets.bottom;
-  const usableHeight = viewportHeight - insets.top - commandBarReserve;
-  const cardHeight = Math.max(320, Math.round(usableHeight * 0.76));
+  // Reserve space for command bar (pill height ~56 + padding + safe area)
+  const commandBarHeight = 56 + 32 + insets.bottom;
+  // Calculate usable height for the card (total - top safe area - command bar area)
+  const usableHeight = viewportHeight - insets.top - 24 - commandBarHeight;
+  // Card takes ~70% of usable height, clamped between reasonable min/max
+  const cardHeight = Math.min(Math.max(400, Math.round(usableHeight * 0.72)), 640);
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1039,15 +1042,15 @@ export default function HomeScreen() {
           style={[
             styles.cardStage,
             {
-              paddingTop: insets.top + 12,
-              paddingBottom: commandBarReserve,
+              paddingTop: insets.top + 16,
+              paddingBottom: commandBarHeight,
             },
           ]}
         >
           <BloomCard
             totalValue={portfolioValue + homeValue}
             dailyChange={displayedTotalPnl || 0}
-            style={{ height: cardHeight, maxWidth: 560 }}
+            style={{ height: cardHeight }}
           />
         </View>
       )}
@@ -1115,7 +1118,10 @@ export default function HomeScreen() {
 
       {/* Command Bar - stays above keyboard */}
       <KeyboardAvoidingView
-        style={[styles.commandBarWrapper, { paddingBottom: insets.bottom + 16 }]}
+        style={[
+          styles.commandBarWrapper,
+          { bottom: Math.max(16, insets.bottom + 12) }
+        ]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
       >
@@ -1598,8 +1604,8 @@ const styles = StyleSheet.create({
   },
   cardStage: {
     flex: 1,
-    paddingHorizontal: 22,
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    justifyContent: 'flex-start',
     alignItems: 'center',
   },
   keyboardAvoid: {
@@ -1608,11 +1614,9 @@ const styles = StyleSheet.create({
   // Command bar wrapper - keeps it at bottom, above keyboard
   commandBarWrapper: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 22,
-    alignItems: 'center',
+    paddingHorizontal: 20,
   },
   // Breakdown header when coin is tapped
   breakdownHeader: {
