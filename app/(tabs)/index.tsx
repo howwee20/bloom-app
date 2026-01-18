@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { fonts, theme } from '../../constants/Colors';
 import { CommandBar, parseCommand, getSearchQuery } from '../../components/CommandBar';
+import { BloomCoin } from '../../components/BloomCoin';
 
 type CustodyFilter = 'bloom' | 'home' | 'watchlist';
 import { supabase } from '../../lib/supabase';
@@ -214,6 +215,7 @@ export default function HomeScreen() {
   const [isFocused, setIsFocused] = useState(true);
   const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false);
   const [activeFilter, setActiveFilter] = useState<CustodyFilter>('bloom');
+  const [coinExpanded, setCoinExpanded] = useState(false);
 
   // Command bar state
   const [commandActive, setCommandActive] = useState(false);
@@ -1026,23 +1028,31 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header - Balance inline with P&L */}
-      <View style={styles.headerArea}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerSpacer} />
-          <Pressable style={styles.headerCenter} onPress={() => setShowBalanceBreakdown(true)}>
-            <View style={styles.balanceRow}>
-              <Text style={styles.balanceAmount}>{formatCurrency(displayedTotalValue)}</Text>
-              {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
-                <Text style={[styles.balancePnl, { color: totalPnlColor }]}>
-                  ({formatPnL(displayedTotalPnl)})
-                </Text>
-              )}
-            </View>
-            <Text style={styles.balanceUpdated}>
-              {pricingFresh && lastUpdatedLabel ? `Updated ${lastUpdatedLabel}` : 'Prices paused'}
-            </Text>
+      {/* The Bloom Coin - shown when not in command mode and not expanded */}
+      {!commandActive && !coinExpanded && (
+        <View style={styles.coinContainer}>
+          <BloomCoin
+            totalValue={displayedTotalValue}
+            dailyChange={displayedTotalPnl || 0}
+            onPress={() => setCoinExpanded(true)}
+          />
+        </View>
+      )}
+
+      {/* Coin Breakdown Header - shown when expanded */}
+      {!commandActive && coinExpanded && (
+        <View style={styles.breakdownHeader}>
+          <Pressable style={styles.backToCoin} onPress={() => setCoinExpanded(false)}>
+            <Text style={styles.backToCoinText}>Tap to close</Text>
           </Pressable>
+          <View style={styles.breakdownBalance}>
+            <Text style={styles.breakdownAmount}>{formatCurrency(displayedTotalValue)}</Text>
+            {hasItems && displayedTotalPnl !== null && displayedTotalPnl !== 0 && (
+              <Text style={[styles.breakdownPnl, { color: totalPnlColor }]}>
+                {formatPnL(displayedTotalPnl)}
+              </Text>
+            )}
+          </View>
           <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
             <View style={styles.profileIcon}>
               <Text style={styles.profileIconText}>
@@ -1051,7 +1061,7 @@ export default function HomeScreen() {
             </View>
           </Pressable>
         </View>
-      </View>
+      )}
 
       {/* Command Results - shown when command bar is active */}
       {commandActive && (
@@ -1113,8 +1123,8 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Wallet Content - hidden when command bar is active */}
-      {!commandActive && (
+      {/* Wallet Content - shown when coin is expanded */}
+      {!commandActive && coinExpanded && (
         <>
           {/* Filter Tabs */}
           <View style={styles.filterTabs}>
@@ -1727,7 +1737,44 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.background,
+    backgroundColor: '#F5F5F0', // Light cream background like the screenshot
+  },
+  // Coin Container - centers the coin on screen
+  coinContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 100, // Space for command bar
+  },
+  // Breakdown header when coin is tapped
+  breakdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#F5F5F0',
+  },
+  backToCoin: {
+    padding: 8,
+  },
+  backToCoinText: {
+    fontSize: 14,
+    color: theme.textTertiary,
+  },
+  breakdownBalance: {
+    alignItems: 'center',
+  },
+  breakdownAmount: {
+    fontFamily: fonts.heading,
+    fontSize: 32,
+    color: theme.textPrimary,
+    letterSpacing: -0.5,
+  },
+  breakdownPnl: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 4,
   },
   headerArea: {
     backgroundColor: '#FFFFFF',
