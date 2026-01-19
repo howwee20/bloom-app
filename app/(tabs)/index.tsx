@@ -229,11 +229,18 @@ export default function HomeScreen() {
   const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
-  const topPadding = insets.top + 24;
-  const bottomPadding = insets.bottom + 88;
-  const usableHeight = viewportHeight - topPadding - bottomPadding;
-  const cardHeight = Math.min(Math.max(320, Math.round(usableHeight * 0.68)), 560);
-  const cardWidth = Math.min(viewportWidth - 44, Math.round(viewportWidth * 0.92));
+  const cardMaxWidth = 420;
+  const topOffset = 10;
+  const bottomGap = 22;
+  const commandBarHeight = 64;
+  const topPadding = insets.top + topOffset;
+  const commandBarBottom = Math.max(12, insets.bottom + 12);
+  const bottomReserve = commandBarBottom + commandBarHeight + bottomGap;
+  const availableHeight = viewportHeight - topPadding - bottomReserve;
+  const maxCardHeight = Math.round(viewportHeight * 0.82);
+  const cardHeight = Math.min(maxCardHeight, availableHeight);
+  const cardWidth = Math.min(Math.round(viewportWidth * 0.95), cardMaxWidth);
+  const cardMargin = Math.max(12, Math.round((viewportWidth - cardWidth) / 2));
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1042,7 +1049,7 @@ export default function HomeScreen() {
             styles.cardStage,
             {
               paddingTop: topPadding,
-              paddingBottom: bottomPadding,
+              paddingBottom: bottomReserve,
             },
           ]}
         >
@@ -1052,8 +1059,6 @@ export default function HomeScreen() {
             style={{
               height: cardHeight,
               width: cardWidth,
-              maxWidth: 420,
-              transform: [{ translateY: 6 }],
             }}
           />
         </View>
@@ -1124,7 +1129,10 @@ export default function HomeScreen() {
       <KeyboardAvoidingView
         style={[
           styles.commandBarWrapper,
-          { bottom: Math.max(16, insets.bottom + 12) }
+          {
+            bottom: commandBarBottom,
+            paddingHorizontal: cardMargin,
+          }
         ]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
@@ -1608,7 +1616,7 @@ const styles = StyleSheet.create({
   },
   cardStage: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
   },
   keyboardAvoid: {
@@ -1620,7 +1628,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 22,
     alignItems: 'center',
   },
   // Breakdown header when coin is tapped
