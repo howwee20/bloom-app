@@ -231,7 +231,6 @@ export default function HomeScreen() {
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const cardMaxWidth = 420;
   const topOffset = 10;
-  const bottomGap = 22;
   const commandBarHeight = 64;
   const targetHeightPercent = commandActive ? 0.7 : 0.82;
   const gapWhenActive = 12;
