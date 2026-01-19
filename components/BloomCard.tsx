@@ -29,17 +29,11 @@ const BREAKDOWN_ITEMS = [
 ];
 
 const GRADIENT_COLORS = [
-  '#F3C7DC', // soft pink
-  '#E0BFEA', // lavender
-  '#C9BDE8', // violet
-  '#B7C6EC', // periwinkle
-  '#A8C9F0', // blue haze
-] as const;
-
-const FRAME_COLORS = [
-  'rgba(255, 255, 255, 0.9)',
-  'rgba(215, 225, 255, 0.7)',
-  'rgba(255, 230, 248, 0.7)',
+  '#FDB0D7', // pink highlight
+  '#F394E7', // hot pink
+  '#ED87D9', // saturated pink center
+  '#E7A2FC', // lavender lift
+  '#F7F2FA', // near-white fade
 ] as const;
 
 export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
@@ -154,9 +148,9 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       {/* Base gradient */}
       <LinearGradient
         colors={[...GRADIENT_COLORS]}
-        locations={[0, 0.25, 0.5, 0.75, 1]}
-        start={{ x: 0.05, y: 0.05 }}
-        end={{ x: 0.95, y: 0.95 }}
+        locations={[0, 0.28, 0.52, 0.78, 1]}
+        start={{ x: 0.08, y: 0.05 }}
+        end={{ x: 0.92, y: 0.95 }}
         style={styles.gradient}
       />
 
@@ -167,10 +161,10 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       <LinearGradient
         colors={[
           'rgba(0,0,0,0)',
-          'rgba(0,0,0,0)',
+          'rgba(0,0,0,0.03)',
           'rgba(0,0,0,0.06)',
         ]}
-        locations={[0, 0.6, 1]}
+        locations={[0, 0.72, 1]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={styles.vignetteOverlay}
@@ -179,21 +173,25 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       {/* Inner edge shadow for depth */}
       <View style={styles.edgeShadow} />
 
-      {/* Specular highlight (top-left) */}
-      <LinearGradient
-        colors={[
-          'rgba(255,255,255,0.32)',
-          'rgba(255,255,255,0.12)',
-          'rgba(255,255,255,0)',
-        ]}
-        start={{ x: 0.3, y: 0 }}
-        end={{ x: 0.9, y: 0.6 }}
-        style={styles.topGlow}
-      />
+      {/* Premium specular highlight - diagonal */}
+      <Animated.View style={[styles.specularFixed, { transform: [{ rotate: '-12deg' }] }]}>
+        <LinearGradient
+          colors={[
+            'rgba(255,255,255,0.35)',
+            'rgba(255,255,255,0.10)',
+            'rgba(255,255,255,0.0)',
+          ]}
+          locations={[0, 0.22, 0.55]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.specularGradient}
+        />
+      </Animated.View>
 
       {/* Inner rim lighting (glass thickness) */}
       <View style={styles.innerRimOuter} />
       <View style={styles.innerRimInner} />
+      <View style={styles.innerRimStroke} />
 
       {/* Subtle animated sheen */}
       <Animated.View
@@ -221,6 +219,17 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
           style={styles.specularGradient}
         />
       </Animated.View>
+
+      {/* Bottom silver fog */}
+      <LinearGradient
+        colors={[
+          'rgba(247,242,250,0.0)',
+          'rgba(247,242,250,0.55)',
+        ]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.bottomFog}
+      />
 
       {/* Subtle grain overlay to prevent banding */}
       <LinearGradient
@@ -318,8 +327,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: FRAME_PADDING,
     borderRadius: OUTER_RADIUS,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
     borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
+    borderColor: 'rgba(235, 240, 255, 0.55)',
   },
   // Layer 3: Inner gradient slab
   innerSlab: {
@@ -358,19 +368,21 @@ const styles = StyleSheet.create({
     left: -60,
     width: '140%',
     height: '55%',
+    transform: [{ rotate: '-18deg' }],
+  },
+  specularFixed: {
+    position: 'absolute',
+    top: -10,
+    left: -20,
+    width: '130%',
+    height: '60%',
   },
   specularGradient: {
     flex: 1,
   },
   // Secondary top glow
   topGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '40%',
-    borderTopLeftRadius: INNER_RADIUS,
-    borderTopRightRadius: INNER_RADIUS,
+    display: 'none',
   },
   // Inner rim outer edge (glass thickness)
   innerRimOuter: {
@@ -390,11 +402,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(210, 225, 255, 0.2)',
   },
+  // Thin inner rim stroke
+  innerRimStroke: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    right: 4,
+    bottom: 4,
+    borderRadius: INNER_RADIUS - 4,
+    borderWidth: 0.6,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
   // Subtle grain to prevent banding (simulated)
   grainOverlay: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.45,
     transform: [{ rotate: '12deg' }],
+    pointerEvents: 'none',
+  },
+  bottomFog: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '26%',
   },
   // Content
   content: {
