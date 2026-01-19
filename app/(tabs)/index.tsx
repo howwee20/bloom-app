@@ -220,22 +220,23 @@ export default function HomeScreen() {
   // Command bar state
   const [commandActive, setCommandActive] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
-  const [commandResults, setCommandResults] = useState<BloomOffer[]>([]);
-  const [commandLoading, setCommandLoading] = useState(false);
-  const [selectedOffer, setSelectedOffer] = useState<BloomOffer | null>(null);
-  const [showBuyModal, setShowBuyModal] = useState(false);
-  const [buySize, setBuySize] = useState('');
-  const [purchasing, setPurchasing] = useState(false);
-  const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const insets = useSafeAreaInsets();
-  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
-  const cardMaxWidth = 420;
-  const topOffset = 8;
-  const commandBarHeight = 64;
-  const gapAboveBar = 16;
+const [commandResults, setCommandResults] = useState<BloomOffer[]>([]);
+const [commandLoading, setCommandLoading] = useState(false);
+const [selectedOffer, setSelectedOffer] = useState<BloomOffer | null>(null);
+const [showBuyModal, setShowBuyModal] = useState(false);
+const [buySize, setBuySize] = useState('');
+const [purchasing, setPurchasing] = useState(false);
+const [keyboardHeight, setKeyboardHeight] = useState(0);
+const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const insets = useSafeAreaInsets();
+const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+const cardMaxWidth = 420;
+const topOffset = 8;
+const commandBarHeight = 64;
+const gapAboveBar = 16;
   const topPadding = insets.top + topOffset;
   const commandBarBottom = Math.max(12, insets.bottom + 12);
-  const bottomReserve = commandBarBottom + commandBarHeight + gapAboveBar;
+  const bottomReserve = commandBarBottom + commandBarHeight + gapAboveBar + keyboardHeight;
   const availableHeight = viewportHeight - topPadding - bottomReserve;
   const maxCardHeight = Math.max(availableHeight, 0);
   const cardHeight = commandActive
@@ -458,6 +459,22 @@ export default function HomeScreen() {
 
     return () => clearInterval(interval);
   }, [session, appState]);
+
+  // Track keyboard height to keep the card snug above the command bar when typing
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates?.height || 0)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const isForeground = appState === 'active';
 
