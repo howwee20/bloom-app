@@ -129,7 +129,7 @@ export function CommandBar({
           border: '1px solid rgba(0, 0, 0, 0.06)',
           boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
           width: '100%',
-          maxWidth: 560,
+          maxWidth: 420,
         }}
       >
         <Ionicons

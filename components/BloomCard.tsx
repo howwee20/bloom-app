@@ -1,10 +1,10 @@
 // components/BloomCard.tsx
-// The Bloom Card - Premium liquid glass financial surface
+// The Bloom Card - Premium glass slab with iridescent sheen
 
 import React, { useRef, useState, useEffect } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
-  Easing,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -28,41 +28,64 @@ const BREAKDOWN_ITEMS = [
   { label: 'Treasuries', ratio: 0.18 },
 ];
 
-// Premium gradient: smooth 5-stop blend (pink glow → purple → periwinkle glow)
 const GRADIENT_COLORS = [
-  '#F7B9D8', // top-left warm pink glow
-  '#EAA2F0', // upper mid orchid
-  '#C989F2', // center purple
-  '#B6A7F2', // lower mid lavender
-  '#9EC0F7', // bottom-right cool blue glow
+  '#F3C7DC', // soft pink
+  '#E0BFEA', // lavender
+  '#C9BDE8', // violet
+  '#B7C6EC', // periwinkle
+  '#A8C9F0', // blue haze
+] as const;
+
+const FRAME_COLORS = [
+  'rgba(255, 255, 255, 0.9)',
+  'rgba(215, 225, 255, 0.7)',
+  'rgba(255, 230, 248, 0.7)',
 ] as const;
 
 export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
   const [flipped, setFlipped] = useState(false);
+  const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const flipAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
-  // Subtle breathing animation for specular highlight
   useEffect(() => {
-    const breathe = Animated.loop(
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotionEnabled(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener?.(
+      'reduceMotionChanged',
+      setReduceMotionEnabled
+    );
+    return () => {
+      mounted = false;
+      subscription?.remove?.();
+    };
+  }, []);
+
+  // Subtle sheen animation for the glass surface
+  useEffect(() => {
+    if (reduceMotionEnabled) {
+      shimmerAnim.setValue(0);
+      return;
+    }
+    const sweep = Animated.loop(
       Animated.sequence([
         Animated.timing(shimmerAnim, {
           toValue: 1,
-          duration: 8000,
-          easing: Easing.inOut(Easing.sin),
+          duration: 18000,
           useNativeDriver: true,
         }),
         Animated.timing(shimmerAnim, {
           toValue: 0,
-          duration: 8000,
-          easing: Easing.inOut(Easing.sin),
+          duration: 18000,
           useNativeDriver: true,
         }),
       ])
     );
-    breathe.start();
-    return () => breathe.stop();
-  }, [shimmerAnim]);
+    sweep.start();
+    return () => sweep.stop();
+  }, [reduceMotionEnabled, shimmerAnim]);
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -105,18 +128,17 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     outputRange: ['180deg', '360deg'],
   });
 
-  // Subtle shimmer position shift (4-8px)
   const shimmerTranslateX = shimmerAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 6],
+    outputRange: [-12, 12],
   });
   const shimmerTranslateY = shimmerAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 4],
+    outputRange: [-8, 8],
   });
   const shimmerOpacity = shimmerAnim.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [0.18, 0.26, 0.18],
+    outputRange: [0.02, 0.05, 0.02],
   });
 
   const breakdown = BREAKDOWN_ITEMS.map((item) => ({
@@ -138,12 +160,15 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         style={styles.gradient}
       />
 
+      {/* Frosted glass haze */}
+      <View style={styles.frostOverlay} />
+
       {/* Subtle dark vignette for depth */}
       <LinearGradient
         colors={[
           'rgba(0,0,0,0)',
           'rgba(0,0,0,0)',
-          'rgba(0,0,0,0.04)',
+          'rgba(0,0,0,0.06)',
         ]}
         locations={[0, 0.6, 1]}
         start={{ x: 0.5, y: 0 }}
@@ -151,44 +176,18 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         style={styles.vignetteOverlay}
       />
 
-      {/* Radial-like edge darkening */}
-      <View style={styles.edgeVignette} />
+      {/* Inner edge shadow for depth */}
+      <View style={styles.edgeShadow} />
 
-      {/* Animated specular sweep highlight (diagonal streak) */}
-      <Animated.View
-        style={[
-          styles.specularSweep,
-          {
-            opacity: shimmerOpacity,
-            transform: [
-              { translateX: shimmerTranslateX },
-              { translateY: shimmerTranslateY },
-            ],
-          },
-        ]}
-      >
-        <LinearGradient
-          colors={[
-            'rgba(255,255,255,0.5)',
-            'rgba(255,255,255,0.2)',
-            'rgba(255,255,255,0)',
-          ]}
-          locations={[0, 0.4, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.specularGradient}
-        />
-      </Animated.View>
-
-      {/* Secondary soft glow (top) */}
+      {/* Specular highlight (top-left) */}
       <LinearGradient
         colors={[
+          'rgba(255,255,255,0.32)',
           'rgba(255,255,255,0.12)',
-          'rgba(255,255,255,0.04)',
           'rgba(255,255,255,0)',
         ]}
         start={{ x: 0.3, y: 0 }}
-        end={{ x: 0.7, y: 0.4 }}
+        end={{ x: 0.9, y: 0.6 }}
         style={styles.topGlow}
       />
 
@@ -196,8 +195,44 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       <View style={styles.innerRimOuter} />
       <View style={styles.innerRimInner} />
 
+      {/* Subtle animated sheen */}
+      <Animated.View
+        style={[
+          styles.specularSweep,
+          {
+            opacity: reduceMotionEnabled ? 0 : shimmerOpacity,
+            transform: [
+              { translateX: shimmerTranslateX },
+              { translateY: shimmerTranslateY },
+              { rotate: '-18deg' },
+            ],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={[
+            'rgba(255,255,255,0)',
+            'rgba(255,255,255,0.35)',
+            'rgba(255,255,255,0)',
+          ]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.specularGradient}
+        />
+      </Animated.View>
+
       {/* Subtle grain overlay to prevent banding */}
-      <View style={styles.grainOverlay} />
+      <LinearGradient
+        colors={[
+          'rgba(255,255,255,0.02)',
+          'rgba(0,0,0,0.02)',
+          'rgba(255,255,255,0.015)',
+        ]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.grainOverlay}
+      />
 
       {/* Content */}
       {!isBack ? (
@@ -225,7 +260,12 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       {/* Layer 1: Shadow wrapper */}
       <View style={styles.shadowWrapper}>
         {/* Layer 2: Glass frame (refined, less pillowy) */}
-        <View style={styles.glassFrame}>
+        <LinearGradient
+          colors={[...FRAME_COLORS]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.glassFrame}
+        >
           {/* Layer 3: Inner slab */}
           <View style={styles.innerSlab}>
             {/* Front face */}
@@ -249,14 +289,14 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
               {renderCardFace(true)}
             </Animated.View>
           </View>
-        </View>
+        </LinearGradient>
       </View>
     </Pressable>
   );
 }
 
-const OUTER_RADIUS = 48;
-const FRAME_PADDING = 8;
+const OUTER_RADIUS = 46;
+const FRAME_PADDING = 6;
 const INNER_RADIUS = 40;
 
 const styles = StyleSheet.create({
@@ -267,20 +307,19 @@ const styles = StyleSheet.create({
   shadowWrapper: {
     flex: 1,
     borderRadius: OUTER_RADIUS,
-    shadowColor: '#4A3060',
+    shadowColor: '#2F2A3A',
     shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.14,
-    shadowRadius: 32,
-    elevation: 12,
+    shadowOpacity: 0.12,
+    shadowRadius: 40,
+    elevation: 10,
   },
   // Layer 2: Glass frame (refined, less pillowy)
   glassFrame: {
     flex: 1,
     padding: FRAME_PADDING,
     borderRadius: OUTER_RADIUS,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
   },
   // Layer 3: Inner gradient slab
   innerSlab: {
@@ -302,21 +341,23 @@ const styles = StyleSheet.create({
   vignetteOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
-  // Edge darkening (simulates radial vignette)
-  edgeVignette: {
+  frostOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  edgeShadow: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: INNER_RADIUS,
-    borderWidth: 20,
-    borderColor: 'rgba(0,0,0,0.025)',
+    borderWidth: 16,
+    borderColor: 'rgba(0, 0, 0, 0.02)',
   },
   // Animated specular sweep (narrow diagonal streak)
   specularSweep: {
     position: 'absolute',
-    top: -20,
-    left: -40,
-    width: '80%',
-    height: '60%',
-    transform: [{ rotate: '-15deg' }],
+    top: -30,
+    left: -60,
+    width: '140%',
+    height: '55%',
   },
   specularGradient: {
     flex: 1,
@@ -327,7 +368,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: '35%',
+    height: '40%',
     borderTopLeftRadius: INNER_RADIUS,
     borderTopRightRadius: INNER_RADIUS,
   },
@@ -336,7 +377,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderRadius: INNER_RADIUS,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
+    borderColor: 'rgba(255, 255, 255, 0.55)',
   },
   // Inner rim inner edge (subtle)
   innerRimInner: {
@@ -347,32 +388,39 @@ const styles = StyleSheet.create({
     bottom: 2,
     borderRadius: INNER_RADIUS - 2,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: 'rgba(210, 225, 255, 0.2)',
   },
   // Subtle grain to prevent banding (simulated)
   grainOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(128, 128, 128, 0.03)',
-    opacity: 0.5,
+    opacity: 0.45,
+    transform: [{ rotate: '12deg' }],
   },
   // Content
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    transform: [{ translateY: -8 }],
   },
   valueText: {
-    fontSize: 42,
-    fontFamily: 'ZenDots',
+    fontSize: 48,
+    fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.98)',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
+    textShadowColor: 'rgba(0, 0, 0, 0.18)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   changeText: {
     fontSize: 17,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '400',
+    color: 'rgba(255, 255, 255, 0.84)',
     marginTop: 6,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
+    textShadowColor: 'rgba(0, 0, 0, 0.14)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   backContent: {
     flex: 1,

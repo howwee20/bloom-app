@@ -109,6 +109,9 @@ export function CommandBar({
 
 const styles = StyleSheet.create({
   container: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.95)',

@@ -229,13 +229,11 @@ export default function HomeScreen() {
   const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
-  // Layout: intentional breathing room, card "placed" not "crammed"
-  const topPadding = insets.top + 28; // ~24-32px from safe area
-  const bottomPadding = insets.bottom + 96; // Room for command bar + 18-24px gap
-  // Card takes 62% of viewport height, clamped between 460-580
-  const cardHeight = Math.min(Math.max(460, Math.round(viewportHeight * 0.62)), 580);
-  // Card width: screen width - 32px (16px margins each side)
-  const cardWidth = viewportWidth - 32;
+  const topPadding = insets.top + 24;
+  const bottomPadding = insets.bottom + 88;
+  const usableHeight = viewportHeight - topPadding - bottomPadding;
+  const cardHeight = Math.min(Math.max(320, Math.round(usableHeight * 0.68)), 560);
+  const cardWidth = Math.min(viewportWidth - 44, Math.round(viewportWidth * 0.92));
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1051,7 +1049,12 @@ export default function HomeScreen() {
           <BloomCard
             totalValue={portfolioValue + homeValue}
             dailyChange={displayedTotalPnl || 0}
-            style={{ height: cardHeight, width: cardWidth, maxWidth: 420 }}
+            style={{
+              height: cardHeight,
+              width: cardWidth,
+              maxWidth: 420,
+              transform: [{ translateY: 6 }],
+            }}
           />
         </View>
       )}
@@ -1605,7 +1608,7 @@ const styles = StyleSheet.create({
   },
   cardStage: {
     flex: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   keyboardAvoid: {
@@ -1614,9 +1617,11 @@ const styles = StyleSheet.create({
   // Command bar wrapper - keeps it at bottom, above keyboard
   commandBarWrapper: {
     position: 'absolute',
+    bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
+    alignItems: 'center',
   },
   // Breakdown header when coin is tapped
   breakdownHeader: {
