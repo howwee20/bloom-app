@@ -233,13 +233,10 @@ const insets = useSafeAreaInsets();
   const cardMaxWidth = 480;
   const topOffset = 8;
   const topPadding = insets.top + topOffset;
-  const baseBottom = Math.max(insets.bottom + 20, 20);
+  const baseBottom = Math.max(insets.bottom + 20, 24);
   const commandBarHeight = 64;
-  const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
-  const cardHeight = Math.max(
-    viewportHeight - topPadding - commandBarBottom - commandBarHeight + 12,
-    420
-  );
+  const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 12 : baseBottom;
+  const cardHeight = Math.max(viewportHeight - topPadding - insets.bottom, 480);
   const cardWidth = Math.min(Math.round(viewportWidth * 0.99), cardMaxWidth);
 
   const handleImageError = (assetId: string) => {
@@ -1077,7 +1074,7 @@ const insets = useSafeAreaInsets();
             {
               height: cardHeight,
               width: cardWidth,
-              paddingBottom: commandBarBottom + commandBarHeight + 8,
+              paddingBottom: commandBarBottom + commandBarHeight + 12,
             },
           ]}
         >
