@@ -36,6 +36,12 @@ const GRADIENT_COLORS = [
   '#F7F2FA', // near-white fade
 ] as const;
 
+const FRAME_COLORS = [
+  'rgba(255, 255, 255, 0.22)',
+  'rgba(235, 240, 255, 0.55)',
+  'rgba(255, 255, 255, 0.25)',
+] as const;
+
 export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
   const [flipped, setFlipped] = useState(false);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
