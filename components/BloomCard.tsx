@@ -42,14 +42,20 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLES = Array.from({ length: 64 }).map((_, i) => ({
+const PARTICLES = Array.from({ length: 96 }).map((_, i) => ({
   key: `p-${i}`,
   top: 8 + (i * 11) % 78, // scatter across vertical range
   left: 12 + (i * 23) % 76, // scatter across horizontal range
   size: 2.5 + (i % 6) * 0.6,
-  opacity: 0.25 + ((i % 5) * 0.08),
-  drift: 6 + (i % 10), // px drift
+  opacity: 0.28 + ((i % 5) * 0.08),
+  drift: 7 + (i % 12), // px drift
 }));
+
+const FLARES = [
+  { key: 'flare-1', top: '18%', left: '28%', size: 160 },
+  { key: 'flare-2', top: '58%', left: '68%', size: 180 },
+  { key: 'flare-3', top: '42%', left: '48%', size: 140 },
+];
 
 export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
   const [flipped, setFlipped] = useState(false);
@@ -60,6 +66,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
   const particleColorShift = useRef(new Animated.Value(0)).current;
   const particlePulse = useRef(new Animated.Value(0)).current;
   const hueOverlay = useRef(new Animated.Value(0)).current;
+  const flarePulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -107,6 +114,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       particleColorShift.setValue(0);
       particlePulse.setValue(0);
       hueOverlay.setValue(0);
+      flarePulse.setValue(0);
       return;
     }
     const drift = Animated.loop(
@@ -165,17 +173,33 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         }),
       ])
     );
+    const flare = Animated.loop(
+      Animated.sequence([
+        Animated.timing(flarePulse, {
+          toValue: 1,
+          duration: 7200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(flarePulse, {
+          toValue: 0,
+          duration: 7200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
     drift.start();
     colorCycle.start();
     pulse.start();
     hue.start();
+    flare.start();
     return () => {
       drift.stop();
       colorCycle.stop();
       pulse.stop();
       hue.stop();
+      flare.stop();
     };
-  }, [reduceMotionEnabled, particleDrift, particleColorShift, particlePulse, hueOverlay]);
+  }, [reduceMotionEnabled, particleDrift, particleColorShift, particlePulse, hueOverlay, flarePulse]);
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -346,7 +370,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
           style={[
             styles.hueOverlay,
             {
-              opacity: 0.14,
+              opacity: 0.16,
               backgroundColor: hueOverlay.interpolate({
                 inputRange: [0, 1],
                 outputRange: ['rgba(255,200,240,0.6)', 'rgba(195,210,255,0.6)'],
@@ -372,7 +396,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
                   opacity: p.opacity,
                   backgroundColor: particleColorShift.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['rgba(255,255,255,0.85)', 'rgba(255,200,235,0.9)'],
+                    outputRange: ['rgba(255,255,255,0.92)', 'rgba(255,180,230,0.95)'],
                   }),
                   transform: [
                     {
@@ -597,6 +621,14 @@ const styles = StyleSheet.create({
   hueOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
+  flareLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  flare: {
+    position: 'absolute',
+    borderRadius: 999,
+    filter: 'blur(18px)' as any,
+  },
   // Content
   content: {
     flex: 1,
@@ -663,3 +695,35 @@ const styles = StyleSheet.create({
 });
 
 export default BloomCard;
+      {/* Flares */}
+      {!reduceMotionEnabled && (
+        <View style={styles.flareLayer} pointerEvents="none">
+          {FLARES.map((flare, idx) => (
+            <Animated.View
+              key={flare.key}
+              style={[
+                styles.flare,
+                {
+                  top: flare.top,
+                  left: flare.left,
+                  width: flare.size,
+                  height: flare.size,
+                  opacity: 0.32,
+                  transform: [
+                    {
+                      scale: flarePulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.9, 1.15],
+                      }),
+                    },
+                  ],
+                  backgroundColor: hueOverlay.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['rgba(255, 210, 250, 0.4)', 'rgba(205, 220, 255, 0.4)'],
+                  }),
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
