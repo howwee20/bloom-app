@@ -245,8 +245,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   valueText: {
-    fontSize: 48,
-    fontWeight: '600',
+    fontSize: 44,
+    fontFamily: 'ZenDots',
     color: '#FFFFFF',
     letterSpacing: -1,
     textShadowColor: 'rgba(0, 0, 0, 0.15)',
