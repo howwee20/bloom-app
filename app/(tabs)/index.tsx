@@ -230,13 +230,19 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const cardMaxWidth = 420;
-  const topOffset = 6;
+  const topOffset = 8;
   const commandBarHeight = 64;
+  const gapAboveBar = 16;
   const topPadding = insets.top + topOffset;
   const commandBarBottom = Math.max(12, insets.bottom + 12);
-  const cardHeight = viewportHeight - insets.top - insets.bottom;
+  const bottomReserve = commandBarBottom + commandBarHeight + gapAboveBar;
+  const availableHeight = viewportHeight - topPadding - bottomReserve;
+  const maxCardHeight = Math.max(availableHeight, 0);
+  const cardHeight = commandActive
+    ? Math.max(320, Math.round(maxCardHeight * 0.82))
+    : maxCardHeight;
   const cardWidth = Math.min(Math.round(viewportWidth * 0.96), cardMaxWidth);
-  const cardMargin = Math.max(8, Math.round((viewportWidth - cardWidth) / 2));
+  const cardMargin = Math.max(12, Math.round((viewportWidth - cardWidth) / 2));
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1048,7 +1054,7 @@ export default function HomeScreen() {
           styles.cardStage,
           {
             paddingTop: topPadding,
-            paddingBottom: commandBarBottom + commandBarHeight + 12,
+            paddingBottom: bottomReserve,
           },
         ]}
       >
