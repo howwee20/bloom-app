@@ -233,7 +233,7 @@ const insets = useSafeAreaInsets();
   const cardMaxWidth = 9999; // allow full bleed on phone
   const topOffset = 0;
   const topPadding = insets.top + topOffset;
-  const baseBottom = Math.max(insets.bottom + 16, 18);
+  const baseBottom = Math.max(insets.bottom + 8, 12);
   const commandBarHeight = 64;
   const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
   const cardHeight = Math.max(viewportHeight - topPadding, 520);
@@ -1075,7 +1075,7 @@ const insets = useSafeAreaInsets();
             {
               height: cardHeight,
               width: cardWidth,
-              paddingBottom: commandBarBottom + commandBarHeight + 12,
+              paddingBottom: commandBarBottom + commandBarHeight * 0.5 + 8,
             },
           ]}
         >
@@ -1094,7 +1094,7 @@ const insets = useSafeAreaInsets();
               styles.commandBarWrapper,
               {
                 bottom: commandBarBottom,
-                paddingHorizontal: 18,
+                paddingHorizontal: 14,
               },
             ]}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
