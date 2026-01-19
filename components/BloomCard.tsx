@@ -29,11 +29,11 @@ const BREAKDOWN_ITEMS = [
 ];
 
 const GRADIENT_COLORS = [
-  '#FDB0D7', // pink highlight
-  '#F394E7', // hot pink
-  '#ED87D9', // saturated pink center
-  '#E7A2FC', // lavender lift
-  '#F7F2FA', // near-white fade
+  '#FFD4EA', // soft pink highlight
+  '#F8BDF0', // airy pink
+  '#F3B0E2', // pastel pink center
+  '#EBC7FA', // light lavender lift
+  '#FAF7FC', // near-white fade
 ] as const;
 
 const FRAME_COLORS = [
@@ -167,8 +167,8 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       <LinearGradient
         colors={[
           'rgba(0,0,0,0)',
-          'rgba(0,0,0,0.03)',
-          'rgba(0,0,0,0.06)',
+          'rgba(0,0,0,0.025)',
+          'rgba(0,0,0,0.04)',
         ]}
         locations={[0, 0.72, 1]}
         start={{ x: 0.5, y: 0 }}
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   },
   frostOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   edgeShadow: {
     ...StyleSheet.absoluteFillObject,
@@ -432,6 +432,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: '26%',
+    opacity: 0.9,
   },
   // Content
   content: {
