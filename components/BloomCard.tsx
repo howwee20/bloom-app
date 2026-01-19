@@ -42,7 +42,7 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLES = Array.from({ length: 18 }).map((_, i) => ({
+const PARTICLES = Array.from({ length: 32 }).map((_, i) => ({
   key: `p-${i}`,
   top: 8 + (i * 11) % 78, // scatter across vertical range
   left: 12 + (i * 23) % 76, // scatter across horizontal range
@@ -57,6 +57,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
   const flipAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const particleDrift = useRef(new Animated.Value(0)).current;
+  const particleColorShift = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -101,6 +102,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
   useEffect(() => {
     if (reduceMotionEnabled) {
       particleDrift.setValue(0);
+      particleColorShift.setValue(0);
       return;
     }
     const drift = Animated.loop(
@@ -117,9 +119,27 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         }),
       ])
     );
+    const colorCycle = Animated.loop(
+      Animated.sequence([
+        Animated.timing(particleColorShift, {
+          toValue: 1,
+          duration: 14000,
+          useNativeDriver: false, // backgroundColor needs JS thread
+        }),
+        Animated.timing(particleColorShift, {
+          toValue: 0,
+          duration: 14000,
+          useNativeDriver: false,
+        }),
+      ])
+    );
     drift.start();
-    return () => drift.stop();
-  }, [reduceMotionEnabled, particleDrift]);
+    colorCycle.start();
+    return () => {
+      drift.stop();
+      colorCycle.stop();
+    };
+  }, [reduceMotionEnabled, particleDrift, particleColorShift]);
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -297,6 +317,10 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
                   width: p.size,
                   height: p.size,
                   opacity: p.opacity,
+                  backgroundColor: particleColorShift.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['rgba(255,255,255,0.8)', 'rgba(255,215,245,0.9)'],
+                  }),
                   transform: [
                     {
                       translateX: particleDrift.interpolate({
