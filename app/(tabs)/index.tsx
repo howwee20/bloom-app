@@ -230,17 +230,17 @@ const [keyboardHeight, setKeyboardHeight] = useState(0);
 const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
-  const cardMaxWidth = 440;
+  const cardMaxWidth = 480;
   const topOffset = 8;
   const topPadding = insets.top + topOffset;
-  const baseBottom = Math.max(insets.bottom + 12, 16);
+  const baseBottom = Math.max(insets.bottom + 20, 20);
   const commandBarHeight = 64;
   const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
   const cardHeight = Math.max(
-    360,
-    viewportHeight - topPadding - commandBarBottom - commandBarHeight - 8
+    viewportHeight - topPadding - commandBarBottom - commandBarHeight + 12,
+    420
   );
-  const cardWidth = Math.min(Math.round(viewportWidth * 0.98), cardMaxWidth);
+  const cardWidth = Math.min(Math.round(viewportWidth * 0.99), cardMaxWidth);
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1077,6 +1077,7 @@ const insets = useSafeAreaInsets();
             {
               height: cardHeight,
               width: cardWidth,
+              paddingBottom: commandBarBottom + commandBarHeight + 8,
             },
           ]}
         >
