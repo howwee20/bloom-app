@@ -42,11 +42,21 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
+const PARTICLES = Array.from({ length: 18 }).map((_, i) => ({
+  key: `p-${i}`,
+  top: 8 + (i * 11) % 78, // scatter across vertical range
+  left: 12 + (i * 23) % 76, // scatter across horizontal range
+  size: 2 + (i % 4),
+  opacity: 0.18 + ((i % 5) * 0.04),
+  drift: 4 + (i % 6), // px drift
+}));
+
 export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
   const [flipped, setFlipped] = useState(false);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const flipAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const particleDrift = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -86,6 +96,30 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     sweep.start();
     return () => sweep.stop();
   }, [reduceMotionEnabled, shimmerAnim]);
+
+  // Gentle particle drift
+  useEffect(() => {
+    if (reduceMotionEnabled) {
+      particleDrift.setValue(0);
+      return;
+    }
+    const drift = Animated.loop(
+      Animated.sequence([
+        Animated.timing(particleDrift, {
+          toValue: 1,
+          duration: 9000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(particleDrift, {
+          toValue: 0,
+          duration: 9000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    drift.start();
+    return () => drift.stop();
+  }, [reduceMotionEnabled, particleDrift]);
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -248,6 +282,41 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         end={{ x: 1, y: 1 }}
         style={styles.grainOverlay}
       />
+
+      {/* Particle drift layer */}
+      {!reduceMotionEnabled && (
+        <View style={styles.particleLayer} pointerEvents="none">
+          {PARTICLES.map((p, idx) => (
+            <Animated.View
+              key={p.key}
+              style={[
+                styles.particle,
+                {
+                  top: `${p.top}%`,
+                  left: `${p.left}%`,
+                  width: p.size,
+                  height: p.size,
+                  opacity: p.opacity,
+                  transform: [
+                    {
+                      translateX: particleDrift.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-p.drift, p.drift],
+                      }),
+                    },
+                    {
+                      translateY: particleDrift.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [p.drift * 0.5, -p.drift * 0.5],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
 
       {/* Content */}
       {!isBack ? (
@@ -433,6 +502,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: '26%',
     opacity: 0.9,
+  },
+  particleLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  particle: {
+    position: 'absolute',
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
   },
   // Content
   content: {
