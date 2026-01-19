@@ -1,5 +1,5 @@
 // components/BloomCard.tsx
-// The Bloom Card - Primary balance surface with flip breakdown.
+// The Bloom Card - 3D glass-framed gradient slab
 
 import React, { useRef, useState } from 'react';
 import {
@@ -27,8 +27,8 @@ const BREAKDOWN_ITEMS = [
   { label: 'Treasuries', ratio: 0.18 },
 ];
 
-// Gradient colors matching the reference (pink → purple → light blue)
-const GRADIENT_COLORS = ['#F87FC4', '#C490F0', '#8FC7FF'] as const;
+// Gradient colors matching reference (pink → purple → periwinkle)
+const GRADIENT_COLORS = ['#F8B6D2', '#EC9FED', '#C97EDA', '#B6A6EE'] as const;
 
 export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
   const [flipped, setFlipped] = useState(false);
@@ -86,70 +86,140 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
 
   return (
     <Pressable style={[styles.container, style]} onPress={toggleFlip}>
-      {/* Front face - Balance view */}
-      <Animated.View
-        style={[
-          styles.face,
-          { transform: [{ perspective: 1200 }, { rotateY: frontRotation }] },
-        ]}
-      >
-        <LinearGradient
-          colors={[...GRADIENT_COLORS]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
-        >
-          <View style={styles.content}>
-            <Text style={styles.valueText}>{displayValue}</Text>
-            <Text style={styles.changeText}>{displayChange}</Text>
-          </View>
-        </LinearGradient>
-      </Animated.View>
+      {/* Layer 1: Outer shadow wrapper */}
+      <View style={styles.shadowWrapper}>
+        {/* Layer 2: Glass frame / bevel */}
+        <View style={styles.glassFrame}>
+          {/* Bevel highlight overlay (top-left light) */}
+          <View style={styles.bevelHighlight} />
+          {/* Bevel shadow overlay (bottom-right dark) */}
+          <View style={styles.bevelShadow} />
 
-      {/* Back face - Breakdown view */}
-      <Animated.View
-        style={[
-          styles.face,
-          styles.faceBack,
-          { transform: [{ perspective: 1200 }, { rotateY: backRotation }] },
-        ]}
-      >
-        <LinearGradient
-          colors={[...GRADIENT_COLORS]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
-        >
-          <View style={styles.backContent}>
-            <Text style={styles.breakdownTitle}>Breakdown</Text>
-            {breakdown.map((item) => (
-              <View key={item.label} style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>{item.label}</Text>
-                <Text style={styles.breakdownValue}>{item.value}</Text>
-              </View>
-            ))}
-            <Text style={styles.breakdownHint}>Tap to return</Text>
+          {/* Layer 3: Inner gradient slab */}
+          <View style={styles.innerSlab}>
+            {/* Front face - Balance view */}
+            <Animated.View
+              style={[
+                styles.face,
+                { transform: [{ perspective: 1200 }, { rotateY: frontRotation }] },
+              ]}
+            >
+              <LinearGradient
+                colors={[...GRADIENT_COLORS]}
+                start={{ x: 0.1, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={styles.gradient}
+              >
+                {/* Specular highlight for glass effect */}
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0.7, y: 0.5 }}
+                  style={styles.specularHighlight}
+                />
+                <View style={styles.content}>
+                  <Text style={styles.valueText}>{displayValue}</Text>
+                  <Text style={styles.changeText}>{displayChange}</Text>
+                </View>
+              </LinearGradient>
+            </Animated.View>
+
+            {/* Back face - Breakdown view */}
+            <Animated.View
+              style={[
+                styles.face,
+                styles.faceBack,
+                { transform: [{ perspective: 1200 }, { rotateY: backRotation }] },
+              ]}
+            >
+              <LinearGradient
+                colors={[...GRADIENT_COLORS]}
+                start={{ x: 0.1, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={styles.gradient}
+              >
+                {/* Specular highlight for glass effect */}
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0.7, y: 0.5 }}
+                  style={styles.specularHighlight}
+                />
+                <View style={styles.backContent}>
+                  <Text style={styles.breakdownTitle}>Breakdown</Text>
+                  {breakdown.map((item) => (
+                    <View key={item.label} style={styles.breakdownRow}>
+                      <Text style={styles.breakdownLabel}>{item.label}</Text>
+                      <Text style={styles.breakdownValue}>{item.value}</Text>
+                    </View>
+                  ))}
+                  <Text style={styles.breakdownHint}>Tap to return</Text>
+                </View>
+              </LinearGradient>
+            </Animated.View>
           </View>
-        </LinearGradient>
-      </Animated.View>
+        </View>
+      </View>
     </Pressable>
   );
 }
 
+const OUTER_RADIUS = 52;
+const FRAME_PADDING = 12;
+const INNER_RADIUS = 44;
+
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    borderRadius: 32,
+  },
+  // Layer 1: Shadow wrapper for float effect
+  shadowWrapper: {
+    flex: 1,
+    borderRadius: OUTER_RADIUS,
+    shadowColor: '#6B4C7A',
+    shadowOffset: { width: 0, height: 22 },
+    shadowOpacity: 0.18,
+    shadowRadius: 36,
+    elevation: 14,
+  },
+  // Layer 2: Glass frame / bevel
+  glassFrame: {
+    flex: 1,
+    padding: FRAME_PADDING,
+    borderRadius: OUTER_RADIUS,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+  },
+  // Bevel highlight (top-left)
+  bevelHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: '50%',
+    bottom: '50%',
+    borderTopLeftRadius: OUTER_RADIUS,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  // Bevel shadow (bottom-right)
+  bevelShadow: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    right: 0,
+    bottom: 0,
+    borderBottomRightRadius: OUTER_RADIUS,
+    backgroundColor: 'rgba(160, 140, 200, 0.12)',
+  },
+  // Layer 3: Inner gradient slab
+  innerSlab: {
+    flex: 1,
+    borderRadius: INNER_RADIUS,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 10,
   },
   face: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 32,
+    borderRadius: INNER_RADIUS,
     overflow: 'hidden',
     backfaceVisibility: 'hidden',
   },
@@ -161,28 +231,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Specular highlight for glass effect
+  specularHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '70%',
+    height: '45%',
+    borderTopLeftRadius: INNER_RADIUS,
+  },
   content: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 40,
   },
   valueText: {
-    fontSize: 44,
+    fontSize: 48,
     fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -1,
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   changeText: {
     fontSize: 18,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: 'rgba(255, 255, 255, 0.92)',
     marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   backContent: {
     flex: 1,
     width: '100%',
-    paddingHorizontal: 28,
-    paddingVertical: 32,
+    paddingHorizontal: 32,
+    paddingVertical: 36,
     justifyContent: 'center',
     gap: 16,
   },

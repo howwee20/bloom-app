@@ -228,12 +228,14 @@ export default function HomeScreen() {
   const [purchasing, setPurchasing] = useState(false);
   const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
-  const { height: viewportHeight } = useWindowDimensions();
-  // Layout: card sits lower on screen with more presence
-  const topPadding = insets.top + 44;
-  const bottomPadding = insets.bottom + 110;
-  // Card takes 74% of viewport height, clamped between 560-690
-  const cardHeight = Math.min(Math.max(560, Math.round(viewportHeight * 0.74)), 690);
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+  // Layout: card sits lower on screen with dominant presence
+  const topPadding = insets.top + 56; // More breathing room at top
+  const bottomPadding = insets.bottom + 100; // Room for command bar + gap
+  // Card takes 65% of viewport height, clamped between 480-620
+  const cardHeight = Math.min(Math.max(480, Math.round(viewportHeight * 0.65)), 620);
+  // Card width: screen width - 32px (16px margins each side)
+  const cardWidth = viewportWidth - 32;
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1049,7 +1051,7 @@ export default function HomeScreen() {
           <BloomCard
             totalValue={portfolioValue + homeValue}
             dailyChange={displayedTotalPnl || 0}
-            style={{ height: cardHeight }}
+            style={{ height: cardHeight, width: cardWidth, maxWidth: 420 }}
           />
         </View>
       )}
@@ -1603,7 +1605,6 @@ const styles = StyleSheet.create({
   },
   cardStage: {
     flex: 1,
-    paddingHorizontal: 20,
     justifyContent: 'flex-start',
     alignItems: 'center',
   },
