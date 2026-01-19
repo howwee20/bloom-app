@@ -233,11 +233,15 @@ export default function HomeScreen() {
   const topOffset = 10;
   const bottomGap = 22;
   const commandBarHeight = 64;
+  const targetHeightPercent = commandActive ? 0.7 : 0.82;
+  const gapWhenActive = 12;
+  const gapWhenIdle = 22;
+  const bottomGap = commandActive ? gapWhenActive : gapWhenIdle;
   const topPadding = insets.top + topOffset;
   const commandBarBottom = Math.max(12, insets.bottom + 12);
   const bottomReserve = commandBarBottom + commandBarHeight + bottomGap;
   const availableHeight = viewportHeight - topPadding - bottomReserve;
-  const maxCardHeight = Math.round(viewportHeight * 0.82);
+  const maxCardHeight = Math.round(viewportHeight * targetHeightPercent);
   const cardHeight = Math.min(maxCardHeight, availableHeight);
   const cardWidth = Math.min(Math.round(viewportWidth * 0.95), cardMaxWidth);
   const cardMargin = Math.max(12, Math.round((viewportWidth - cardWidth) / 2));
@@ -1042,88 +1046,25 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Bloom Card - tap to flip breakdown */}
-      {!commandActive && (
-        <View
-          style={[
-            styles.cardStage,
-            {
-              paddingTop: topPadding,
-              paddingBottom: bottomReserve,
-            },
-          ]}
-        >
-          <BloomCard
-            totalValue={portfolioValue + homeValue}
-            dailyChange={displayedTotalPnl || 0}
-            style={{
-              height: cardHeight,
-              width: cardWidth,
-            }}
-          />
-        </View>
-      )}
-
-      {/* Command Results - shown when command bar is active */}
-      {commandActive && (
-        <View style={styles.commandResultsSection}>
-          {commandLoading ? (
-            <View style={styles.commandLoadingContainer}>
-              <ActivityIndicator size="large" color={theme.textSecondary} />
-              <Text style={styles.commandLoadingText}>Finding best prices...</Text>
-            </View>
-          ) : commandResults.length > 0 ? (
-            <FlatList
-              data={commandResults}
-              renderItem={({ item }) => {
-                const sourceConfig = SOURCE_CONFIG[item.source] || { label: item.source, color: '#888' };
-                return (
-                  <Pressable
-                    style={styles.offerCard}
-                    onPress={() => handleSelectOffer(item)}
-                  >
-                    <View style={[styles.offerSourceBadge, { backgroundColor: sourceConfig.color }]}>
-                      <Text style={styles.offerSourceText}>{sourceConfig.label}</Text>
-                    </View>
-                    <View style={styles.offerImageContainer}>
-                      {item.image ? (
-                        <Image
-                          source={{ uri: item.image }}
-                          style={styles.offerImage}
-                          resizeMode="contain"
-                        />
-                      ) : (
-                        <View style={[styles.offerImage, styles.offerImagePlaceholder]}>
-                          <Text style={styles.offerImagePlaceholderText}>
-                            {item.title.charAt(0)}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.offerTitle} numberOfLines={2}>{item.title}</Text>
-                    <Text style={styles.offerPrice}>{formatPrice(item.total_estimate)}</Text>
-                  </Pressable>
-                );
-              }}
-              keyExtractor={(item) => item.offer_id}
-              numColumns={2}
-              columnWrapperStyle={styles.commandGridRow}
-              contentContainerStyle={styles.commandGridContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            />
-          ) : getSearchQuery(commandQuery) ? (
-            <View style={styles.commandNoResults}>
-              <Text style={styles.commandNoResultsTitle}>No matches</Text>
-              <Text style={styles.commandNoResultsSubtitle}>Try a different search</Text>
-            </View>
-          ) : (
-            <View style={styles.commandHint}>
-              <Text style={styles.commandHintText}>Search for sneakers, apparel, or type "sell" to list items</Text>
-            </View>
-          )}
-        </View>
-      )}
+      {/* Bloom Card - tap to flip breakdown; stays on home screen when typing */}
+      <View
+        style={[
+          styles.cardStage,
+          {
+            paddingTop: topPadding,
+            paddingBottom: bottomReserve,
+          },
+        ]}
+      >
+        <BloomCard
+          totalValue={portfolioValue + homeValue}
+          dailyChange={displayedTotalPnl || 0}
+          style={{
+            height: cardHeight,
+            width: cardWidth,
+          }}
+        />
+      </View>
 
       {/* Command Bar - stays above keyboard */}
       <KeyboardAvoidingView
