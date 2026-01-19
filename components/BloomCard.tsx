@@ -380,6 +380,39 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         />
       )}
 
+      {/* Flares */}
+      {!reduceMotionEnabled && (
+        <View style={styles.flareLayer} pointerEvents="none">
+          {FLARES.map((flare) => (
+            <Animated.View
+              key={flare.key}
+              style={[
+                styles.flare,
+                {
+                  top: flare.top,
+                  left: flare.left,
+                  width: flare.size,
+                  height: flare.size,
+                  opacity: 0.32,
+                  transform: [
+                    {
+                      scale: flarePulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.9, 1.15],
+                      }),
+                    },
+                  ],
+                  backgroundColor: hueOverlay.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['rgba(255, 210, 250, 0.4)', 'rgba(205, 220, 255, 0.4)'],
+                  }),
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
+
       {/* Particle drift layer */}
       {!reduceMotionEnabled && (
         <View style={styles.particleLayer} pointerEvents="none">
@@ -695,35 +728,3 @@ const styles = StyleSheet.create({
 });
 
 export default BloomCard;
-      {/* Flares */}
-      {!reduceMotionEnabled && (
-        <View style={styles.flareLayer} pointerEvents="none">
-          {FLARES.map((flare, idx) => (
-            <Animated.View
-              key={flare.key}
-              style={[
-                styles.flare,
-                {
-                  top: flare.top,
-                  left: flare.left,
-                  width: flare.size,
-                  height: flare.size,
-                  opacity: 0.32,
-                  transform: [
-                    {
-                      scale: flarePulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.9, 1.15],
-                      }),
-                    },
-                  ],
-                  backgroundColor: hueOverlay.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['rgba(255, 210, 250, 0.4)', 'rgba(205, 220, 255, 0.4)'],
-                  }),
-                },
-              ]}
-            />
-          ))}
-        </View>
-      )}
