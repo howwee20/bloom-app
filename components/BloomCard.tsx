@@ -68,6 +68,8 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
   const particlePulse = useRef(new Animated.Value(0)).current;
   const hueOverlay = useRef(new Animated.Value(0)).current;
   const flarePulse = useRef(new Animated.Value(0)).current;
+  const swirlAnim = useRef(new Animated.Value(0)).current;
+  const flashAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -798,7 +800,7 @@ const styles = StyleSheet.create({
   },
   valueText: {
     fontSize: 48,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     color: 'rgba(255, 255, 255, 0.98)',
     letterSpacing: -0.4,
     textShadowColor: 'rgba(0, 0, 0, 0.18)',
@@ -807,7 +809,7 @@ const styles = StyleSheet.create({
   },
   changeText: {
     fontSize: 17,
-    fontWeight: '400',
+    fontFamily: 'PlusJakartaSans-Regular',
     color: 'rgba(255, 255, 255, 0.84)',
     letterSpacing: 0.1,
     textShadowColor: 'rgba(0, 0, 0, 0.14)',
@@ -824,7 +826,7 @@ const styles = StyleSheet.create({
   },
   breakdownTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     color: 'rgba(255, 255, 255, 0.95)',
     marginBottom: 6,
     letterSpacing: 0.3,
@@ -837,16 +839,17 @@ const styles = StyleSheet.create({
   },
   breakdownLabel: {
     fontSize: 15,
-    fontWeight: '500',
+    fontFamily: 'PlusJakartaSans-Medium',
     color: 'rgba(255, 255, 255, 0.85)',
   },
   breakdownValue: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     color: 'rgba(255, 255, 255, 0.95)',
   },
   breakdownHint: {
     fontSize: 13,
+    fontFamily: 'PlusJakartaSans-Regular',
     color: 'rgba(255, 255, 255, 0.6)',
     marginTop: 10,
     textAlign: 'center',
