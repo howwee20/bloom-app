@@ -49,6 +49,9 @@ const PARTICLES = Array.from({ length: 180 }).map((_, i) => ({
   size: 1.6 + (i % 9) * 0.55,
   opacity: 0.28 + ((i % 6) * 0.08),
   drift: 10 + (i % 16), // px drift
+  fastX: 2.5 + (i % 5) * 1.6,
+  fastY: 2.5 + (i % 6) * 1.4,
+  scaleHi: 1.05 + (i % 5) * 0.07,
 }));
 
 const FLARES = [
@@ -70,6 +73,9 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
   const flarePulse = useRef(new Animated.Value(0)).current;
   const swirlAnim = useRef(new Animated.Value(0)).current;
   const flashAnim = useRef(new Animated.Value(0)).current;
+  const fastJitter = useRef(new Animated.Value(0)).current;
+  const smokeAnimA = useRef(new Animated.Value(0)).current;
+  const smokeAnimB = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -148,6 +154,9 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       flarePulse.setValue(0);
       swirlAnim.setValue(0);
       flashAnim.setValue(0);
+      fastJitter.setValue(0);
+      smokeAnimA.setValue(0);
+      smokeAnimB.setValue(0);
       return;
     }
     const drift = Animated.loop(
@@ -260,6 +269,49 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         }),
       ])
     );
+    const fast = Animated.loop(
+      Animated.sequence([
+        Animated.timing(fastJitter, {
+          toValue: 1,
+          duration: 1400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fastJitter, {
+          toValue: 0,
+          duration: 1400,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const smokeA = Animated.loop(
+      Animated.sequence([
+        Animated.timing(smokeAnimA, {
+          toValue: 1,
+          duration: 8200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(smokeAnimA, {
+          toValue: 0,
+          duration: 8200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const smokeB = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1200),
+        Animated.timing(smokeAnimB, {
+          toValue: 1,
+          duration: 10400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(smokeAnimB, {
+          toValue: 0,
+          duration: 10400,
+          useNativeDriver: true,
+        }),
+      ])
+    );
     drift.start();
     colorCycle.start();
     pulse.start();
@@ -267,6 +319,9 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     flare.start();
     swirl.start();
     flash.start();
+    fast.start();
+    smokeA.start();
+    smokeB.start();
     return () => {
       drift.stop();
       colorCycle.stop();
@@ -275,6 +330,9 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       flare.stop();
       swirl.stop();
       flash.stop();
+      fast.stop();
+      smokeA.stop();
+      smokeB.stop();
     };
   }, [
     reduceMotionEnabled,
@@ -285,6 +343,9 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     flarePulse,
     swirlAnim,
     flashAnim,
+    fastJitter,
+    smokeAnimA,
+    smokeAnimB,
   ]);
 
   const formatValue = (value: number) => {
@@ -455,6 +516,101 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         style={styles.grainOverlay}
       />
 
+      {/* Smoke / nebula energy */}
+      {!reduceMotionEnabled && (
+        <>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.smokeOverlay,
+              {
+                opacity: smokeAnimA.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.08, 0.26],
+                }),
+                transform: [
+                  {
+                    translateX: smokeAnimA.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-40, 36],
+                    }),
+                  },
+                  {
+                    translateY: smokeAnimA.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30, -28],
+                    }),
+                  },
+                  {
+                    scale: smokeAnimA.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1.05, 1.2],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[
+                'rgba(255,255,255,0.06)',
+                'rgba(255,220,245,0.22)',
+                'rgba(210,225,255,0.16)',
+                'rgba(255,255,255,0)',
+              ]}
+              start={{ x: 0.2, y: 0.1 }}
+              end={{ x: 0.9, y: 0.9 }}
+              style={styles.smokeGradient}
+            />
+          </Animated.View>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.smokeOverlay,
+              {
+                opacity: smokeAnimB.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.06, 0.22],
+                }),
+                transform: [
+                  {
+                    translateX: smokeAnimB.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [32, -28],
+                    }),
+                  },
+                  {
+                    translateY: smokeAnimB.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-20, 24],
+                    }),
+                  },
+                  {
+                    scale: smokeAnimB.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1.1, 1.28],
+                    }),
+                  },
+                  { rotate: '-8deg' },
+                ],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[
+                'rgba(255,255,255,0.05)',
+                'rgba(240,210,255,0.24)',
+                'rgba(205,220,255,0.2)',
+                'rgba(255,255,255,0.02)',
+              ]}
+              start={{ x: 0.1, y: 0.2 }}
+              end={{ x: 0.9, y: 0.8 }}
+              style={styles.smokeGradient}
+            />
+          </Animated.View>
+        </>
+      )}
+
       {/* Swirling aurora layer */}
       {!reduceMotionEnabled && (
         <Animated.View
@@ -610,21 +766,33 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
                   }),
                   transform: [
                     {
-                      translateX: particleDrift.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-p.drift, p.drift],
-                      }),
+                      translateX: Animated.add(
+                        particleDrift.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-p.drift, p.drift],
+                        }),
+                        fastJitter.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-p.fastX, p.fastX],
+                        })
+                      ),
                     },
                     {
-                      translateY: particleDrift.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [p.drift * 0.6, -p.drift * 0.6],
-                      }),
+                      translateY: Animated.add(
+                        particleDrift.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [p.drift * 0.6, -p.drift * 0.6],
+                        }),
+                        fastJitter.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-p.fastY, p.fastY],
+                        })
+                      ),
                     },
                     {
                       scale: particlePulse.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0.82, 1.25],
+                        outputRange: [0.78, p.scaleHi],
                       }),
                     },
                   ],
@@ -898,6 +1066,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: 999,
     filter: 'blur(18px)' as any,
+  },
+  smokeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  smokeGradient: {
+    ...StyleSheet.absoluteFillObject,
   },
   swirlOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -230,14 +230,14 @@ const [keyboardHeight, setKeyboardHeight] = useState(0);
 const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
-  const cardMaxWidth = 480;
-  const topOffset = 8;
+  const cardMaxWidth = 9999; // allow full bleed on phone
+  const topOffset = 0;
   const topPadding = insets.top + topOffset;
-  const baseBottom = Math.max(insets.bottom + 20, 24);
+  const baseBottom = Math.max(insets.bottom + 16, 18);
   const commandBarHeight = 64;
-  const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 12 : baseBottom;
-  const cardHeight = Math.max(viewportHeight - topPadding - insets.bottom, 480);
-  const cardWidth = Math.min(Math.round(viewportWidth * 0.99), cardMaxWidth);
+  const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
+  const cardHeight = Math.max(viewportHeight - topPadding, 520);
+  const cardWidth = Math.min(Math.round(viewportWidth * 1), cardMaxWidth);
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1065,6 +1065,7 @@ const insets = useSafeAreaInsets();
           styles.cardStage,
           {
             paddingTop: topPadding,
+            paddingHorizontal: 0,
           },
         ]}
       >
@@ -1583,7 +1584,7 @@ const styles = StyleSheet.create({
   cardStage: {
     flex: 1,
     justifyContent: 'flex-start',
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
   cardContainer: {
     position: 'relative',
