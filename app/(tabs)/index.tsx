@@ -230,20 +230,13 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const cardMaxWidth = 420;
-  const topOffset = 10;
+  const topOffset = 6;
   const commandBarHeight = 64;
-  const targetHeightPercent = commandActive ? 0.7 : 0.82;
-  const gapWhenActive = 12;
-  const gapWhenIdle = 22;
-  const bottomGap = commandActive ? gapWhenActive : gapWhenIdle;
   const topPadding = insets.top + topOffset;
   const commandBarBottom = Math.max(12, insets.bottom + 12);
-  const bottomReserve = commandBarBottom + commandBarHeight + bottomGap;
-  const availableHeight = viewportHeight - topPadding - bottomReserve;
-  const maxCardHeight = Math.round(viewportHeight * targetHeightPercent);
-  const cardHeight = Math.min(maxCardHeight, availableHeight);
-  const cardWidth = Math.min(Math.round(viewportWidth * 0.95), cardMaxWidth);
-  const cardMargin = Math.max(12, Math.round((viewportWidth - cardWidth) / 2));
+  const cardHeight = viewportHeight - insets.top - insets.bottom;
+  const cardWidth = Math.min(Math.round(viewportWidth * 0.96), cardMaxWidth);
+  const cardMargin = Math.max(8, Math.round((viewportWidth - cardWidth) / 2));
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1055,7 +1048,7 @@ export default function HomeScreen() {
           styles.cardStage,
           {
             paddingTop: topPadding,
-            paddingBottom: bottomReserve,
+            paddingBottom: commandBarBottom + commandBarHeight + 12,
           },
         ]}
       >
@@ -1570,7 +1563,6 @@ const styles = StyleSheet.create({
   // Command bar wrapper - keeps it at bottom, above keyboard
   commandBarWrapper: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
     alignItems: 'center',
