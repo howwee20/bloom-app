@@ -62,6 +62,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const flipAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const textShimmerAnim = useRef(new Animated.Value(0)).current;
   const particleDrift = useRef(new Animated.Value(0)).current;
   const particleColorShift = useRef(new Animated.Value(0)).current;
   const particlePulse = useRef(new Animated.Value(0)).current;
@@ -106,6 +107,34 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     sweep.start();
     return () => sweep.stop();
   }, [reduceMotionEnabled, shimmerAnim]);
+
+  // Text shimmer - periodic shine sweep across text
+  useEffect(() => {
+    if (reduceMotionEnabled) {
+      textShimmerAnim.setValue(0);
+      return;
+    }
+    const textSweep = Animated.loop(
+      Animated.sequence([
+        // Wait 4 seconds before starting
+        Animated.delay(4000),
+        // Sweep across in 800ms
+        Animated.timing(textShimmerAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        // Reset instantly
+        Animated.timing(textShimmerAnim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    textSweep.start();
+    return () => textSweep.stop();
+  }, [reduceMotionEnabled, textShimmerAnim]);
 
   // Gentle particle drift
   useEffect(() => {
@@ -253,6 +282,12 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
   const shimmerOpacity = shimmerAnim.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: [0.02, 0.05, 0.02],
+  });
+
+  // Text shimmer sweep position (from -100% to +200% of container width)
+  const textShimmerTranslate = textShimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-150, 350], // px - sweeps from left off-screen to right off-screen
   });
 
   const breakdown = BREAKDOWN_ITEMS.map((item) => ({
@@ -461,8 +496,68 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       {/* Content */}
       {!isBack ? (
         <View style={styles.content}>
-          <Text style={styles.valueText}>{displayValue}</Text>
-          <Text style={styles.changeText}>{displayChange}</Text>
+          {/* Value text with shimmer */}
+          <View style={styles.textShimmerContainer}>
+            <Text style={styles.valueText}>{displayValue}</Text>
+            {!reduceMotionEnabled && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.textShimmer,
+                  {
+                    transform: [
+                      { translateX: textShimmerTranslate },
+                      { skewX: '-20deg' },
+                    ],
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={[
+                    'rgba(255,255,255,0)',
+                    'rgba(255,255,255,0.15)',
+                    'rgba(255,255,255,0.5)',
+                    'rgba(255,255,255,0.15)',
+                    'rgba(255,255,255,0)',
+                  ]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.textShimmerGradient}
+                />
+              </Animated.View>
+            )}
+          </View>
+          {/* Change text with shimmer */}
+          <View style={styles.textShimmerContainerSmall}>
+            <Text style={styles.changeText}>{displayChange}</Text>
+            {!reduceMotionEnabled && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.textShimmerSmall,
+                  {
+                    transform: [
+                      { translateX: textShimmerTranslate },
+                      { skewX: '-20deg' },
+                    ],
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={[
+                    'rgba(255,255,255,0)',
+                    'rgba(255,255,255,0.1)',
+                    'rgba(255,255,255,0.35)',
+                    'rgba(255,255,255,0.1)',
+                    'rgba(255,255,255,0)',
+                  ]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.textShimmerGradient}
+                />
+              </Animated.View>
+            )}
+          </View>
         </View>
       ) : (
         <View style={styles.backContent}>
@@ -669,6 +764,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     transform: [{ translateY: -8 }],
   },
+  // Text shimmer containers
+  textShimmerContainer: {
+    position: 'relative',
+    overflow: 'hidden',
+    paddingHorizontal: 20,
+  },
+  textShimmerContainerSmall: {
+    position: 'relative',
+    overflow: 'hidden',
+    paddingHorizontal: 16,
+    marginTop: 6,
+  },
+  textShimmer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 60,
+  },
+  textShimmerSmall: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 40,
+  },
+  textShimmerGradient: {
+    flex: 1,
+  },
   valueText: {
     fontSize: 48,
     fontWeight: '600',
@@ -682,7 +806,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '400',
     color: 'rgba(255, 255, 255, 0.84)',
-    marginTop: 6,
     letterSpacing: 0.1,
     textShadowColor: 'rgba(0, 0, 0, 0.14)',
     textShadowOffset: { width: 0, height: 1 },
