@@ -42,13 +42,13 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLES = Array.from({ length: 120 }).map((_, i) => ({
+const PARTICLES = Array.from({ length: 180 }).map((_, i) => ({
   key: `p-${i}`,
   top: 8 + (i * 11) % 78, // scatter across vertical range
   left: 12 + (i * 23) % 76, // scatter across horizontal range
-  size: 1.8 + (i % 7) * 0.55,
-  opacity: 0.32 + ((i % 6) * 0.07),
-  drift: 8 + (i % 14), // px drift
+  size: 1.6 + (i % 9) * 0.55,
+  opacity: 0.28 + ((i % 6) * 0.08),
+  drift: 10 + (i % 16), // px drift
 }));
 
 const FLARES = [
@@ -146,18 +146,20 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       particlePulse.setValue(0);
       hueOverlay.setValue(0);
       flarePulse.setValue(0);
+      swirlAnim.setValue(0);
+      flashAnim.setValue(0);
       return;
     }
     const drift = Animated.loop(
       Animated.sequence([
         Animated.timing(particleDrift, {
           toValue: 1,
-          duration: 5200,
+          duration: 3600,
           useNativeDriver: true,
         }),
         Animated.timing(particleDrift, {
           toValue: 0,
-          duration: 5200,
+          duration: 3600,
           useNativeDriver: true,
         }),
       ])
@@ -166,12 +168,12 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       Animated.sequence([
         Animated.timing(particleColorShift, {
           toValue: 1,
-          duration: 6500,
+          duration: 5400,
           useNativeDriver: false, // backgroundColor needs JS thread
         }),
         Animated.timing(particleColorShift, {
           toValue: 0,
-          duration: 6500,
+          duration: 5400,
           useNativeDriver: false,
         }),
       ])
@@ -180,12 +182,12 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       Animated.sequence([
         Animated.timing(particlePulse, {
           toValue: 1,
-          duration: 4200,
+          duration: 3600,
           useNativeDriver: true,
         }),
         Animated.timing(particlePulse, {
           toValue: 0,
-          duration: 4200,
+          duration: 3600,
           useNativeDriver: true,
         }),
       ])
@@ -194,12 +196,12 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       Animated.sequence([
         Animated.timing(hueOverlay, {
           toValue: 1,
-          duration: 9000,
+          duration: 7800,
           useNativeDriver: false,
         }),
         Animated.timing(hueOverlay, {
           toValue: 0,
-          duration: 9000,
+          duration: 7800,
           useNativeDriver: false,
         }),
       ])
@@ -208,12 +210,52 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       Animated.sequence([
         Animated.timing(flarePulse, {
           toValue: 1,
-          duration: 7200,
+          duration: 6200,
           useNativeDriver: true,
         }),
         Animated.timing(flarePulse, {
           toValue: 0,
-          duration: 7200,
+          duration: 6200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const swirl = Animated.loop(
+      Animated.sequence([
+        Animated.timing(swirlAnim, {
+          toValue: 1,
+          duration: 5200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(swirlAnim, {
+          toValue: 0,
+          duration: 5200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const flash = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1800),
+        Animated.timing(flashAnim, {
+          toValue: 1,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        Animated.timing(flashAnim, {
+          toValue: 0.12,
+          duration: 1100,
+          useNativeDriver: true,
+        }),
+        Animated.delay(2200),
+        Animated.timing(flashAnim, {
+          toValue: 0.55,
+          duration: 620,
+          useNativeDriver: true,
+        }),
+        Animated.timing(flashAnim, {
+          toValue: 0,
+          duration: 1400,
           useNativeDriver: true,
         }),
       ])
@@ -223,14 +265,27 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     pulse.start();
     hue.start();
     flare.start();
+    swirl.start();
+    flash.start();
     return () => {
       drift.stop();
       colorCycle.stop();
       pulse.stop();
       hue.stop();
       flare.stop();
+      swirl.stop();
+      flash.stop();
     };
-  }, [reduceMotionEnabled, particleDrift, particleColorShift, particlePulse, hueOverlay, flarePulse]);
+  }, [
+    reduceMotionEnabled,
+    particleDrift,
+    particleColorShift,
+    particlePulse,
+    hueOverlay,
+    flarePulse,
+    swirlAnim,
+    flashAnim,
+  ]);
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -400,6 +455,60 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         style={styles.grainOverlay}
       />
 
+      {/* Swirling aurora layer */}
+      {!reduceMotionEnabled && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.swirlOverlay,
+            {
+              opacity: swirlAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.14, 0.34],
+              }),
+              transform: [
+                {
+                  translateX: swirlAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-26, 22],
+                  }),
+                },
+                {
+                  translateY: swirlAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [18, -16],
+                  }),
+                },
+                {
+                  rotate: swirlAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['-10deg', '16deg'],
+                  }),
+                },
+                {
+                  scale: swirlAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[
+              'rgba(255,255,255,0.08)',
+              'rgba(255,210,245,0.18)',
+              'rgba(205,215,255,0.14)',
+              'rgba(255,255,255,0.02)',
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.swirlGradient}
+          />
+        </Animated.View>
+      )}
+
       {/* Hue overlay shift */}
       {!reduceMotionEnabled && (
         <Animated.View
@@ -415,6 +524,34 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
             },
           ]}
         />
+      )}
+
+      {/* Cinematic light flash */}
+      {!reduceMotionEnabled && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.flashOverlay,
+            {
+              opacity: flashAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 0.45],
+              }),
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[
+              'rgba(255,255,255,0.35)',
+              'rgba(255,215,245,0.18)',
+              'rgba(255,255,255,0)',
+            ]}
+            locations={[0, 0.28, 1]}
+            start={{ x: 0.1, y: 0.1 }}
+            end={{ x: 0.9, y: 0.9 }}
+            style={styles.flashGradient}
+          />
+        </Animated.View>
       )}
 
       {/* Flares */}
@@ -761,6 +898,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: 999,
     filter: 'blur(18px)' as any,
+  },
+  swirlOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ rotate: '-6deg' }],
+  },
+  swirlGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  flashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  flashGradient: {
+    ...StyleSheet.absoluteFillObject,
   },
   // Content
   content: {
