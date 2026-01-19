@@ -229,11 +229,11 @@ export default function HomeScreen() {
   const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
-  // Layout: card sits lower on screen with dominant presence
-  const topPadding = insets.top + 56; // More breathing room at top
-  const bottomPadding = insets.bottom + 100; // Room for command bar + gap
-  // Card takes 65% of viewport height, clamped between 480-620
-  const cardHeight = Math.min(Math.max(480, Math.round(viewportHeight * 0.65)), 620);
+  // Layout: intentional breathing room, card "placed" not "crammed"
+  const topPadding = insets.top + 28; // ~24-32px from safe area
+  const bottomPadding = insets.bottom + 96; // Room for command bar + 18-24px gap
+  // Card takes 62% of viewport height, clamped between 460-580
+  const cardHeight = Math.min(Math.max(460, Math.round(viewportHeight * 0.62)), 580);
   // Card width: screen width - 32px (16px margins each side)
   const cardWidth = viewportWidth - 32;
 
