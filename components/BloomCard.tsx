@@ -42,13 +42,13 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLES = Array.from({ length: 32 }).map((_, i) => ({
+const PARTICLES = Array.from({ length: 48 }).map((_, i) => ({
   key: `p-${i}`,
   top: 8 + (i * 11) % 78, // scatter across vertical range
   left: 12 + (i * 23) % 76, // scatter across horizontal range
-  size: 2 + (i % 4),
-  opacity: 0.18 + ((i % 5) * 0.04),
-  drift: 4 + (i % 6), // px drift
+  size: 2.5 + (i % 5),
+  opacity: 0.22 + ((i % 5) * 0.06),
+  drift: 5 + (i % 8), // px drift
 }));
 
 export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
@@ -58,6 +58,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const particleDrift = useRef(new Animated.Value(0)).current;
   const particleColorShift = useRef(new Animated.Value(0)).current;
+  const particlePulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -103,18 +104,19 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     if (reduceMotionEnabled) {
       particleDrift.setValue(0);
       particleColorShift.setValue(0);
+      particlePulse.setValue(0);
       return;
     }
     const drift = Animated.loop(
       Animated.sequence([
         Animated.timing(particleDrift, {
           toValue: 1,
-          duration: 9000,
+          duration: 6500,
           useNativeDriver: true,
         }),
         Animated.timing(particleDrift, {
           toValue: 0,
-          duration: 9000,
+          duration: 6500,
           useNativeDriver: true,
         }),
       ])
@@ -123,23 +125,39 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       Animated.sequence([
         Animated.timing(particleColorShift, {
           toValue: 1,
-          duration: 14000,
+          duration: 10000,
           useNativeDriver: false, // backgroundColor needs JS thread
         }),
         Animated.timing(particleColorShift, {
           toValue: 0,
-          duration: 14000,
+          duration: 10000,
           useNativeDriver: false,
+        }),
+      ])
+    );
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(particlePulse, {
+          toValue: 1,
+          duration: 5200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(particlePulse, {
+          toValue: 0,
+          duration: 5200,
+          useNativeDriver: true,
         }),
       ])
     );
     drift.start();
     colorCycle.start();
+    pulse.start();
     return () => {
       drift.stop();
       colorCycle.stop();
+      pulse.stop();
     };
-  }, [reduceMotionEnabled, particleDrift, particleColorShift]);
+  }, [reduceMotionEnabled, particleDrift, particleColorShift, particlePulse]);
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -319,7 +337,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
                   opacity: p.opacity,
                   backgroundColor: particleColorShift.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['rgba(255,255,255,0.8)', 'rgba(255,215,245,0.9)'],
+                    outputRange: ['rgba(255,255,255,0.85)', 'rgba(255,200,235,0.9)'],
                   }),
                   transform: [
                     {
@@ -332,6 +350,12 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
                       translateY: particleDrift.interpolate({
                         inputRange: [0, 1],
                         outputRange: [p.drift * 0.5, -p.drift * 0.5],
+                      }),
+                    },
+                    {
+                      scale: particlePulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.9, 1.15],
                       }),
                     },
                   ],
