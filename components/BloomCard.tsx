@@ -42,13 +42,13 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLES = Array.from({ length: 48 }).map((_, i) => ({
+const PARTICLES = Array.from({ length: 64 }).map((_, i) => ({
   key: `p-${i}`,
   top: 8 + (i * 11) % 78, // scatter across vertical range
   left: 12 + (i * 23) % 76, // scatter across horizontal range
-  size: 2.5 + (i % 5),
-  opacity: 0.22 + ((i % 5) * 0.06),
-  drift: 5 + (i % 8), // px drift
+  size: 2.5 + (i % 6) * 0.6,
+  opacity: 0.25 + ((i % 5) * 0.08),
+  drift: 6 + (i % 10), // px drift
 }));
 
 export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
@@ -59,6 +59,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
   const particleDrift = useRef(new Animated.Value(0)).current;
   const particleColorShift = useRef(new Animated.Value(0)).current;
   const particlePulse = useRef(new Animated.Value(0)).current;
+  const hueOverlay = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -105,18 +106,19 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       particleDrift.setValue(0);
       particleColorShift.setValue(0);
       particlePulse.setValue(0);
+      hueOverlay.setValue(0);
       return;
     }
     const drift = Animated.loop(
       Animated.sequence([
         Animated.timing(particleDrift, {
           toValue: 1,
-          duration: 6500,
+          duration: 5200,
           useNativeDriver: true,
         }),
         Animated.timing(particleDrift, {
           toValue: 0,
-          duration: 6500,
+          duration: 5200,
           useNativeDriver: true,
         }),
       ])
@@ -125,12 +127,12 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       Animated.sequence([
         Animated.timing(particleColorShift, {
           toValue: 1,
-          duration: 10000,
+          duration: 8000,
           useNativeDriver: false, // backgroundColor needs JS thread
         }),
         Animated.timing(particleColorShift, {
           toValue: 0,
-          duration: 10000,
+          duration: 8000,
           useNativeDriver: false,
         }),
       ])
@@ -139,25 +141,41 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       Animated.sequence([
         Animated.timing(particlePulse, {
           toValue: 1,
-          duration: 5200,
+          duration: 4200,
           useNativeDriver: true,
         }),
         Animated.timing(particlePulse, {
           toValue: 0,
-          duration: 5200,
+          duration: 4200,
           useNativeDriver: true,
+        }),
+      ])
+    );
+    const hue = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hueOverlay, {
+          toValue: 1,
+          duration: 9000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(hueOverlay, {
+          toValue: 0,
+          duration: 9000,
+          useNativeDriver: false,
         }),
       ])
     );
     drift.start();
     colorCycle.start();
     pulse.start();
+    hue.start();
     return () => {
       drift.stop();
       colorCycle.stop();
       pulse.stop();
+      hue.stop();
     };
-  }, [reduceMotionEnabled, particleDrift, particleColorShift, particlePulse]);
+  }, [reduceMotionEnabled, particleDrift, particleColorShift, particlePulse, hueOverlay]);
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -320,6 +338,23 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         end={{ x: 1, y: 1 }}
         style={styles.grainOverlay}
       />
+
+      {/* Hue overlay shift */}
+      {!reduceMotionEnabled && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.hueOverlay,
+            {
+              opacity: 0.14,
+              backgroundColor: hueOverlay.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['rgba(255,200,240,0.6)', 'rgba(195,210,255,0.6)'],
+              }),
+            },
+          ]}
+        />
+      )}
 
       {/* Particle drift layer */}
       {!reduceMotionEnabled && (
@@ -558,6 +593,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: 999,
     backgroundColor: '#FFFFFF',
+  },
+  hueOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
   // Content
   content: {
