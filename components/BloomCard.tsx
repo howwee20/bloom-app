@@ -108,7 +108,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     return () => sweep.stop();
   }, [reduceMotionEnabled, shimmerAnim]);
 
-  // Text shimmer - periodic shine sweep across text
+  // Text shimmer - gentle periodic shine to make numbers feel alive
   useEffect(() => {
     if (reduceMotionEnabled) {
       textShimmerAnim.setValue(0);
@@ -116,12 +116,12 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
     }
     const textSweep = Animated.loop(
       Animated.sequence([
-        // Wait 4 seconds before starting
-        Animated.delay(4000),
-        // Sweep across in 800ms
+        // Wait 10 seconds before starting
+        Animated.delay(10000),
+        // Slow, gentle sweep across in 2 seconds
         Animated.timing(textShimmerAnim, {
           toValue: 1,
-          duration: 800,
+          duration: 2000,
           useNativeDriver: true,
         }),
         // Reset instantly
@@ -515,9 +515,9 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
                 <LinearGradient
                   colors={[
                     'rgba(255,255,255,0)',
-                    'rgba(255,255,255,0.15)',
-                    'rgba(255,255,255,0.5)',
-                    'rgba(255,255,255,0.15)',
+                    'rgba(255,255,255,0.08)',
+                    'rgba(255,255,255,0.22)',
+                    'rgba(255,255,255,0.08)',
                     'rgba(255,255,255,0)',
                   ]}
                   start={{ x: 0, y: 0.5 }}
@@ -546,9 +546,9 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
                 <LinearGradient
                   colors={[
                     'rgba(255,255,255,0)',
-                    'rgba(255,255,255,0.1)',
-                    'rgba(255,255,255,0.35)',
-                    'rgba(255,255,255,0.1)',
+                    'rgba(255,255,255,0.05)',
+                    'rgba(255,255,255,0.15)',
+                    'rgba(255,255,255,0.05)',
                     'rgba(255,255,255,0)',
                   ]}
                   start={{ x: 0, y: 0.5 }}
