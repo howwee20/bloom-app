@@ -229,21 +229,18 @@ const [purchasing, setPurchasing] = useState(false);
 const [keyboardHeight, setKeyboardHeight] = useState(0);
 const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const insets = useSafeAreaInsets();
-const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
-const cardMaxWidth = 420;
-const topOffset = 8;
-const commandBarHeight = 64;
-const gapAboveBar = 16;
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+  const cardMaxWidth = 440;
+  const topOffset = 8;
   const topPadding = insets.top + topOffset;
-  const commandBarBottom = Math.max(12, insets.bottom + 12);
-  const bottomReserve = commandBarBottom + commandBarHeight + gapAboveBar + keyboardHeight;
-  const availableHeight = viewportHeight - topPadding - bottomReserve;
-  const maxCardHeight = Math.max(availableHeight, 0);
-  const cardHeight = commandActive
-    ? Math.max(320, Math.round(maxCardHeight * 0.82))
-    : maxCardHeight;
-  const cardWidth = Math.min(Math.round(viewportWidth * 0.96), cardMaxWidth);
-  const cardMargin = Math.max(12, Math.round((viewportWidth - cardWidth) / 2));
+  const baseBottom = Math.max(insets.bottom + 12, 16);
+  const commandBarHeight = 64;
+  const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
+  const cardHeight = Math.max(
+    360,
+    viewportHeight - topPadding - commandBarBottom - commandBarHeight - 8
+  );
+  const cardWidth = Math.min(Math.round(viewportWidth * 0.98), cardMaxWidth);
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -1071,43 +1068,53 @@ const gapAboveBar = 16;
           styles.cardStage,
           {
             paddingTop: topPadding,
-            paddingBottom: bottomReserve,
           },
         ]}
       >
-        <BloomCard
-          totalValue={portfolioValue + homeValue}
-          dailyChange={displayedTotalPnl || 0}
-          style={{
-            height: cardHeight,
-            width: cardWidth,
-          }}
-        />
+        <View
+          style={[
+            styles.cardContainer,
+            {
+              height: cardHeight,
+              width: cardWidth,
+            },
+          ]}
+        >
+          <BloomCard
+            totalValue={portfolioValue + homeValue}
+            dailyChange={displayedTotalPnl || 0}
+            style={{
+              height: cardHeight,
+              width: cardWidth,
+            }}
+          />
+
+          {/* Command Bar inside the card */}
+          <KeyboardAvoidingView
+            style={[
+              styles.commandBarWrapper,
+              {
+                bottom: commandBarBottom,
+                paddingHorizontal: 18,
+              },
+            ]}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
+          >
+            <CommandBar
+              query={commandQuery}
+              onChangeQuery={handleCommandQueryChange}
+              onFocus={handleCommandFocus}
+              onBlur={handleCommandBlur}
+              onClear={handleCommandClear}
+              onSubmit={handleCommandSubmit}
+              isActive={commandActive}
+            />
+          </KeyboardAvoidingView>
+        </View>
       </View>
 
       {/* Command Bar - stays above keyboard */}
-      <KeyboardAvoidingView
-        style={[
-          styles.commandBarWrapper,
-          {
-            bottom: commandBarBottom,
-            paddingHorizontal: cardMargin,
-          }
-        ]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
-      >
-        <CommandBar
-          query={commandQuery}
-          onChangeQuery={handleCommandQueryChange}
-          onFocus={handleCommandFocus}
-          onBlur={handleCommandBlur}
-          onClear={handleCommandClear}
-          onSubmit={handleCommandSubmit}
-          isActive={commandActive}
-        />
-      </KeyboardAvoidingView>
-
       {/* Buy Intent Modal and Route Home Modal removed - now navigating to /buy */}
 
       {/* Sell Modal */}
@@ -1579,6 +1586,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
+  },
+  cardContainer: {
+    position: 'relative',
+    borderRadius: 46,
+    overflow: 'hidden',
   },
   keyboardAvoid: {
     flex: 1,
