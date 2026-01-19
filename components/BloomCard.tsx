@@ -42,13 +42,13 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLES = Array.from({ length: 96 }).map((_, i) => ({
+const PARTICLES = Array.from({ length: 120 }).map((_, i) => ({
   key: `p-${i}`,
   top: 8 + (i * 11) % 78, // scatter across vertical range
   left: 12 + (i * 23) % 76, // scatter across horizontal range
-  size: 2.5 + (i % 6) * 0.6,
-  opacity: 0.28 + ((i % 5) * 0.08),
-  drift: 7 + (i % 12), // px drift
+  size: 1.8 + (i % 7) * 0.55,
+  opacity: 0.32 + ((i % 6) * 0.07),
+  drift: 8 + (i % 14), // px drift
 }));
 
 const FLARES = [
@@ -164,12 +164,12 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
       Animated.sequence([
         Animated.timing(particleColorShift, {
           toValue: 1,
-          duration: 8000,
+          duration: 6500,
           useNativeDriver: false, // backgroundColor needs JS thread
         }),
         Animated.timing(particleColorShift, {
           toValue: 0,
-          duration: 8000,
+          duration: 6500,
           useNativeDriver: false,
         }),
       ])
@@ -391,7 +391,7 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         colors={[
           'rgba(255,255,255,0.02)',
           'rgba(0,0,0,0.02)',
-          'rgba(255,255,255,0.015)',
+          'rgba(255,255,255,0.025)',
         ]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -461,10 +461,13 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
                   left: `${p.left}%`,
                   width: p.size,
                   height: p.size,
-                  opacity: p.opacity,
+                  opacity: particlePulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [p.opacity * 0.6, p.opacity * 1.1],
+                  }),
                   backgroundColor: particleColorShift.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['rgba(255,255,255,0.92)', 'rgba(255,180,230,0.95)'],
+                    outputRange: ['rgba(255,255,255,0.98)', 'rgba(205,220,255,0.95)'],
                   }),
                   transform: [
                     {
@@ -476,13 +479,13 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
                     {
                       translateY: particleDrift.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [p.drift * 0.5, -p.drift * 0.5],
+                        outputRange: [p.drift * 0.6, -p.drift * 0.6],
                       }),
                     },
                     {
                       scale: particlePulse.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0.9, 1.15],
+                        outputRange: [0.82, 1.25],
                       }),
                     },
                   ],
