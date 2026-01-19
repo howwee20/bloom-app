@@ -47,6 +47,7 @@ interface CommandBarProps {
   query: string;
   onChangeQuery: (query: string) => void;
   onFocus: () => void;
+  onBlur: () => void;
   onClear: () => void;
   onSubmit: () => void;
   isActive: boolean;
@@ -56,6 +57,7 @@ export function CommandBar({
   query,
   onChangeQuery,
   onFocus,
+  onBlur,
   onClear,
   onSubmit,
   isActive,
@@ -91,6 +93,7 @@ export function CommandBar({
         value={query}
         onChangeText={onChangeQuery}
         onFocus={onFocus}
+        onBlur={onBlur}
         onSubmitEditing={handleSubmit}
         placeholder="Pay, buy, sell..."
         placeholderTextColor="#9A9A9A"

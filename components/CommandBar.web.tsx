@@ -38,6 +38,7 @@ interface CommandBarProps {
   query: string;
   onChangeQuery: (query: string) => void;
   onFocus: () => void;
+  onBlur: () => void;
   onClear: () => void;
   onSubmit: () => void;
   isActive: boolean;
@@ -47,6 +48,7 @@ export function CommandBar({
   query,
   onChangeQuery,
   onFocus,
+  onBlur,
   onClear,
   onSubmit,
   isActive,
@@ -74,6 +76,7 @@ export function CommandBar({
 
   const handleBlur = () => {
     setIsFocused(false);
+    onBlur();
   };
 
   // Inject styles for backdrop-filter

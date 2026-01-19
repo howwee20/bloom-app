@@ -302,6 +302,10 @@ export default function HomeScreen() {
     setCommandActive(true);
   };
 
+  const handleCommandBlur = () => {
+    setCommandActive(false);
+  };
+
   const handleCommandClear = () => {
     setCommandQuery('');
     setCommandActive(false);
@@ -1081,6 +1085,7 @@ export default function HomeScreen() {
           query={commandQuery}
           onChangeQuery={handleCommandQueryChange}
           onFocus={handleCommandFocus}
+          onBlur={handleCommandBlur}
           onClear={handleCommandClear}
           onSubmit={handleCommandSubmit}
           isActive={commandActive}
