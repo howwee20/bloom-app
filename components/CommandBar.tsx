@@ -118,12 +118,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     // Frosted glass pink that blends with the card gradient
-    backgroundColor: 'rgba(255, 220, 240, 0.45)',
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'rgba(255, 220, 240, 0.38)',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 0.8,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
     // Inner glow effect
     shadowColor: 'rgba(255, 255, 255, 0.8)',
     shadowOffset: { width: 0, height: 0 },
