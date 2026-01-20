@@ -84,7 +84,7 @@ export function CommandBar({
       <Ionicons
         name="search"
         size={20}
-        color="#9A9A9A"
+        color="rgba(255, 255, 255, 0.7)"
         style={styles.searchIcon}
       />
       <TextInput
@@ -96,14 +96,14 @@ export function CommandBar({
         onBlur={onBlur}
         onSubmitEditing={handleSubmit}
         placeholder="Pay, buy, sell..."
-        placeholderTextColor="#9A9A9A"
+        placeholderTextColor="rgba(255, 255, 255, 0.55)"
         returnKeyType="search"
         autoCapitalize="none"
         autoCorrect={false}
       />
       {(query.length > 0 || isActive) && (
         <Pressable onPress={handleClear} style={styles.clearButton}>
-          <Ionicons name="close-circle" size={20} color="#9A9A9A" />
+          <Ionicons name="close-circle" size={20} color="rgba(255, 255, 255, 0.6)" />
         </Pressable>
       )}
     </View>
@@ -117,20 +117,23 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 236, 246, 0.74)',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.65)',
-    shadowColor: '#A45DBD',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.035,
-    shadowRadius: 12,
-    elevation: 1,
+    // Frosted glass pink that blends with the card gradient
+    backgroundColor: 'rgba(255, 220, 240, 0.45)',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    // Inner glow effect
+    shadowColor: 'rgba(255, 255, 255, 0.8)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 0,
   },
   containerActive: {
     marginBottom: 6,
+    backgroundColor: 'rgba(255, 225, 245, 0.55)',
   },
   searchIcon: {
     marginRight: 10,
@@ -138,7 +141,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: '#2B1B2C',
+    fontFamily: 'PlusJakartaSans-Regular',
+    color: 'rgba(255, 255, 255, 0.95)',
     padding: 0,
   },
   clearButton: {
