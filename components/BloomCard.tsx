@@ -45,33 +45,12 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const seeded = (seed: number) => {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-};
-
-const PARTICLES = Array.from({ length: 260 }).map((_, i) => {
-  const r1 = seeded(i * 1.7 + 1);
-  const r2 = seeded(i * 2.9 + 11);
-  const r3 = seeded(i * 3.3 + 21);
-  const r4 = seeded(i * 4.1 + 37);
-  const r5 = seeded(i * 5.7 + 49);
-  const big = r5 > 0.86 ? 1.8 : 1;
-  return {
-    key: `p-${i}`,
-    top: 6 + r1 * 88,
-    left: 6 + r2 * 88,
-    size: (1.2 + r3 * 2.8) * big,
-    opacity: 0.18 + r4 * 0.55,
-    drift: 14 + r3 * 24,
-    altDrift: 6 + r2 * 12,
-    fastX: 2.6 + r1 * 6.4,
-    fastY: 2.4 + r2 * 6.2,
-    scaleHi: 1.12 + r4 * 0.55,
-    dirX: r2 > 0.5 ? 1 : -1,
-    dirY: r3 > 0.5 ? 1 : -1,
-  };
-});
+const PARTICLE_COUNT = 80;
+const PARTICLE_COLORS = [
+  'rgba(255, 245, 252, 0.95)',
+  'rgba(245, 230, 255, 0.95)',
+  'rgba(255, 228, 242, 0.95)',
+] as const;
 
 const FLARES = [
   { key: 'flare-1', top: '16%', left: '22%', size: 220, alpha: 0.28 },
@@ -81,6 +60,207 @@ const FLARES = [
   { key: 'flare-5', top: '40%', left: '84%', size: 300, alpha: 0.36 },
   { key: 'flare-6', top: '74%', left: '66%', size: 320, alpha: 0.32 },
 ];
+
+type Particle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  opacityBase: number;
+  flickerSpeed: number;
+  flickerPhase: number;
+  flickerAmp: number;
+  color: string;
+  xVal: Animated.Value;
+  yVal: Animated.Value;
+  opacityVal: Animated.Value;
+};
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+
+function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; reduceMotionEnabled: boolean }) {
+  const [layout, setLayout] = useState({ width: 0, height: 0 });
+  const particlesRef = useRef<Particle[]>([]);
+  const rafRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number | null>(null);
+  const sizeRef = useRef({ width: 0, height: 0 });
+
+  const initParticles = (width: number, height: number) => {
+    const particles: Particle[] = [];
+    for (let i = 0; i < PARTICLE_COUNT; i += 1) {
+      const radius = 1.2 + Math.random() * 3.6;
+      const speed = 6 + Math.random() * 16;
+      const angle = Math.random() * Math.PI * 2;
+      const x = radius + Math.random() * (width - radius * 2);
+      const y = radius + Math.random() * (height - radius * 2);
+      const opacityBase = 0.3 + Math.random() * 0.5;
+      const flickerSpeed = 0.6 + Math.random() * 1.8;
+      const flickerPhase = Math.random() * Math.PI * 2;
+      const flickerAmp = 0.06 + Math.random() * 0.08;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius,
+        opacityBase,
+        flickerSpeed,
+        flickerPhase,
+        flickerAmp,
+        color: PARTICLE_COLORS[i % PARTICLE_COLORS.length],
+        xVal: new Animated.Value(x - radius),
+        yVal: new Animated.Value(y - radius),
+        opacityVal: new Animated.Value(opacityBase),
+      });
+    }
+    particlesRef.current = particles;
+    sizeRef.current = { width, height };
+  };
+
+  useEffect(() => {
+    if (!layout.width || !layout.height) return;
+    if (
+      !particlesRef.current.length ||
+      Math.abs(layout.width - sizeRef.current.width) > 4 ||
+      Math.abs(layout.height - sizeRef.current.height) > 4
+    ) {
+      initParticles(layout.width, layout.height);
+    }
+  }, [layout.width, layout.height]);
+
+  useEffect(() => {
+    if (!enabled || reduceMotionEnabled) {
+      lastTimeRef.current = null;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      particlesRef.current.forEach((p) => {
+        p.opacityVal.setValue(p.opacityBase);
+      });
+      return;
+    }
+    if (!layout.width || !layout.height || !particlesRef.current.length) return;
+
+    const animate = (time: number) => {
+      const last = lastTimeRef.current ?? time;
+      const dt = Math.min(0.033, (time - last) / 1000);
+      lastTimeRef.current = time;
+      const width = layout.width;
+      const height = layout.height;
+      const particles = particlesRef.current;
+      const maxSpeed = 24;
+      const jitter = 8;
+
+      for (let i = 0; i < particles.length; i += 1) {
+        const p = particles[i];
+        p.vx += (Math.random() - 0.5) * jitter * dt;
+        p.vy += (Math.random() - 0.5) * jitter * dt;
+        const speed = Math.hypot(p.vx, p.vy);
+        if (speed > maxSpeed) {
+          p.vx = (p.vx / speed) * maxSpeed;
+          p.vy = (p.vy / speed) * maxSpeed;
+        }
+
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        if (p.x - p.radius < 0) {
+          p.x = p.radius;
+          p.vx = Math.abs(p.vx) * 0.9;
+        } else if (p.x + p.radius > width) {
+          p.x = width - p.radius;
+          p.vx = -Math.abs(p.vx) * 0.9;
+        }
+        if (p.y - p.radius < 0) {
+          p.y = p.radius;
+          p.vy = Math.abs(p.vy) * 0.9;
+        } else if (p.y + p.radius > height) {
+          p.y = height - p.radius;
+          p.vy = -Math.abs(p.vy) * 0.9;
+        }
+      }
+
+      for (let i = 0; i < particles.length; i += 1) {
+        for (let j = i + 1; j < particles.length; j += 1) {
+          const a = particles[i];
+          const b = particles[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          const minDist = a.radius + b.radius + 1;
+          if (dist > 0 && dist < minDist) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const overlap = (minDist - dist) * 0.5;
+            a.x -= nx * overlap;
+            a.y -= ny * overlap;
+            b.x += nx * overlap;
+            b.y += ny * overlap;
+
+            const dvx = b.vx - a.vx;
+            const dvy = b.vy - a.vy;
+            const relVel = dvx * nx + dvy * ny;
+            if (relVel < 0) {
+              const impulse = -relVel * 0.6;
+              a.vx -= impulse * nx;
+              a.vy -= impulse * ny;
+              b.vx += impulse * nx;
+              b.vy += impulse * ny;
+            }
+          }
+        }
+      }
+
+      for (let i = 0; i < particles.length; i += 1) {
+        const p = particles[i];
+        p.xVal.setValue(p.x - p.radius);
+        p.yVal.setValue(p.y - p.radius);
+        const flicker = Math.sin(time / 1000 * p.flickerSpeed + p.flickerPhase) * p.flickerAmp;
+        p.opacityVal.setValue(clamp(p.opacityBase + flicker, 0.3, 0.85));
+      }
+
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      lastTimeRef.current = null;
+    };
+  }, [enabled, reduceMotionEnabled, layout.width, layout.height]);
+
+  return (
+    <View
+      style={styles.particleLayer}
+      pointerEvents="none"
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        setLayout({ width, height });
+      }}
+    >
+      {particlesRef.current.map((particle, index) => (
+        <Animated.View
+          key={`particle-${index}`}
+          style={[
+            styles.particle,
+            {
+              width: particle.radius * 2,
+              height: particle.radius * 2,
+              backgroundColor: particle.color,
+              opacity: particle.opacityVal,
+              transform: [
+                { translateX: particle.xVal },
+                { translateY: particle.yVal },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
 
 export function BloomCard({
   totalValue,
@@ -96,16 +276,10 @@ export function BloomCard({
   const flipAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const textShimmerAnim = useRef(new Animated.Value(0)).current;
-  const particleDrift = useRef(new Animated.Value(0)).current;
-  const particleDriftAlt = useRef(new Animated.Value(0)).current;
-  const particleColorShift = useRef(new Animated.Value(0)).current;
-  const particlePulse = useRef(new Animated.Value(0)).current;
   const hueOverlay = useRef(new Animated.Value(0)).current;
   const flarePulse = useRef(new Animated.Value(0)).current;
   const swirlAnim = useRef(new Animated.Value(0)).current;
   const flashAnim = useRef(new Animated.Value(0)).current;
-  const fastJitter = useRef(new Animated.Value(0)).current;
-  const fastJitterAlt = useRef(new Animated.Value(0)).current;
   const smokeAnimA = useRef(new Animated.Value(0)).current;
   const smokeAnimB = useRef(new Animated.Value(0)).current;
 
@@ -176,79 +350,17 @@ export function BloomCard({
     return () => textSweep.stop();
   }, [reduceMotionEnabled, textShimmerAnim]);
 
-  // Gentle particle drift
+  // Atmosphere animation loops (hue, flares, swirls, flashes, smoke)
   useEffect(() => {
     if (reduceMotionEnabled) {
-      particleDrift.setValue(0);
-      particleDriftAlt.setValue(0);
-      particleColorShift.setValue(0);
-      particlePulse.setValue(0);
       hueOverlay.setValue(0);
       flarePulse.setValue(0);
       swirlAnim.setValue(0);
       flashAnim.setValue(0);
-      fastJitter.setValue(0);
-      fastJitterAlt.setValue(0);
       smokeAnimA.setValue(0);
       smokeAnimB.setValue(0);
       return;
     }
-    const drift = Animated.loop(
-      Animated.sequence([
-        Animated.timing(particleDrift, {
-          toValue: 1,
-          duration: 2600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(particleDrift, {
-          toValue: 0,
-          duration: 2600,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    const driftAlt = Animated.loop(
-      Animated.sequence([
-        Animated.timing(particleDriftAlt, {
-          toValue: 1,
-          duration: 4300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(particleDriftAlt, {
-          toValue: 0,
-          duration: 4300,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    const colorCycle = Animated.loop(
-      Animated.sequence([
-        Animated.timing(particleColorShift, {
-          toValue: 1,
-          duration: 4200,
-          useNativeDriver: false, // backgroundColor needs JS thread
-        }),
-        Animated.timing(particleColorShift, {
-          toValue: 0,
-          duration: 4200,
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(particlePulse, {
-          toValue: 1,
-          duration: 2400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(particlePulse, {
-          toValue: 0,
-          duration: 2400,
-          useNativeDriver: true,
-        }),
-      ])
-    );
     const hue = Animated.loop(
       Animated.sequence([
         Animated.timing(hueOverlay, {
@@ -317,34 +429,6 @@ export function BloomCard({
         }),
       ])
     );
-    const fast = Animated.loop(
-      Animated.sequence([
-        Animated.timing(fastJitter, {
-          toValue: 1,
-          duration: 1100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fastJitter, {
-          toValue: 0,
-          duration: 1100,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    const fastAlt = Animated.loop(
-      Animated.sequence([
-        Animated.timing(fastJitterAlt, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fastJitterAlt, {
-          toValue: 0,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
-    );
     const smokeA = Animated.loop(
       Animated.sequence([
         Animated.timing(smokeAnimA, {
@@ -374,44 +458,26 @@ export function BloomCard({
         }),
       ])
     );
-    drift.start();
-    driftAlt.start();
-    colorCycle.start();
-    pulse.start();
     hue.start();
     flare.start();
     swirl.start();
     flash.start();
-    fast.start();
-    fastAlt.start();
     smokeA.start();
     smokeB.start();
     return () => {
-      drift.stop();
-      driftAlt.stop();
-      colorCycle.stop();
-      pulse.stop();
       hue.stop();
       flare.stop();
       swirl.stop();
       flash.stop();
-      fast.stop();
-      fastAlt.stop();
       smokeA.stop();
       smokeB.stop();
     };
   }, [
     reduceMotionEnabled,
-    particleDrift,
-    particleDriftAlt,
-    particleColorShift,
-    particlePulse,
     hueOverlay,
     flarePulse,
     swirlAnim,
     flashAnim,
-    fastJitter,
-    fastJitterAlt,
     smokeAnimA,
     smokeAnimB,
   ]);
@@ -825,88 +891,9 @@ export function BloomCard({
         </View>
       )}
 
-      {/* Particle drift layer */}
-      {!reduceMotionEnabled && (
-        <View style={styles.particleLayer} pointerEvents="none">
-          {PARTICLES.map((p, idx) => (
-            <Animated.View
-              key={p.key}
-              style={[
-                styles.particle,
-                {
-                  top: `${p.top}%`,
-                  left: `${p.left}%`,
-                  width: p.size,
-                  height: p.size,
-                  opacity: particlePulse.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [p.opacity * 0.45, p.opacity * 1.4],
-                  }),
-                  backgroundColor: particleColorShift.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['rgba(255,235,248,0.95)', 'rgba(200,225,255,0.95)'],
-                  }),
-                  transform: [
-                    {
-                      translateX: Animated.add(
-                        Animated.add(
-                          particleDrift.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-p.drift * p.dirX, p.drift * p.dirX],
-                          }),
-                          particleDriftAlt.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [p.altDrift * p.dirX, -p.altDrift * p.dirX],
-                          })
-                        ),
-                        Animated.add(
-                          fastJitter.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-p.fastX, p.fastX],
-                          }),
-                          fastJitterAlt.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [p.fastX * 0.6, -p.fastX * 0.6],
-                          })
-                        )
-                      ),
-                    },
-                    {
-                      translateY: Animated.add(
-                        Animated.add(
-                          particleDrift.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [p.drift * 0.6 * p.dirY, -p.drift * 0.6 * p.dirY],
-                          }),
-                          particleDriftAlt.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-p.altDrift * p.dirY, p.altDrift * p.dirY],
-                          })
-                        ),
-                        Animated.add(
-                          fastJitter.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-p.fastY, p.fastY],
-                          }),
-                          fastJitterAlt.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-p.fastY * 0.6, p.fastY * 0.6],
-                          })
-                        )
-                      ),
-                    },
-                    {
-                      scale: particlePulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.7, p.scaleHi],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-          ))}
-        </View>
+      {/* Particle field */}
+      {!isBack && (
+        <ParticleField enabled={!isBack} reduceMotionEnabled={reduceMotionEnabled} />
       )}
 
       {/* Bottom haze to blend dock */}
@@ -1217,7 +1204,14 @@ const styles = StyleSheet.create({
   particle: {
     position: 'absolute',
     borderRadius: 999,
+    top: 0,
+    left: 0,
     backgroundColor: '#FFFFFF',
+    shadowColor: 'rgba(255, 220, 245, 0.9)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 6,
+    elevation: 0,
   },
   hueOverlay: {
     ...StyleSheet.absoluteFillObject,
