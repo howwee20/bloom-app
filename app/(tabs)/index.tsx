@@ -234,7 +234,7 @@ const insets = useSafeAreaInsets();
   const topOffset = 0;
   const topPadding = insets.top + topOffset;
   const baseBottom = Math.max(insets.bottom + 8, 12);
-  const commandBarHeight = 64;
+  const commandBarHeight = 56;
   const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
   const cardHeight = Math.max(viewportHeight - topPadding, 520);
   const cardWidth = Math.min(Math.round(viewportWidth * 1), cardMaxWidth);
@@ -1075,7 +1075,7 @@ const insets = useSafeAreaInsets();
             {
               height: cardHeight,
               width: cardWidth,
-              paddingBottom: commandBarBottom + commandBarHeight * 0.5 + 8,
+              paddingBottom: commandBarBottom + commandBarHeight * 0.4 + 8,
             },
           ]}
         >
@@ -1094,7 +1094,7 @@ const insets = useSafeAreaInsets();
               styles.commandBarWrapper,
               {
                 bottom: commandBarBottom,
-                paddingHorizontal: 14,
+                paddingHorizontal: 12,
               },
             ]}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
