@@ -45,22 +45,41 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLES = Array.from({ length: 180 }).map((_, i) => ({
-  key: `p-${i}`,
-  top: 8 + (i * 11) % 78, // scatter across vertical range
-  left: 12 + (i * 23) % 76, // scatter across horizontal range
-  size: 1.6 + (i % 9) * 0.55,
-  opacity: 0.28 + ((i % 6) * 0.08),
-  drift: 10 + (i % 16), // px drift
-  fastX: 2.5 + (i % 5) * 1.6,
-  fastY: 2.5 + (i % 6) * 1.4,
-  scaleHi: 1.05 + (i % 5) * 0.07,
-}));
+const seeded = (seed: number) => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+};
+
+const PARTICLES = Array.from({ length: 260 }).map((_, i) => {
+  const r1 = seeded(i * 1.7 + 1);
+  const r2 = seeded(i * 2.9 + 11);
+  const r3 = seeded(i * 3.3 + 21);
+  const r4 = seeded(i * 4.1 + 37);
+  const r5 = seeded(i * 5.7 + 49);
+  const big = r5 > 0.86 ? 1.8 : 1;
+  return {
+    key: `p-${i}`,
+    top: 6 + r1 * 88,
+    left: 6 + r2 * 88,
+    size: (1.2 + r3 * 2.8) * big,
+    opacity: 0.18 + r4 * 0.55,
+    drift: 14 + r3 * 24,
+    altDrift: 6 + r2 * 12,
+    fastX: 2.6 + r1 * 6.4,
+    fastY: 2.4 + r2 * 6.2,
+    scaleHi: 1.12 + r4 * 0.55,
+    dirX: r2 > 0.5 ? 1 : -1,
+    dirY: r3 > 0.5 ? 1 : -1,
+  };
+});
 
 const FLARES = [
-  { key: 'flare-1', top: '18%', left: '28%', size: 160 },
-  { key: 'flare-2', top: '58%', left: '68%', size: 180 },
-  { key: 'flare-3', top: '42%', left: '48%', size: 140 },
+  { key: 'flare-1', top: '16%', left: '22%', size: 220, alpha: 0.28 },
+  { key: 'flare-2', top: '30%', left: '70%', size: 280, alpha: 0.34 },
+  { key: 'flare-3', top: '52%', left: '50%', size: 240, alpha: 0.3 },
+  { key: 'flare-4', top: '68%', left: '28%', size: 220, alpha: 0.26 },
+  { key: 'flare-5', top: '40%', left: '84%', size: 300, alpha: 0.36 },
+  { key: 'flare-6', top: '74%', left: '66%', size: 320, alpha: 0.32 },
 ];
 
 export function BloomCard({
@@ -78,6 +97,7 @@ export function BloomCard({
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const textShimmerAnim = useRef(new Animated.Value(0)).current;
   const particleDrift = useRef(new Animated.Value(0)).current;
+  const particleDriftAlt = useRef(new Animated.Value(0)).current;
   const particleColorShift = useRef(new Animated.Value(0)).current;
   const particlePulse = useRef(new Animated.Value(0)).current;
   const hueOverlay = useRef(new Animated.Value(0)).current;
@@ -85,6 +105,7 @@ export function BloomCard({
   const swirlAnim = useRef(new Animated.Value(0)).current;
   const flashAnim = useRef(new Animated.Value(0)).current;
   const fastJitter = useRef(new Animated.Value(0)).current;
+  const fastJitterAlt = useRef(new Animated.Value(0)).current;
   const smokeAnimA = useRef(new Animated.Value(0)).current;
   const smokeAnimB = useRef(new Animated.Value(0)).current;
 
@@ -159,6 +180,7 @@ export function BloomCard({
   useEffect(() => {
     if (reduceMotionEnabled) {
       particleDrift.setValue(0);
+      particleDriftAlt.setValue(0);
       particleColorShift.setValue(0);
       particlePulse.setValue(0);
       hueOverlay.setValue(0);
@@ -166,6 +188,7 @@ export function BloomCard({
       swirlAnim.setValue(0);
       flashAnim.setValue(0);
       fastJitter.setValue(0);
+      fastJitterAlt.setValue(0);
       smokeAnimA.setValue(0);
       smokeAnimB.setValue(0);
       return;
@@ -174,12 +197,26 @@ export function BloomCard({
       Animated.sequence([
         Animated.timing(particleDrift, {
           toValue: 1,
-          duration: 3600,
+          duration: 2600,
           useNativeDriver: true,
         }),
         Animated.timing(particleDrift, {
           toValue: 0,
-          duration: 3600,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const driftAlt = Animated.loop(
+      Animated.sequence([
+        Animated.timing(particleDriftAlt, {
+          toValue: 1,
+          duration: 4300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(particleDriftAlt, {
+          toValue: 0,
+          duration: 4300,
           useNativeDriver: true,
         }),
       ])
@@ -188,12 +225,12 @@ export function BloomCard({
       Animated.sequence([
         Animated.timing(particleColorShift, {
           toValue: 1,
-          duration: 5400,
+          duration: 4200,
           useNativeDriver: false, // backgroundColor needs JS thread
         }),
         Animated.timing(particleColorShift, {
           toValue: 0,
-          duration: 5400,
+          duration: 4200,
           useNativeDriver: false,
         }),
       ])
@@ -202,12 +239,12 @@ export function BloomCard({
       Animated.sequence([
         Animated.timing(particlePulse, {
           toValue: 1,
-          duration: 3600,
+          duration: 2400,
           useNativeDriver: true,
         }),
         Animated.timing(particlePulse, {
           toValue: 0,
-          duration: 3600,
+          duration: 2400,
           useNativeDriver: true,
         }),
       ])
@@ -216,12 +253,12 @@ export function BloomCard({
       Animated.sequence([
         Animated.timing(hueOverlay, {
           toValue: 1,
-          duration: 7800,
+          duration: 5200,
           useNativeDriver: false,
         }),
         Animated.timing(hueOverlay, {
           toValue: 0,
-          duration: 7800,
+          duration: 5200,
           useNativeDriver: false,
         }),
       ])
@@ -230,12 +267,12 @@ export function BloomCard({
       Animated.sequence([
         Animated.timing(flarePulse, {
           toValue: 1,
-          duration: 6200,
+          duration: 4200,
           useNativeDriver: true,
         }),
         Animated.timing(flarePulse, {
           toValue: 0,
-          duration: 6200,
+          duration: 4200,
           useNativeDriver: true,
         }),
       ])
@@ -244,38 +281,38 @@ export function BloomCard({
       Animated.sequence([
         Animated.timing(swirlAnim, {
           toValue: 1,
-          duration: 5200,
+          duration: 3600,
           useNativeDriver: true,
         }),
         Animated.timing(swirlAnim, {
           toValue: 0,
-          duration: 5200,
+          duration: 3600,
           useNativeDriver: true,
         }),
       ])
     );
     const flash = Animated.loop(
       Animated.sequence([
-        Animated.delay(1800),
+        Animated.delay(900),
         Animated.timing(flashAnim, {
           toValue: 1,
-          duration: 650,
+          duration: 520,
           useNativeDriver: true,
         }),
         Animated.timing(flashAnim, {
           toValue: 0.12,
-          duration: 1100,
+          duration: 900,
           useNativeDriver: true,
         }),
-        Animated.delay(2200),
+        Animated.delay(1400),
         Animated.timing(flashAnim, {
-          toValue: 0.55,
-          duration: 620,
+          toValue: 0.7,
+          duration: 520,
           useNativeDriver: true,
         }),
         Animated.timing(flashAnim, {
           toValue: 0,
-          duration: 1400,
+          duration: 1100,
           useNativeDriver: true,
         }),
       ])
@@ -284,12 +321,26 @@ export function BloomCard({
       Animated.sequence([
         Animated.timing(fastJitter, {
           toValue: 1,
-          duration: 1400,
+          duration: 1100,
           useNativeDriver: true,
         }),
         Animated.timing(fastJitter, {
           toValue: 0,
-          duration: 1400,
+          duration: 1100,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const fastAlt = Animated.loop(
+      Animated.sequence([
+        Animated.timing(fastJitterAlt, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fastJitterAlt, {
+          toValue: 0,
+          duration: 800,
           useNativeDriver: true,
         }),
       ])
@@ -298,12 +349,12 @@ export function BloomCard({
       Animated.sequence([
         Animated.timing(smokeAnimA, {
           toValue: 1,
-          duration: 8200,
+          duration: 6200,
           useNativeDriver: true,
         }),
         Animated.timing(smokeAnimA, {
           toValue: 0,
-          duration: 8200,
+          duration: 6200,
           useNativeDriver: true,
         }),
       ])
@@ -313,17 +364,18 @@ export function BloomCard({
         Animated.delay(1200),
         Animated.timing(smokeAnimB, {
           toValue: 1,
-          duration: 10400,
+          duration: 7400,
           useNativeDriver: true,
         }),
         Animated.timing(smokeAnimB, {
           toValue: 0,
-          duration: 10400,
+          duration: 7400,
           useNativeDriver: true,
         }),
       ])
     );
     drift.start();
+    driftAlt.start();
     colorCycle.start();
     pulse.start();
     hue.start();
@@ -331,10 +383,12 @@ export function BloomCard({
     swirl.start();
     flash.start();
     fast.start();
+    fastAlt.start();
     smokeA.start();
     smokeB.start();
     return () => {
       drift.stop();
+      driftAlt.stop();
       colorCycle.stop();
       pulse.stop();
       hue.stop();
@@ -342,12 +396,14 @@ export function BloomCard({
       swirl.stop();
       flash.stop();
       fast.stop();
+      fastAlt.stop();
       smokeA.stop();
       smokeB.stop();
     };
   }, [
     reduceMotionEnabled,
     particleDrift,
+    particleDriftAlt,
     particleColorShift,
     particlePulse,
     hueOverlay,
@@ -355,6 +411,7 @@ export function BloomCard({
     swirlAnim,
     flashAnim,
     fastJitter,
+    fastJitterAlt,
     smokeAnimA,
     smokeAnimB,
   ]);
@@ -541,7 +598,7 @@ export function BloomCard({
               {
                 opacity: smokeAnimA.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0.08, 0.26],
+                  outputRange: [0.12, 0.4],
                 }),
                 transform: [
                   {
@@ -568,10 +625,10 @@ export function BloomCard({
           >
             <LinearGradient
               colors={[
-                'rgba(255,255,255,0.06)',
-                'rgba(255,220,245,0.22)',
-                'rgba(210,225,255,0.16)',
-                'rgba(255,255,255,0)',
+                'rgba(255,255,255,0.1)',
+                'rgba(255,210,240,0.32)',
+                'rgba(210,225,255,0.24)',
+                'rgba(255,255,255,0.04)',
               ]}
               start={{ x: 0.2, y: 0.1 }}
               end={{ x: 0.9, y: 0.9 }}
@@ -585,7 +642,7 @@ export function BloomCard({
               {
                 opacity: smokeAnimB.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0.06, 0.22],
+                  outputRange: [0.1, 0.36],
                 }),
                 transform: [
                   {
@@ -613,10 +670,10 @@ export function BloomCard({
           >
             <LinearGradient
               colors={[
-                'rgba(255,255,255,0.05)',
-                'rgba(240,210,255,0.24)',
-                'rgba(205,220,255,0.2)',
-                'rgba(255,255,255,0.02)',
+                'rgba(255,255,255,0.08)',
+                'rgba(240,200,255,0.32)',
+                'rgba(205,220,255,0.28)',
+                'rgba(255,255,255,0.06)',
               ]}
               start={{ x: 0.1, y: 0.2 }}
               end={{ x: 0.9, y: 0.8 }}
@@ -635,31 +692,31 @@ export function BloomCard({
             {
               opacity: swirlAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0.14, 0.34],
+                outputRange: [0.22, 0.6],
               }),
               transform: [
                 {
                   translateX: swirlAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [-26, 22],
+                    outputRange: [-40, 34],
                   }),
                 },
                 {
                   translateY: swirlAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [18, -16],
+                    outputRange: [32, -26],
                   }),
                 },
                 {
                   rotate: swirlAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['-10deg', '16deg'],
+                    outputRange: ['-14deg', '20deg'],
                   }),
                 },
                 {
                   scale: swirlAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [1, 1.1],
+                    outputRange: [1.05, 1.25],
                   }),
                 },
               ],
@@ -668,10 +725,10 @@ export function BloomCard({
         >
           <LinearGradient
             colors={[
-              'rgba(255,255,255,0.08)',
-              'rgba(255,210,245,0.18)',
-              'rgba(205,215,255,0.14)',
-              'rgba(255,255,255,0.02)',
+              'rgba(255,255,255,0.12)',
+              'rgba(255,200,240,0.26)',
+              'rgba(205,215,255,0.22)',
+              'rgba(255,255,255,0.04)',
             ]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -687,10 +744,10 @@ export function BloomCard({
           style={[
             styles.hueOverlay,
             {
-              opacity: 0.16,
+              opacity: 0.28,
               backgroundColor: hueOverlay.interpolate({
                 inputRange: [0, 1],
-                outputRange: ['rgba(255,200,240,0.6)', 'rgba(195,210,255,0.6)'],
+                outputRange: ['rgba(255,190,235,0.75)', 'rgba(190,215,255,0.75)'],
               }),
             },
           ]}
@@ -706,18 +763,19 @@ export function BloomCard({
             {
               opacity: flashAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, 0.45],
+                outputRange: [0, 0.75],
               }),
             },
           ]}
         >
           <LinearGradient
             colors={[
-              'rgba(255,255,255,0.35)',
-              'rgba(255,215,245,0.18)',
+              'rgba(255,255,255,0.5)',
+              'rgba(255,200,240,0.3)',
+              'rgba(210,225,255,0.12)',
               'rgba(255,255,255,0)',
             ]}
-            locations={[0, 0.28, 1]}
+            locations={[0, 0.2, 0.55, 1]}
             start={{ x: 0.1, y: 0.1 }}
             end={{ x: 0.9, y: 0.9 }}
             style={styles.flashGradient}
@@ -738,18 +796,27 @@ export function BloomCard({
                   left: flare.left,
                   width: flare.size,
                   height: flare.size,
-                  opacity: 0.32,
+                  opacity: Animated.add(
+                    flarePulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [flare.alpha * 0.6, flare.alpha * 1.4],
+                    }),
+                    flashAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 0.28],
+                    })
+                  ),
                   transform: [
                     {
                       scale: flarePulse.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0.9, 1.15],
+                        outputRange: [0.8, 1.4],
                       }),
                     },
                   ],
                   backgroundColor: hueOverlay.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['rgba(255, 210, 250, 0.4)', 'rgba(205, 220, 255, 0.4)'],
+                    outputRange: ['rgba(255, 190, 245, 0.55)', 'rgba(195, 220, 255, 0.55)'],
                   }),
                 },
               ]}
@@ -773,41 +840,65 @@ export function BloomCard({
                   height: p.size,
                   opacity: particlePulse.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [p.opacity * 0.6, p.opacity * 1.1],
+                    outputRange: [p.opacity * 0.45, p.opacity * 1.4],
                   }),
                   backgroundColor: particleColorShift.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['rgba(255,255,255,0.98)', 'rgba(205,220,255,0.95)'],
+                    outputRange: ['rgba(255,235,248,0.95)', 'rgba(200,225,255,0.95)'],
                   }),
                   transform: [
                     {
                       translateX: Animated.add(
-                        particleDrift.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-p.drift, p.drift],
-                        }),
-                        fastJitter.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-p.fastX, p.fastX],
-                        })
+                        Animated.add(
+                          particleDrift.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-p.drift * p.dirX, p.drift * p.dirX],
+                          }),
+                          particleDriftAlt.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [p.altDrift * p.dirX, -p.altDrift * p.dirX],
+                          })
+                        ),
+                        Animated.add(
+                          fastJitter.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-p.fastX, p.fastX],
+                          }),
+                          fastJitterAlt.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [p.fastX * 0.6, -p.fastX * 0.6],
+                          })
+                        )
                       ),
                     },
                     {
                       translateY: Animated.add(
-                        particleDrift.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [p.drift * 0.6, -p.drift * 0.6],
-                        }),
-                        fastJitter.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-p.fastY, p.fastY],
-                        })
+                        Animated.add(
+                          particleDrift.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [p.drift * 0.6 * p.dirY, -p.drift * 0.6 * p.dirY],
+                          }),
+                          particleDriftAlt.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-p.altDrift * p.dirY, p.altDrift * p.dirY],
+                          })
+                        ),
+                        Animated.add(
+                          fastJitter.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-p.fastY, p.fastY],
+                          }),
+                          fastJitterAlt.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-p.fastY * 0.6, p.fastY * 0.6],
+                          })
+                        )
                       ),
                     },
                     {
                       scale: particlePulse.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0.78, p.scaleHi],
+                        outputRange: [0.7, p.scaleHi],
                       }),
                     },
                   ],
