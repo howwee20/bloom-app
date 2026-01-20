@@ -507,8 +507,8 @@ export function BloomCard({
       {/* Bottom silver fog */}
       <LinearGradient
         colors={[
-          'rgba(247,242,250,0.0)',
-          'rgba(247,242,250,0.55)',
+          'rgba(255,228,242,0.0)',
+          'rgba(245,225,255,0.32)',
         ]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
@@ -817,15 +817,16 @@ export function BloomCard({
       {/* Bottom haze to blend dock */}
       <LinearGradient
         colors={[
-          'rgba(255,255,255,0)',
-          'rgba(255,240,248,0.45)',
+          'rgba(255,255,255,0.0)',
+          'rgba(255,210,236,0.18)',
+          'rgba(245,235,255,0.28)',
         ]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={[
           styles.bottomHaze,
           {
-            height: footerHeight + footerOffset + 28,
+            height: footerHeight + footerOffset + 40,
           },
         ]}
         pointerEvents="none"
@@ -1091,7 +1092,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: '26%',
-    opacity: 0.9,
+    opacity: 0.65,
   },
   bottomHaze: {
     position: 'absolute',

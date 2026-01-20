@@ -8,8 +8,10 @@ import {
   Pressable,
   StyleSheet,
   Keyboard,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Intent types
 export type CommandIntent =
@@ -75,12 +77,22 @@ export function CommandBar({
     }
   };
 
-  const containerStyle = isActive
-    ? [styles.container, styles.containerActive]
-    : styles.container;
+  const containerStyle = [
+    styles.container,
+    isActive && styles.containerActive,
+    Platform.OS === 'web' && styles.containerWebBlur,
+  ];
 
   return (
-    <View style={containerStyle}>
+    <LinearGradient
+      colors={[
+        'rgba(255,235,246,0.78)',
+        'rgba(236,226,255,0.52)',
+      ]}
+      start={{ x: 0.5, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
+      style={containerStyle}
+    >
       <Ionicons
         name="search"
         size={20}
@@ -106,7 +118,7 @@ export function CommandBar({
           <Ionicons name="close-circle" size={20} color="rgba(255, 255, 255, 0.6)" />
         </Pressable>
       )}
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -118,22 +130,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     // Frosted glass pink that blends with the card gradient
-    backgroundColor: 'rgba(255, 220, 240, 0.38)',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderWidth: 0.8,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
-    // Inner glow effect
-    shadowColor: 'rgba(255, 255, 255, 0.8)',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+    shadowColor: '#D8B3E8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
     shadowRadius: 8,
-    elevation: 0,
+    elevation: 1,
   },
   containerActive: {
     marginBottom: 6,
-    backgroundColor: 'rgba(255, 225, 245, 0.55)',
+  },
+  containerWebBlur: {
+    backdropFilter: 'blur(18px)' as any,
+    WebkitBackdropFilter: 'blur(18px)' as any,
   },
   searchIcon: {
     marginRight: 10,

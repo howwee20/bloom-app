@@ -1075,7 +1075,7 @@ const insets = useSafeAreaInsets();
             {
               height: cardHeight,
               width: cardWidth,
-              paddingBottom: commandBarHeight + commandBarBottom + 8,
+              paddingBottom: commandBarHeight + commandBarBottom + 16,
             },
           ]}
         >
