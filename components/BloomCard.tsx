@@ -457,6 +457,10 @@ export function BloomCard({
       {/* Inner edge shadow for depth */}
       <View style={styles.edgeShadow} />
 
+      {/* Outer bevel to add 3D edge */}
+      <View style={styles.outerBevel} pointerEvents="none" />
+      <View style={styles.outerBevelInner} pointerEvents="none" />
+
       {/* Premium specular highlight - diagonal */}
       <Animated.View style={[styles.specularFixed, { transform: [{ rotate: '-12deg' }] }]}>
         <LinearGradient
@@ -838,8 +842,8 @@ export function BloomCard({
           style={[
             styles.footerDock,
             {
-              left: 20,
-              right: 20,
+              left: 24,
+              right: 24,
               bottom: footerOffset,
             },
           ]}
@@ -1026,6 +1030,22 @@ const styles = StyleSheet.create({
     borderRadius: INNER_RADIUS,
     borderWidth: 16,
     borderColor: 'rgba(0, 0, 0, 0.02)',
+  },
+  outerBevel: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: INNER_RADIUS,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+  },
+  outerBevelInner: {
+    position: 'absolute',
+    top: 1,
+    left: 1,
+    right: 1,
+    bottom: 1,
+    borderRadius: INNER_RADIUS - 1,
+    borderWidth: 1,
+    borderColor: 'rgba(210, 220, 255, 0.28)',
   },
   // Animated specular sweep (narrow diagonal streak)
   specularSweep: {
