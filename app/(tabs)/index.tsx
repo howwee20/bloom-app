@@ -1086,30 +1086,25 @@ const insets = useSafeAreaInsets();
               height: cardHeight,
               width: cardWidth,
             }}
+            footerOffset={commandBarBottom}
+            footerHeight={commandBarHeight}
+            footer={
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
+              >
+                <CommandBar
+                  query={commandQuery}
+                  onChangeQuery={handleCommandQueryChange}
+                  onFocus={handleCommandFocus}
+                  onBlur={handleCommandBlur}
+                  onClear={handleCommandClear}
+                  onSubmit={handleCommandSubmit}
+                  isActive={commandActive}
+                />
+              </KeyboardAvoidingView>
+            }
           />
-
-          {/* Command Bar inside the card */}
-          <KeyboardAvoidingView
-            style={[
-              styles.commandBarWrapper,
-              {
-                bottom: commandBarBottom,
-                paddingHorizontal: 14,
-              },
-            ]}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
-          >
-            <CommandBar
-              query={commandQuery}
-              onChangeQuery={handleCommandQueryChange}
-              onFocus={handleCommandFocus}
-              onBlur={handleCommandBlur}
-              onClear={handleCommandClear}
-              onSubmit={handleCommandSubmit}
-              isActive={commandActive}
-            />
-          </KeyboardAvoidingView>
         </View>
       </View>
 
@@ -1593,13 +1588,6 @@ const styles = StyleSheet.create({
   },
   keyboardAvoid: {
     flex: 1,
-  },
-  // Command bar wrapper - keeps it at bottom, above keyboard
-  commandBarWrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
   },
   // Breakdown header when coin is tapped
   breakdownHeader: {

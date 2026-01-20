@@ -1,7 +1,7 @@
 // components/BloomCard.tsx
 // The Bloom Card - Premium glass slab with iridescent sheen
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -19,6 +19,9 @@ interface BloomCardProps {
   dailyChange: number;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  footer?: ReactNode;
+  footerOffset?: number;
+  footerHeight?: number;
 }
 
 const BREAKDOWN_ITEMS = [
@@ -60,7 +63,15 @@ const FLARES = [
   { key: 'flare-3', top: '42%', left: '48%', size: 140 },
 ];
 
-export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCardProps) {
+export function BloomCard({
+  totalValue,
+  dailyChange,
+  onPress,
+  style,
+  footer,
+  footerOffset = 16,
+  footerHeight = 52,
+}: BloomCardProps) {
   const [flipped, setFlipped] = useState(false);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const flipAnim = useRef(new Animated.Value(0)).current;
@@ -803,6 +814,39 @@ export function BloomCard({ totalValue, dailyChange, onPress, style }: BloomCard
         </View>
       )}
 
+      {/* Bottom haze to blend dock */}
+      <LinearGradient
+        colors={[
+          'rgba(255,255,255,0)',
+          'rgba(255,240,248,0.45)',
+        ]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={[
+          styles.bottomHaze,
+          {
+            height: footerHeight + footerOffset + 28,
+          },
+        ]}
+        pointerEvents="none"
+      />
+
+      {/* Footer dock inside card */}
+      {!isBack && footer && (
+        <View
+          style={[
+            styles.footerDock,
+            {
+              left: 14,
+              right: 14,
+              bottom: footerOffset,
+            },
+          ]}
+        >
+          {footer}
+        </View>
+      )}
+
       {/* Content */}
       {!isBack ? (
         <View style={styles.content}>
@@ -931,6 +975,7 @@ const INNER_RADIUS = 40;
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    position: 'relative',
   },
   // Layer 1: Shadow (softer, more realistic)
   shadowWrapper: {
@@ -1048,6 +1093,12 @@ const styles = StyleSheet.create({
     height: '26%',
     opacity: 0.9,
   },
+  bottomHaze: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   particleLayer: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -1085,6 +1136,9 @@ const styles = StyleSheet.create({
   },
   flashGradient: {
     ...StyleSheet.absoluteFillObject,
+  },
+  footerDock: {
+    position: 'absolute',
   },
   // Content
   content: {
