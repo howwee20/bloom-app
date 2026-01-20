@@ -838,8 +838,8 @@ export function BloomCard({
           style={[
             styles.footerDock,
             {
-              left: 14,
-              right: 14,
+              left: 20,
+              right: 20,
               bottom: footerOffset,
             },
           ]}

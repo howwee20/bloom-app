@@ -95,7 +95,7 @@ export function CommandBar({
     >
       <Ionicons
         name="search"
-        size={20}
+        size={18}
         color="rgba(255, 255, 255, 0.7)"
         style={styles.searchIcon}
       />
@@ -115,7 +115,7 @@ export function CommandBar({
       />
       {(query.length > 0 || isActive) && (
         <Pressable onPress={handleClear} style={styles.clearButton}>
-          <Ionicons name="close-circle" size={20} color="rgba(255, 255, 255, 0.6)" />
+          <Ionicons name="close-circle" size={18} color="rgba(255, 255, 255, 0.6)" />
         </Pressable>
       )}
     </LinearGradient>
@@ -130,37 +130,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     // Frosted glass pink that blends with the card gradient
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.55)',
     shadowColor: '#D8B3E8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
     elevation: 1,
   },
   containerActive: {
-    marginBottom: 6,
+    marginBottom: 4,
   },
   containerWebBlur: {
     backdropFilter: 'blur(18px)' as any,
     WebkitBackdropFilter: 'blur(18px)' as any,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: 'PlusJakartaSans-Regular',
     color: 'rgba(255, 255, 255, 0.95)',
     padding: 0,
   },
   clearButton: {
-    marginLeft: 8,
-    padding: 4,
+    marginLeft: 6,
+    padding: 3,
   },
 });
 
