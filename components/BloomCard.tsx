@@ -45,7 +45,7 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLE_COUNT = 500;
+const PARTICLE_COUNT = 220;
 const STAR_COUNT = 12;
 const PARTICLE_COLORS = [
   'rgba(255, 245, 252, 0.95)',
@@ -74,6 +74,13 @@ type Particle = {
   flickerPhase: number;
   flickerAmp: number;
   color: string;
+  isOrb: boolean;
+  highlightOpacity: number;
+  wanderSpeed: number;
+  wanderPhase: number;
+  wanderAmp: number;
+  biasX: number;
+  biasY: number;
   xVal: Animated.Value;
   yVal: Animated.Value;
   opacityVal: Animated.Value;
@@ -136,15 +143,21 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
   const initParticles = (width: number, height: number) => {
     const particles: Particle[] = [];
     for (let i = 0; i < PARTICLE_COUNT; i += 1) {
-      const radius = 1 + Math.random() * 4.4;
+      const isOrb = Math.random() > 0.82;
+      const radius = isOrb ? 3 + Math.random() * 4.2 : 0.9 + Math.random() * 2.6;
       const speed = 8 + Math.random() * 18;
       const angle = Math.random() * Math.PI * 2;
       const x = radius + Math.random() * (width - radius * 2);
       const y = radius + Math.random() * (height - radius * 2);
-      const opacityBase = 0.3 + Math.random() * 0.5;
-      const flickerSpeed = 0.4 + Math.random() * 2.6;
+      const opacityBase = isOrb ? 0.55 + Math.random() * 0.3 : 0.3 + Math.random() * 0.5;
+      const flickerSpeed = 0.3 + Math.random() * 2.8;
       const flickerPhase = Math.random() * Math.PI * 2;
-      const flickerAmp = 0.08 + Math.random() * 0.1;
+      const flickerAmp = isOrb ? 0.05 + Math.random() * 0.08 : 0.08 + Math.random() * 0.1;
+      const wanderSpeed = 0.6 + Math.random() * 1.8;
+      const wanderPhase = Math.random() * Math.PI * 2;
+      const wanderAmp = 6 + Math.random() * 14;
+      const biasX = (Math.random() - 0.5) * 6;
+      const biasY = (Math.random() - 0.5) * 6;
       particles.push({
         x,
         y,
@@ -155,7 +168,14 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
         flickerSpeed,
         flickerPhase,
         flickerAmp,
-        color: PARTICLE_COLORS[i % PARTICLE_COLORS.length],
+        color: isOrb ? 'rgba(255, 245, 255, 0.98)' : PARTICLE_COLORS[i % PARTICLE_COLORS.length],
+        isOrb,
+        highlightOpacity: 0.5 + Math.random() * 0.35,
+        wanderSpeed,
+        wanderPhase,
+        wanderAmp,
+        biasX,
+        biasY,
         xVal: new Animated.Value(x - radius),
         yVal: new Animated.Value(y - radius),
         opacityVal: new Animated.Value(opacityBase),
@@ -219,6 +239,12 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
         const flowY = Math.cos((p.x - time * 0.05) / 140) * 16;
         p.vx += flowX * flowScaleX * dt;
         p.vy += flowY * flowScaleY * dt;
+        const wanderX = Math.sin(time / 1000 * p.wanderSpeed + p.wanderPhase) * p.wanderAmp;
+        const wanderY = Math.cos(time / 1000 * (p.wanderSpeed * 0.85) + p.wanderPhase) * p.wanderAmp;
+        p.vx += wanderX * dt;
+        p.vy += wanderY * dt;
+        p.vx += p.biasX * dt;
+        p.vy += p.biasY * dt;
         p.vx += (Math.random() - 0.5) * jitter * dt;
         p.vy += (Math.random() - 0.5) * jitter * dt;
         const speed = Math.hypot(p.vx, p.vy);
@@ -349,6 +375,7 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
           key={`particle-${index}`}
           style={[
             styles.particle,
+            particle.isOrb && styles.particleOrb,
             {
               width: particle.radius * 2,
               height: particle.radius * 2,
@@ -360,7 +387,21 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
               ],
             },
           ]}
-        />
+        >
+          {particle.isOrb && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.particleOrbHighlight,
+                {
+                  width: particle.radius * 1.2,
+                  height: particle.radius * 1.2,
+                  opacity: particle.highlightOpacity,
+                },
+              ]}
+            />
+          )}
+        </Animated.View>
       ))}
       {starsRef.current.map((star, index) => (
         <Animated.View
@@ -1346,6 +1387,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.55,
     shadowRadius: 10,
     elevation: 0,
+  },
+  particleOrb: {
+    overflow: 'hidden',
+  },
+  particleOrbHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
   },
   shootingStar: {
     position: 'absolute',
