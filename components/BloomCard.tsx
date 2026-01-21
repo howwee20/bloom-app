@@ -45,11 +45,13 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLE_COUNT = 80;
+const PARTICLE_COUNT = 500;
+const STAR_COUNT = 12;
 const PARTICLE_COLORS = [
   'rgba(255, 245, 252, 0.95)',
   'rgba(245, 230, 255, 0.95)',
   'rgba(255, 228, 242, 0.95)',
+  'rgba(255, 238, 248, 0.95)',
 ] as const;
 
 const FLARES = [
@@ -77,28 +79,72 @@ type Particle = {
   opacityVal: Animated.Value;
 };
 
+type ShootingStar = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  angle: number;
+  length: number;
+  thickness: number;
+  opacityBase: number;
+  life: number;
+  duration: number;
+  delay: number;
+  xVal: Animated.Value;
+  yVal: Animated.Value;
+  opacityVal: Animated.Value;
+};
+
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
 function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; reduceMotionEnabled: boolean }) {
   const [layout, setLayout] = useState({ width: 0, height: 0 });
   const particlesRef = useRef<Particle[]>([]);
+  const starsRef = useRef<ShootingStar[]>([]);
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
 
+  const spawnStar = (width: number, height: number, initialDelay = false): ShootingStar => {
+    const fromTop = Math.random() > 0.5;
+    const angle = (Math.PI / 6) + Math.random() * (Math.PI / 4);
+    const speed = 260 + Math.random() * 220;
+    const length = 40 + Math.random() * 90;
+    const thickness = 1 + Math.random() * 2.2;
+    const x = fromTop ? Math.random() * width : -length;
+    const y = fromTop ? -length : Math.random() * height * 0.7;
+    return {
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      angle,
+      length,
+      thickness,
+      opacityBase: 0.4 + Math.random() * 0.45,
+      life: 0,
+      duration: 0.8 + Math.random() * 1.1,
+      delay: initialDelay ? Math.random() * 2.4 : 0,
+      xVal: new Animated.Value(x),
+      yVal: new Animated.Value(y),
+      opacityVal: new Animated.Value(0),
+    };
+  };
+
   const initParticles = (width: number, height: number) => {
     const particles: Particle[] = [];
     for (let i = 0; i < PARTICLE_COUNT; i += 1) {
-      const radius = 1.2 + Math.random() * 3.6;
-      const speed = 6 + Math.random() * 16;
+      const radius = 1 + Math.random() * 4.4;
+      const speed = 8 + Math.random() * 18;
       const angle = Math.random() * Math.PI * 2;
       const x = radius + Math.random() * (width - radius * 2);
       const y = radius + Math.random() * (height - radius * 2);
       const opacityBase = 0.3 + Math.random() * 0.5;
-      const flickerSpeed = 0.6 + Math.random() * 1.8;
+      const flickerSpeed = 0.4 + Math.random() * 2.6;
       const flickerPhase = Math.random() * Math.PI * 2;
-      const flickerAmp = 0.06 + Math.random() * 0.08;
+      const flickerAmp = 0.08 + Math.random() * 0.1;
       particles.push({
         x,
         y,
@@ -116,6 +162,9 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
       });
     }
     particlesRef.current = particles;
+    starsRef.current = Array.from({ length: STAR_COUNT }).map(() =>
+      spawnStar(width, height, true)
+    );
     sizeRef.current = { width, height };
   };
 
@@ -138,6 +187,9 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
       particlesRef.current.forEach((p) => {
         p.opacityVal.setValue(p.opacityBase);
       });
+      starsRef.current.forEach((star) => {
+        star.opacityVal.setValue(0);
+      });
       return;
     }
     if (!layout.width || !layout.height || !particlesRef.current.length) return;
@@ -149,11 +201,24 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
       const width = layout.width;
       const height = layout.height;
       const particles = particlesRef.current;
-      const maxSpeed = 24;
-      const jitter = 8;
+      const maxSpeed = 28;
+      const jitter = 12;
+      const flowScaleX = 0.2;
+      const flowScaleY = 0.2;
+      const cellSize = 24;
+      const cols = Math.max(1, Math.floor(width / cellSize));
+      const rows = Math.max(1, Math.floor(height / cellSize));
+      const grid = new Array(cols * rows);
+      for (let i = 0; i < grid.length; i += 1) {
+        grid[i] = [];
+      }
 
       for (let i = 0; i < particles.length; i += 1) {
         const p = particles[i];
+        const flowX = Math.sin((p.y + time * 0.06) / 120) * 16;
+        const flowY = Math.cos((p.x - time * 0.05) / 140) * 16;
+        p.vx += flowX * flowScaleX * dt;
+        p.vy += flowY * flowScaleY * dt;
         p.vx += (Math.random() - 0.5) * jitter * dt;
         p.vy += (Math.random() - 0.5) * jitter * dt;
         const speed = Math.hypot(p.vx, p.vy);
@@ -179,34 +244,48 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
           p.y = height - p.radius;
           p.vy = -Math.abs(p.vy) * 0.9;
         }
+
+        const cx = clamp(Math.floor(p.x / cellSize), 0, cols - 1);
+        const cy = clamp(Math.floor(p.y / cellSize), 0, rows - 1);
+        grid[cx + cy * cols].push(i);
       }
 
       for (let i = 0; i < particles.length; i += 1) {
-        for (let j = i + 1; j < particles.length; j += 1) {
-          const a = particles[i];
-          const b = particles[j];
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const dist = Math.hypot(dx, dy);
-          const minDist = a.radius + b.radius + 1;
-          if (dist > 0 && dist < minDist) {
-            const nx = dx / dist;
-            const ny = dy / dist;
-            const overlap = (minDist - dist) * 0.5;
-            a.x -= nx * overlap;
-            a.y -= ny * overlap;
-            b.x += nx * overlap;
-            b.y += ny * overlap;
+        const a = particles[i];
+        const cx = clamp(Math.floor(a.x / cellSize), 0, cols - 1);
+        const cy = clamp(Math.floor(a.y / cellSize), 0, rows - 1);
+        for (let gx = cx - 1; gx <= cx + 1; gx += 1) {
+          for (let gy = cy - 1; gy <= cy + 1; gy += 1) {
+            if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) continue;
+            const cell = grid[gx + gy * cols] as number[];
+            for (let k = 0; k < cell.length; k += 1) {
+              const j = cell[k];
+              if (j <= i) continue;
+              const b = particles[j];
+              const dx = b.x - a.x;
+              const dy = b.y - a.y;
+              const dist = Math.hypot(dx, dy);
+              const minDist = a.radius + b.radius + 1;
+              if (dist > 0 && dist < minDist) {
+                const nx = dx / dist;
+                const ny = dy / dist;
+                const overlap = (minDist - dist) * 0.5;
+                a.x -= nx * overlap;
+                a.y -= ny * overlap;
+                b.x += nx * overlap;
+                b.y += ny * overlap;
 
-            const dvx = b.vx - a.vx;
-            const dvy = b.vy - a.vy;
-            const relVel = dvx * nx + dvy * ny;
-            if (relVel < 0) {
-              const impulse = -relVel * 0.6;
-              a.vx -= impulse * nx;
-              a.vy -= impulse * ny;
-              b.vx += impulse * nx;
-              b.vy += impulse * ny;
+                const dvx = b.vx - a.vx;
+                const dvy = b.vy - a.vy;
+                const relVel = dvx * nx + dvy * ny;
+                if (relVel < 0) {
+                  const impulse = -relVel * 0.6;
+                  a.vx -= impulse * nx;
+                  a.vy -= impulse * ny;
+                  b.vx += impulse * nx;
+                  b.vy += impulse * ny;
+                }
+              }
             }
           }
         }
@@ -218,6 +297,31 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
         p.yVal.setValue(p.y - p.radius);
         const flicker = Math.sin(time / 1000 * p.flickerSpeed + p.flickerPhase) * p.flickerAmp;
         p.opacityVal.setValue(clamp(p.opacityBase + flicker, 0.3, 0.85));
+      }
+
+      const stars = starsRef.current;
+      for (let i = 0; i < stars.length; i += 1) {
+        const star = stars[i];
+        if (star.delay > 0) {
+          star.delay -= dt;
+          star.opacityVal.setValue(0);
+          continue;
+        }
+        star.life += dt / star.duration;
+        star.x += star.vx * dt;
+        star.y += star.vy * dt;
+        const lifeFade = Math.sin(Math.PI * clamp(star.life, 0, 1));
+        star.opacityVal.setValue(star.opacityBase * lifeFade);
+        star.xVal.setValue(star.x);
+        star.yVal.setValue(star.y);
+
+        const offscreen =
+          star.x > width + star.length ||
+          star.y > height + star.length ||
+          star.life >= 1;
+        if (offscreen) {
+          stars[i] = spawnStar(width, height, true);
+        }
       }
 
       rafRef.current = requestAnimationFrame(animate);
@@ -257,6 +361,36 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
             },
           ]}
         />
+      ))}
+      {starsRef.current.map((star, index) => (
+        <Animated.View
+          key={`star-${index}`}
+          style={[
+            styles.shootingStar,
+            {
+              width: star.length,
+              height: star.thickness,
+              opacity: star.opacityVal,
+              transform: [
+                { translateX: star.xVal },
+                { translateY: star.yVal },
+                { rotate: `${star.angle}rad` },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[
+              'rgba(255,255,255,0.0)',
+              'rgba(255,245,255,0.8)',
+              'rgba(255,220,245,0.5)',
+              'rgba(255,255,255,0.0)',
+            ]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.shootingStarGradient}
+          />
+        </Animated.View>
       ))}
     </View>
   );
@@ -1209,9 +1343,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     shadowColor: 'rgba(255, 220, 245, 0.9)',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 6,
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
     elevation: 0,
+  },
+  shootingStar: {
+    position: 'absolute',
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  shootingStarGradient: {
+    flex: 1,
   },
   hueOverlay: {
     ...StyleSheet.absoluteFillObject,
