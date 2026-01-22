@@ -456,14 +456,17 @@ function ParticleField({
           <LinearGradient
             colors={[
               'rgba(255,255,255,0.0)',
-              'rgba(255,245,255,0.8)',
-              'rgba(255,220,245,0.5)',
+              'rgba(255,255,255,0.9)',
+              'rgba(255,210,245,0.7)',
+              'rgba(205,220,255,0.25)',
               'rgba(255,255,255,0.0)',
             ]}
+            locations={[0, 0.3, 0.6, 0.82, 1]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
             style={styles.shootingStarGradient}
           />
+          <View style={styles.shootingStarCore} />
         </Animated.View>
       ))}
     </View>
@@ -1301,7 +1304,7 @@ export function BloomCard({
         enabled={!reduceMotionEnabled && ((!isBack && !flipped) || (isBack && flipped))}
         reduceMotionEnabled={reduceMotionEnabled}
         showParticles={!isBack}
-        showStars={isBack}
+        showStars
       />
 
       {/* Butterflies - front face only */}
@@ -1331,7 +1334,8 @@ export function BloomCard({
       />
 
       {/* Footer dock inside card */}
-      {!isBack && footer && (
+      {/* Footer dock (command bar) - both sides */}
+      {footer && (
         <View
           style={[
             styles.footerDock,
@@ -1453,6 +1457,31 @@ export function BloomCard({
                   </View>
                 </View>
               ))}
+            </View>
+          </View>
+
+          <View style={styles.assetsSection}>
+            <View style={styles.assetsHeader}>
+              <Text style={styles.sectionTitle}>Other Assets</Text>
+              <Text style={styles.sectionTitleMuted}>Liabilities</Text>
+            </View>
+            <View style={styles.assetsGrid}>
+              <View style={styles.assetsColumn}>
+                {OTHER_ASSETS.map((item) => (
+                  <View key={item.label} style={styles.assetRow}>
+                    <Text style={styles.assetLabel}>{item.label}</Text>
+                    <Text style={styles.assetValue}>{item.value}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.assetsColumn}>
+                {LIABILITIES.map((item) => (
+                  <View key={item.label} style={styles.assetRow}>
+                    <Text style={styles.assetLabel}>{item.label}</Text>
+                    <Text style={styles.assetValue}>{item.value}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
 
@@ -1789,10 +1818,45 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   paymentsSection: {
-    flexBasis: '26%',
+    flexBasis: '22%',
   },
   investmentsSection: {
-    flexBasis: '64%',
+    flexBasis: '52%',
+  },
+  assetsSection: {
+    flexBasis: '20%',
+  },
+  assetsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionTitleMuted: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    color: 'rgba(255, 255, 255, 0.65)',
+  },
+  assetsGrid: {
+    flexDirection: 'row',
+    marginTop: 10,
+  },
+  assetsColumn: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  assetRow: {
+    marginBottom: 8,
+  },
+  assetLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans-Medium',
+    color: 'rgba(255, 255, 255, 0.75)',
+  },
+  assetValue: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    color: 'rgba(255, 255, 255, 0.92)',
+    marginTop: 2,
   },
   sectionTitle: {
     fontSize: 14,
