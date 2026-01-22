@@ -38,6 +38,17 @@ const HOLDINGS = [
 
 const HOLDING_TREND = [0.35, 0.6, 0.42, 0.78, 0.56, 0.7, 0.48];
 
+const OTHER_ASSETS = [
+  { label: '401(k)', value: '$64,200' },
+  { label: 'IRA', value: '$22,450' },
+  { label: 'Home Equity', value: '$128,000' },
+];
+
+const LIABILITIES = [
+  { label: 'Mortgage', value: '-$312,000' },
+  { label: 'Student Loan', value: '-$18,400' },
+];
+
 const GRADIENT_COLORS = [
   '#FFD4EA', // soft pink highlight
   '#F8BDF0', // airy pink
@@ -53,7 +64,7 @@ const FRAME_COLORS = [
 ] as const;
 
 const PARTICLE_COUNT = 220;
-const STAR_COUNT = 12;
+const STAR_COUNT = 16;
 const PARTICLE_COLORS = [
   'rgba(255, 245, 252, 0.95)',
   'rgba(245, 230, 255, 0.95)',
@@ -451,6 +462,200 @@ function ParticleField({
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
             style={styles.shootingStarGradient}
+          />
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+
+// Fast whizzing particles - solid, speedy streaks
+const WHIZZ_COUNT = 24;
+
+type WhizzParticle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  length: number;
+  thickness: number;
+  xVal: Animated.Value;
+  yVal: Animated.Value;
+  angle: number;
+};
+
+function WhizzingParticles({
+  enabled,
+  reduceMotionEnabled,
+}: {
+  enabled: boolean;
+  reduceMotionEnabled: boolean;
+}) {
+  const [layout, setLayout] = useState({ width: 0, height: 0 });
+  const particlesRef = useRef<WhizzParticle[]>([]);
+  const rafRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number | null>(null);
+
+  const spawnWhizz = (width: number, height: number): WhizzParticle => {
+    // Random edge spawn
+    const edge = Math.floor(Math.random() * 4);
+    let x = 0, y = 0, vx = 0, vy = 0;
+    const speed = 280 + Math.random() * 320; // Very fast
+
+    switch (edge) {
+      case 0: // top
+        x = Math.random() * width;
+        y = -20;
+        vx = (Math.random() - 0.5) * 100;
+        vy = speed;
+        break;
+      case 1: // right
+        x = width + 20;
+        y = Math.random() * height;
+        vx = -speed;
+        vy = (Math.random() - 0.5) * 100;
+        break;
+      case 2: // bottom
+        x = Math.random() * width;
+        y = height + 20;
+        vx = (Math.random() - 0.5) * 100;
+        vy = -speed;
+        break;
+      case 3: // left
+        x = -20;
+        y = Math.random() * height;
+        vx = speed;
+        vy = (Math.random() - 0.5) * 100;
+        break;
+    }
+
+    const angle = Math.atan2(vy, vx);
+    const length = 12 + Math.random() * 24;
+    const thickness = 1.5 + Math.random() * 1.5;
+
+    return {
+      x,
+      y,
+      vx,
+      vy,
+      length,
+      thickness,
+      xVal: new Animated.Value(x),
+      yVal: new Animated.Value(y),
+      angle,
+    };
+  };
+
+  const initParticles = (width: number, height: number) => {
+    const particles: WhizzParticle[] = [];
+    for (let i = 0; i < WHIZZ_COUNT; i++) {
+      const p = spawnWhizz(width, height);
+      // Stagger initial positions
+      p.x = Math.random() * width;
+      p.y = Math.random() * height;
+      p.xVal.setValue(p.x);
+      p.yVal.setValue(p.y);
+      particles.push(p);
+    }
+    particlesRef.current = particles;
+  };
+
+  useEffect(() => {
+    if (!layout.width || !layout.height) return;
+    initParticles(layout.width, layout.height);
+  }, [layout.width, layout.height]);
+
+  useEffect(() => {
+    if (!enabled || reduceMotionEnabled) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      lastTimeRef.current = null;
+      return;
+    }
+    if (!layout.width || !layout.height) return;
+
+    const animate = (time: number) => {
+      const last = lastTimeRef.current ?? time;
+      const dt = Math.min(0.05, (time - last) / 1000);
+      lastTimeRef.current = time;
+
+      const width = layout.width;
+      const height = layout.height;
+      const particles = particlesRef.current;
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        // Respawn if off screen
+        const margin = 50;
+        if (p.x < -margin || p.x > width + margin ||
+            p.y < -margin || p.y > height + margin) {
+          const newP = spawnWhizz(width, height);
+          p.x = newP.x;
+          p.y = newP.y;
+          p.vx = newP.vx;
+          p.vy = newP.vy;
+          p.angle = newP.angle;
+          p.length = newP.length;
+          p.thickness = newP.thickness;
+        }
+
+        p.xVal.setValue(p.x);
+        p.yVal.setValue(p.y);
+      }
+
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [enabled, reduceMotionEnabled, layout.width, layout.height]);
+
+  if (!enabled || reduceMotionEnabled) return null;
+
+  return (
+    <View
+      style={styles.whizzLayer}
+      pointerEvents="none"
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (width > 0 && height > 0) {
+          setLayout({ width, height });
+        }
+      }}
+    >
+      {particlesRef.current.map((p, index) => (
+        <Animated.View
+          key={`whizz-${index}`}
+          style={[
+            styles.whizzParticle,
+            {
+              width: p.length,
+              height: p.thickness,
+              borderRadius: p.thickness / 2,
+              transform: [
+                { translateX: p.xVal },
+                { translateY: p.yVal },
+                { rotate: `${p.angle}rad` },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[
+              'rgba(255,255,255,0)',
+              'rgba(255,255,255,1)',
+              'rgba(255,255,255,1)',
+              'rgba(255,255,255,0.6)',
+            ]}
+            locations={[0, 0.3, 0.7, 1]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.whizzGradient}
           />
         </Animated.View>
       ))}
@@ -1090,6 +1295,14 @@ export function BloomCard({
         showStars={isBack}
       />
 
+      {/* Fast whizzing particles - front face only */}
+      {!isBack && (
+        <WhizzingParticles
+          enabled={!reduceMotionEnabled && !flipped}
+          reduceMotionEnabled={reduceMotionEnabled}
+        />
+      )}
+
       {/* Bottom haze to blend dock */}
       <LinearGradient
         colors={[
@@ -1458,6 +1671,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   shootingStarGradient: {
+    flex: 1,
+  },
+  whizzLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  whizzParticle: {
+    position: 'absolute',
+    overflow: 'hidden',
+  },
+  whizzGradient: {
     flex: 1,
   },
   hueOverlay: {
