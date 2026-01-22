@@ -143,25 +143,26 @@ function ParticleField({
   const sizeRef = useRef({ width: 0, height: 0 });
 
   const spawnStar = (width: number, height: number, initialDelay = false): ShootingStar => {
-    const fromTop = Math.random() > 0.5;
-    const angle = (Math.PI / 6) + Math.random() * (Math.PI / 4);
-    const speed = 260 + Math.random() * 220;
-    const length = 40 + Math.random() * 90;
-    const thickness = 1 + Math.random() * 2.2;
-    const x = fromTop ? Math.random() * width : -length;
-    const y = fromTop ? -length : Math.random() * height * 0.7;
+    const fromTop = Math.random() > 0.4;
+    const direction = Math.random() > 0.5 ? 1 : -1;
+    const angle = (Math.PI / 8) + Math.random() * (Math.PI / 5);
+    const speed = 240 + Math.random() * 260;
+    const length = 70 + Math.random() * 140;
+    const thickness = 1 + Math.random() * 2.6;
+    const x = fromTop ? Math.random() * width : direction === 1 ? -length : width + length;
+    const y = fromTop ? -length : Math.random() * height * 0.75;
     return {
       x,
       y,
-      vx: Math.cos(angle) * speed,
+      vx: Math.cos(angle) * speed * direction,
       vy: Math.sin(angle) * speed,
-      angle,
+      angle: direction === 1 ? angle : Math.PI - angle,
       length,
       thickness,
-      opacityBase: 0.4 + Math.random() * 0.45,
+      opacityBase: 0.45 + Math.random() * 0.5,
       life: 0,
-      duration: 0.8 + Math.random() * 1.1,
-      delay: initialDelay ? Math.random() * 2.4 : 0,
+      duration: 0.7 + Math.random() * 1.2,
+      delay: initialDelay ? Math.random() * 2.2 : 0,
       xVal: new Animated.Value(x),
       yVal: new Animated.Value(y),
       opacityVal: new Animated.Value(0),
@@ -469,22 +470,24 @@ function ParticleField({
   );
 }
 
-// Fast whizzing particles - solid, speedy streaks
-const WHIZZ_COUNT = 24;
+// Simple V-shaped butterflies that flutter around
+const BUTTERFLY_COUNT = 8;
 
-type WhizzParticle = {
+type Butterfly = {
   x: number;
   y: number;
   vx: number;
   vy: number;
-  length: number;
-  thickness: number;
+  size: number;
+  flapSpeed: number;
+  flapPhase: number;
   xVal: Animated.Value;
   yVal: Animated.Value;
-  angle: number;
+  flapVal: Animated.Value;
+  rotation: number;
 };
 
-function WhizzingParticles({
+function Butterflies({
   enabled,
   reduceMotionEnabled,
 }: {
@@ -492,77 +495,37 @@ function WhizzingParticles({
   reduceMotionEnabled: boolean;
 }) {
   const [layout, setLayout] = useState({ width: 0, height: 0 });
-  const particlesRef = useRef<WhizzParticle[]>([]);
+  const butterfliesRef = useRef<Butterfly[]>([]);
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
 
-  const spawnWhizz = (width: number, height: number): WhizzParticle => {
-    // Random edge spawn
-    const edge = Math.floor(Math.random() * 4);
-    let x = 0, y = 0, vx = 0, vy = 0;
-    const speed = 280 + Math.random() * 320; // Very fast
-
-    switch (edge) {
-      case 0: // top
-        x = Math.random() * width;
-        y = -20;
-        vx = (Math.random() - 0.5) * 100;
-        vy = speed;
-        break;
-      case 1: // right
-        x = width + 20;
-        y = Math.random() * height;
-        vx = -speed;
-        vy = (Math.random() - 0.5) * 100;
-        break;
-      case 2: // bottom
-        x = Math.random() * width;
-        y = height + 20;
-        vx = (Math.random() - 0.5) * 100;
-        vy = -speed;
-        break;
-      case 3: // left
-        x = -20;
-        y = Math.random() * height;
-        vx = speed;
-        vy = (Math.random() - 0.5) * 100;
-        break;
+  const initButterflies = (width: number, height: number) => {
+    const butterflies: Butterfly[] = [];
+    for (let i = 0; i < BUTTERFLY_COUNT; i++) {
+      const x = 40 + Math.random() * (width - 80);
+      const y = 40 + Math.random() * (height - 80);
+      const speed = 15 + Math.random() * 25;
+      const angle = Math.random() * Math.PI * 2;
+      butterflies.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: 6 + Math.random() * 5,
+        flapSpeed: 8 + Math.random() * 6,
+        flapPhase: Math.random() * Math.PI * 2,
+        xVal: new Animated.Value(x),
+        yVal: new Animated.Value(y),
+        flapVal: new Animated.Value(0),
+        rotation: Math.random() * Math.PI * 2,
+      });
     }
-
-    const angle = Math.atan2(vy, vx);
-    const length = 12 + Math.random() * 24;
-    const thickness = 1.5 + Math.random() * 1.5;
-
-    return {
-      x,
-      y,
-      vx,
-      vy,
-      length,
-      thickness,
-      xVal: new Animated.Value(x),
-      yVal: new Animated.Value(y),
-      angle,
-    };
-  };
-
-  const initParticles = (width: number, height: number) => {
-    const particles: WhizzParticle[] = [];
-    for (let i = 0; i < WHIZZ_COUNT; i++) {
-      const p = spawnWhizz(width, height);
-      // Stagger initial positions
-      p.x = Math.random() * width;
-      p.y = Math.random() * height;
-      p.xVal.setValue(p.x);
-      p.yVal.setValue(p.y);
-      particles.push(p);
-    }
-    particlesRef.current = particles;
+    butterfliesRef.current = butterflies;
   };
 
   useEffect(() => {
     if (!layout.width || !layout.height) return;
-    initParticles(layout.width, layout.height);
+    initButterflies(layout.width, layout.height);
   }, [layout.width, layout.height]);
 
   useEffect(() => {
@@ -581,29 +544,52 @@ function WhizzingParticles({
 
       const width = layout.width;
       const height = layout.height;
-      const particles = particlesRef.current;
+      const butterflies = butterfliesRef.current;
 
-      for (let i = 0; i < particles.length; i++) {
-        const p = particles[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
+      for (let i = 0; i < butterflies.length; i++) {
+        const b = butterflies[i];
 
-        // Respawn if off screen
-        const margin = 50;
-        if (p.x < -margin || p.x > width + margin ||
-            p.y < -margin || p.y > height + margin) {
-          const newP = spawnWhizz(width, height);
-          p.x = newP.x;
-          p.y = newP.y;
-          p.vx = newP.vx;
-          p.vy = newP.vy;
-          p.angle = newP.angle;
-          p.length = newP.length;
-          p.thickness = newP.thickness;
+        // Gentle wandering motion
+        b.vx += (Math.random() - 0.5) * 80 * dt;
+        b.vy += (Math.random() - 0.5) * 80 * dt;
+
+        // Speed limit
+        const speed = Math.hypot(b.vx, b.vy);
+        const maxSpeed = 40;
+        if (speed > maxSpeed) {
+          b.vx = (b.vx / speed) * maxSpeed;
+          b.vy = (b.vy / speed) * maxSpeed;
         }
 
-        p.xVal.setValue(p.x);
-        p.yVal.setValue(p.y);
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+
+        // Bounce off edges softly
+        const margin = 30;
+        if (b.x < margin) {
+          b.x = margin;
+          b.vx = Math.abs(b.vx) * 0.8;
+        } else if (b.x > width - margin) {
+          b.x = width - margin;
+          b.vx = -Math.abs(b.vx) * 0.8;
+        }
+        if (b.y < margin) {
+          b.y = margin;
+          b.vy = Math.abs(b.vy) * 0.8;
+        } else if (b.y > height - margin) {
+          b.y = height - margin;
+          b.vy = -Math.abs(b.vy) * 0.8;
+        }
+
+        // Update rotation to face movement direction
+        b.rotation = Math.atan2(b.vy, b.vx);
+
+        // Flap animation
+        const flap = Math.sin(time / 1000 * b.flapSpeed + b.flapPhase);
+
+        b.xVal.setValue(b.x);
+        b.yVal.setValue(b.y);
+        b.flapVal.setValue(flap);
       }
 
       rafRef.current = requestAnimationFrame(animate);
@@ -619,7 +605,7 @@ function WhizzingParticles({
 
   return (
     <View
-      style={styles.whizzLayer}
+      style={styles.butterflyLayer}
       pointerEvents="none"
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
@@ -628,34 +614,57 @@ function WhizzingParticles({
         }
       }}
     >
-      {particlesRef.current.map((p, index) => (
+      {butterfliesRef.current.map((b, index) => (
         <Animated.View
-          key={`whizz-${index}`}
+          key={`butterfly-${index}`}
           style={[
-            styles.whizzParticle,
+            styles.butterfly,
             {
-              width: p.length,
-              height: p.thickness,
-              borderRadius: p.thickness / 2,
               transform: [
-                { translateX: p.xVal },
-                { translateY: p.yVal },
-                { rotate: `${p.angle}rad` },
+                { translateX: b.xVal },
+                { translateY: b.yVal },
+                { rotate: `${b.rotation}rad` },
               ],
             },
           ]}
         >
-          <LinearGradient
-            colors={[
-              'rgba(255,255,255,0)',
-              'rgba(255,255,255,1)',
-              'rgba(255,255,255,1)',
-              'rgba(255,255,255,0.6)',
+          {/* Left wing */}
+          <Animated.View
+            style={[
+              styles.butterflyWing,
+              {
+                width: b.size,
+                height: b.size * 0.6,
+                borderTopLeftRadius: b.size * 0.5,
+                borderTopRightRadius: b.size * 0.15,
+                transform: [
+                  { rotateX: b.flapVal.interpolate({
+                    inputRange: [-1, 1],
+                    outputRange: ['-60deg', '60deg'],
+                  })},
+                  { translateY: -1 },
+                ],
+              },
             ]}
-            locations={[0, 0.3, 0.7, 1]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.whizzGradient}
+          />
+          {/* Right wing */}
+          <Animated.View
+            style={[
+              styles.butterflyWing,
+              {
+                width: b.size,
+                height: b.size * 0.6,
+                borderBottomLeftRadius: b.size * 0.5,
+                borderBottomRightRadius: b.size * 0.15,
+                transform: [
+                  { rotateX: b.flapVal.interpolate({
+                    inputRange: [-1, 1],
+                    outputRange: ['60deg', '-60deg'],
+                  })},
+                  { translateY: 1 },
+                ],
+              },
+            ]}
           />
         </Animated.View>
       ))}
@@ -1295,9 +1304,9 @@ export function BloomCard({
         showStars={isBack}
       />
 
-      {/* Fast whizzing particles - front face only */}
+      {/* Butterflies - front face only */}
       {!isBack && (
-        <WhizzingParticles
+        <Butterflies
           enabled={!reduceMotionEnabled && !flipped}
           reduceMotionEnabled={reduceMotionEnabled}
         />
@@ -1673,15 +1682,16 @@ const styles = StyleSheet.create({
   shootingStarGradient: {
     flex: 1,
   },
-  whizzLayer: {
+  butterflyLayer: {
     ...StyleSheet.absoluteFillObject,
   },
-  whizzParticle: {
+  butterfly: {
     position: 'absolute',
-    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  whizzGradient: {
-    flex: 1,
+  butterflyWing: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
   },
   hueOverlay: {
     ...StyleSheet.absoluteFillObject,
