@@ -63,13 +63,13 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLE_COUNT = 35;
+const PARTICLE_COUNT = 45;
 const STAR_COUNT = 10;
 const PARTICLE_COLORS = [
-  'rgba(255, 255, 255, 0.6)',
-  'rgba(220, 240, 255, 0.5)',
-  'rgba(200, 230, 255, 0.45)',
-  'rgba(255, 255, 255, 0.5)',
+  'rgba(255, 255, 255, 0.85)',
+  'rgba(220, 240, 255, 0.8)',
+  'rgba(200, 230, 255, 0.75)',
+  'rgba(240, 250, 255, 0.8)',
 ] as const;
 
 const FLARES = [
@@ -173,22 +173,22 @@ function ParticleField({
     const particles: Particle[] = [];
     if (showParticles) {
       for (let i = 0; i < PARTICLE_COUNT; i += 1) {
-        // Small floating dust - no orbs, just tiny specks
-        const isOrb = false;
-        const radius = 1 + Math.random() * 1.5; // Tiny: 1-2.5px
-        const speed = 2 + Math.random() * 4; // Very slow drift
+        // Floating spheres - mix of sizes
+        const isOrb = Math.random() > 0.3; // 70% are orbs
+        const radius = isOrb ? 3 + Math.random() * 5 : 1.5 + Math.random() * 2.5; // Orbs: 3-8px, small: 1.5-4px
+        const speed = 3 + Math.random() * 6;
         const angle = Math.random() * Math.PI * 2;
         const x = radius + Math.random() * (width - radius * 2);
         const y = radius + Math.random() * (height - radius * 2);
-        const opacityBase = 0.25 + Math.random() * 0.35; // Subtle: 25-60%
-        const flickerSpeed = 0.2 + Math.random() * 0.6; // Gentle flicker
+        const opacityBase = isOrb ? 0.5 + Math.random() * 0.35 : 0.4 + Math.random() * 0.3; // More visible
+        const flickerSpeed = 0.3 + Math.random() * 0.8;
         const flickerPhase = Math.random() * Math.PI * 2;
-        const flickerAmp = 0.1 + Math.random() * 0.15;
-        const wanderSpeed = 0.15 + Math.random() * 0.3; // Very slow wander
+        const flickerAmp = 0.08 + Math.random() * 0.12;
+        const wanderSpeed = 0.2 + Math.random() * 0.4;
         const wanderPhase = Math.random() * Math.PI * 2;
-        const wanderAmp = 8 + Math.random() * 12;
-        const biasX = (Math.random() - 0.5) * 2;
-        const biasY = -0.5 - Math.random() * 1; // Slight upward drift
+        const wanderAmp = 10 + Math.random() * 18;
+        const biasX = (Math.random() - 0.5) * 3;
+        const biasY = -0.8 - Math.random() * 1.5; // Upward drift
         particles.push({
           x,
           y,
@@ -199,9 +199,9 @@ function ParticleField({
           flickerSpeed,
           flickerPhase,
           flickerAmp,
-          color: PARTICLE_COLORS[i % PARTICLE_COLORS.length],
+          color: isOrb ? 'rgba(255, 255, 255, 0.9)' : PARTICLE_COLORS[i % PARTICLE_COLORS.length],
           isOrb,
-          highlightOpacity: 0,
+          highlightOpacity: isOrb ? 0.6 + Math.random() * 0.3 : 0,
           wanderSpeed,
           wanderPhase,
           wanderAmp,
@@ -248,10 +248,10 @@ function ParticleField({
       const height = layout.height;
       const particles = particlesRef.current;
       const runParticles = showParticles && particles.length > 0;
-      const maxSpeed = 6; // Slow gentle drift
-      const jitter = 2; // Minimal jitter
-      const flowScaleX = 0.08;
-      const flowScaleY = 0.08;
+      const maxSpeed = 12; // Noticeable but smooth
+      const jitter = 4;
+      const flowScaleX = 0.12;
+      const flowScaleY = 0.12;
       const cellSize = 24;
       let cols = 0;
       let rows = 0;
@@ -266,8 +266,8 @@ function ParticleField({
         }
         for (let i = 0; i < particles.length; i += 1) {
           const p = particles[i];
-          const flowX = Math.sin((p.y + time * 0.02) / 180) * 6;
-          const flowY = Math.cos((p.x - time * 0.015) / 200) * 6;
+          const flowX = Math.sin((p.y + time * 0.04) / 140) * 10;
+          const flowY = Math.cos((p.x - time * 0.03) / 160) * 10;
           p.vx += flowX * flowScaleX * dt;
           p.vy += flowY * flowScaleY * dt;
           const wanderX = Math.sin(time / 1000 * p.wanderSpeed + p.wanderPhase) * p.wanderAmp;
