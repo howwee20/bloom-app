@@ -24,12 +24,19 @@ interface BloomCardProps {
   footerHeight?: number;
 }
 
-const BREAKDOWN_ITEMS = [
-  { label: 'S&P 500', ratio: 0.42 },
-  { label: 'Cash buffer', ratio: 0.18 },
-  { label: 'BTC', ratio: 0.22 },
-  { label: 'Treasuries', ratio: 0.18 },
+const RECENT_PAYMENTS = [
+  { merchant: 'Spotify', amount: '-$12', time: 'Today 9:24a' },
+  { merchant: 'Blue Bottle', amount: '-$7', time: 'Today 8:11a' },
+  { merchant: 'Apple', amount: '-$3', time: 'Yesterday' },
 ];
+
+const HOLDINGS = [
+  { label: 'Cash', value: '$12,480', pct: 0.34 },
+  { label: 'Stocks', value: '$21,940', pct: 0.46 },
+  { label: 'BTC', value: '$7,820', pct: 0.2 },
+];
+
+const HOLDING_TREND = [0.35, 0.6, 0.42, 0.78, 0.56, 0.7, 0.48];
 
 const GRADIENT_COLORS = [
   '#FFD4EA', // soft pink highlight
@@ -717,11 +724,6 @@ export function BloomCard({
     outputRange: [-150, 350], // px - sweeps from left off-screen to right off-screen
   });
 
-  const breakdown = BREAKDOWN_ITEMS.map((item) => ({
-    ...item,
-    value: formatValue(Math.round(totalValue * item.ratio)),
-  }));
-
   const displayValue = totalValue > 0 ? formatValue(totalValue) : '$47,291';
   const displayChange = totalValue > 0 ? formatChange(dailyChange) : '+ $127 today';
 
@@ -1173,13 +1175,48 @@ export function BloomCard({
         </View>
       ) : (
         <View style={styles.backContent}>
-          <Text style={styles.breakdownTitle}>Breakdown</Text>
-          {breakdown.map((item) => (
-            <View key={item.label} style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>{item.label}</Text>
-              <Text style={styles.breakdownValue}>{item.value}</Text>
+          <View style={styles.paymentsSection}>
+            <Text style={styles.sectionTitle}>Payments</Text>
+            <View style={styles.paymentList}>
+              {RECENT_PAYMENTS.map((item) => (
+                <View key={item.merchant} style={styles.paymentRow}>
+                  <View style={styles.paymentMeta}>
+                    <Text style={styles.paymentMerchant}>{item.merchant}</Text>
+                    <Text style={styles.paymentTime}>{item.time}</Text>
+                  </View>
+                  <View style={styles.paymentAmountWrap}>
+                    <Text style={styles.paymentArrow}>-&gt;</Text>
+                    <Text style={styles.paymentAmount}>{item.amount}</Text>
+                  </View>
+                </View>
+              ))}
             </View>
-          ))}
+          </View>
+
+          <View style={styles.investmentsSection}>
+            <Text style={styles.sectionTitle}>Investments</Text>
+            <View style={styles.trendChart}>
+              {HOLDING_TREND.map((value, index) => (
+                <View key={`trend-${index}`} style={styles.chartBar}>
+                  <View style={[styles.chartFill, { height: `${value * 100}%` }]} />
+                </View>
+              ))}
+            </View>
+            <View style={styles.holdingsList}>
+              {HOLDINGS.map((item) => (
+                <View key={item.label} style={styles.holdingRow}>
+                  <View style={styles.holdingMeta}>
+                    <Text style={styles.holdingLabel}>{item.label}</Text>
+                    <Text style={styles.holdingValue}>{item.value}</Text>
+                  </View>
+                  <View style={styles.holdingBar}>
+                    <View style={[styles.holdingFill, { width: `${item.pct * 100}%` }]} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
           <Text style={styles.breakdownHint}>Tap to return</Text>
         </View>
       )}
@@ -1496,10 +1533,115 @@ const styles = StyleSheet.create({
   backContent: {
     flex: 1,
     width: '100%',
-    paddingHorizontal: 32,
-    paddingVertical: 36,
-    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 30,
+    justifyContent: 'space-between',
     gap: 14,
+  },
+  paymentsSection: {
+    flexBasis: '26%',
+  },
+  investmentsSection: {
+    flexBasis: '64%',
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    color: 'rgba(255, 255, 255, 0.9)',
+    letterSpacing: 0.2,
+  },
+  paymentList: {
+    marginTop: 10,
+  },
+  paymentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  paymentMeta: {
+    flex: 1,
+  },
+  paymentMerchant: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    color: 'rgba(255, 255, 255, 0.92)',
+  },
+  paymentTime: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans-Regular',
+    color: 'rgba(255, 255, 255, 0.65)',
+    marginTop: 2,
+  },
+  paymentAmountWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  paymentArrow: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans-Medium',
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginRight: 6,
+  },
+  paymentAmount: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    color: 'rgba(255, 255, 255, 0.92)',
+  },
+  trendChart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginTop: 12,
+    height: 54,
+  },
+  chartBar: {
+    width: 14,
+    height: 54,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    overflow: 'hidden',
+    marginRight: 6,
+  },
+  chartFill: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+  },
+  holdingsList: {
+    marginTop: 16,
+  },
+  holdingRow: {
+    marginBottom: 12,
+  },
+  holdingMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  holdingLabel: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans-Medium',
+    color: 'rgba(255, 255, 255, 0.86)',
+  },
+  holdingValue: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    color: 'rgba(255, 255, 255, 0.92)',
+  },
+  holdingBar: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  holdingFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
   breakdownTitle: {
     fontSize: 18,
