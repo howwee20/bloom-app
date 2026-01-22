@@ -63,13 +63,13 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLE_COUNT = 0;
-const STAR_COUNT = 12;
+const PARTICLE_COUNT = 35;
+const STAR_COUNT = 10;
 const PARTICLE_COLORS = [
-  'rgba(255, 245, 252, 0.95)',
-  'rgba(245, 230, 255, 0.95)',
-  'rgba(255, 228, 242, 0.95)',
-  'rgba(255, 238, 248, 0.95)',
+  'rgba(255, 255, 255, 0.6)',
+  'rgba(220, 240, 255, 0.5)',
+  'rgba(200, 230, 255, 0.45)',
+  'rgba(255, 255, 255, 0.5)',
 ] as const;
 
 const FLARES = [
@@ -173,21 +173,22 @@ function ParticleField({
     const particles: Particle[] = [];
     if (showParticles) {
       for (let i = 0; i < PARTICLE_COUNT; i += 1) {
-        const isOrb = Math.random() > 0.82;
-        const radius = isOrb ? 3 + Math.random() * 4.2 : 0.9 + Math.random() * 2.6;
-        const speed = 8 + Math.random() * 18;
+        // Small floating dust - no orbs, just tiny specks
+        const isOrb = false;
+        const radius = 1 + Math.random() * 1.5; // Tiny: 1-2.5px
+        const speed = 2 + Math.random() * 4; // Very slow drift
         const angle = Math.random() * Math.PI * 2;
         const x = radius + Math.random() * (width - radius * 2);
         const y = radius + Math.random() * (height - radius * 2);
-        const opacityBase = isOrb ? 0.55 + Math.random() * 0.3 : 0.3 + Math.random() * 0.5;
-        const flickerSpeed = 0.3 + Math.random() * 2.8;
+        const opacityBase = 0.25 + Math.random() * 0.35; // Subtle: 25-60%
+        const flickerSpeed = 0.2 + Math.random() * 0.6; // Gentle flicker
         const flickerPhase = Math.random() * Math.PI * 2;
-        const flickerAmp = isOrb ? 0.05 + Math.random() * 0.08 : 0.08 + Math.random() * 0.1;
-        const wanderSpeed = 0.6 + Math.random() * 1.8;
+        const flickerAmp = 0.1 + Math.random() * 0.15;
+        const wanderSpeed = 0.15 + Math.random() * 0.3; // Very slow wander
         const wanderPhase = Math.random() * Math.PI * 2;
-        const wanderAmp = 6 + Math.random() * 14;
-        const biasX = (Math.random() - 0.5) * 6;
-        const biasY = (Math.random() - 0.5) * 6;
+        const wanderAmp = 8 + Math.random() * 12;
+        const biasX = (Math.random() - 0.5) * 2;
+        const biasY = -0.5 - Math.random() * 1; // Slight upward drift
         particles.push({
           x,
           y,
@@ -198,9 +199,9 @@ function ParticleField({
           flickerSpeed,
           flickerPhase,
           flickerAmp,
-          color: isOrb ? 'rgba(255, 245, 255, 0.98)' : PARTICLE_COLORS[i % PARTICLE_COLORS.length],
+          color: PARTICLE_COLORS[i % PARTICLE_COLORS.length],
           isOrb,
-          highlightOpacity: 0.5 + Math.random() * 0.35,
+          highlightOpacity: 0,
           wanderSpeed,
           wanderPhase,
           wanderAmp,
@@ -247,10 +248,10 @@ function ParticleField({
       const height = layout.height;
       const particles = particlesRef.current;
       const runParticles = showParticles && particles.length > 0;
-      const maxSpeed = 28;
-      const jitter = 12;
-      const flowScaleX = 0.2;
-      const flowScaleY = 0.2;
+      const maxSpeed = 6; // Slow gentle drift
+      const jitter = 2; // Minimal jitter
+      const flowScaleX = 0.08;
+      const flowScaleY = 0.08;
       const cellSize = 24;
       let cols = 0;
       let rows = 0;
@@ -265,8 +266,8 @@ function ParticleField({
         }
         for (let i = 0; i < particles.length; i += 1) {
           const p = particles[i];
-          const flowX = Math.sin((p.y + time * 0.06) / 120) * 16;
-          const flowY = Math.cos((p.x - time * 0.05) / 140) * 16;
+          const flowX = Math.sin((p.y + time * 0.02) / 180) * 6;
+          const flowY = Math.cos((p.x - time * 0.015) / 200) * 6;
           p.vx += flowX * flowScaleX * dt;
           p.vy += flowY * flowScaleY * dt;
           const wanderX = Math.sin(time / 1000 * p.wanderSpeed + p.wanderPhase) * p.wanderAmp;
@@ -1278,7 +1279,7 @@ export function BloomCard({
       <ParticleField
         enabled={!reduceMotionEnabled && ((!isBack && !flipped) || (isBack && flipped))}
         reduceMotionEnabled={reduceMotionEnabled}
-        showParticles={false}
+        showParticles={!isBack}
         showStars
       />
 
