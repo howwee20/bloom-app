@@ -50,11 +50,11 @@ const LIABILITIES = [
 ];
 
 const GRADIENT_COLORS = [
-  '#FFD4EA', // soft pink highlight
-  '#F8BDF0', // airy pink
-  '#F3B0E2', // pastel pink center
-  '#EBC7FA', // light lavender lift
-  '#FAF7FC', // near-white fade
+  '#A8D8F0', // soft sky blue top
+  '#B8E0F8', // light blue
+  '#D0ECFC', // pale blue center
+  '#E8F6FF', // very light blue
+  '#FFFFFF', // white at bottom
 ] as const;
 
 const FRAME_COLORS = [
@@ -63,8 +63,8 @@ const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.25)',
 ] as const;
 
-const PARTICLE_COUNT = 220;
-const STAR_COUNT = 16;
+const PARTICLE_COUNT = 0;
+const STAR_COUNT = 12;
 const PARTICLE_COLORS = [
   'rgba(255, 245, 252, 0.95)',
   'rgba(245, 230, 255, 0.95)',
@@ -1014,11 +1014,11 @@ export function BloomCard({
         />
       </Animated.View>
 
-      {/* Bottom silver fog */}
+      {/* Bottom white fog */}
       <LinearGradient
         colors={[
-          'rgba(255,228,242,0.0)',
-          'rgba(245,225,255,0.32)',
+          'rgba(255,255,255,0.0)',
+          'rgba(255,255,255,0.4)',
         ]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
@@ -1037,7 +1037,7 @@ export function BloomCard({
         style={styles.grainOverlay}
       />
 
-      {/* Smoke / nebula energy */}
+      {/* Smoke / nebula energy - blue/white */}
       {!reduceMotionEnabled && (
         <>
           <Animated.View
@@ -1047,7 +1047,7 @@ export function BloomCard({
               {
                 opacity: smokeAnimA.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0.12, 0.4],
+                  outputRange: [0.08, 0.25],
                 }),
                 transform: [
                   {
@@ -1075,8 +1075,8 @@ export function BloomCard({
             <LinearGradient
               colors={[
                 'rgba(255,255,255,0.1)',
-                'rgba(255,210,240,0.32)',
-                'rgba(210,225,255,0.24)',
+                'rgba(200,230,255,0.2)',
+                'rgba(180,220,255,0.15)',
                 'rgba(255,255,255,0.04)',
               ]}
               start={{ x: 0.2, y: 0.1 }}
@@ -1091,7 +1091,7 @@ export function BloomCard({
               {
                 opacity: smokeAnimB.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0.1, 0.36],
+                  outputRange: [0.06, 0.22],
                 }),
                 transform: [
                   {
@@ -1120,8 +1120,8 @@ export function BloomCard({
             <LinearGradient
               colors={[
                 'rgba(255,255,255,0.08)',
-                'rgba(240,200,255,0.32)',
-                'rgba(205,220,255,0.28)',
+                'rgba(190,225,255,0.2)',
+                'rgba(170,215,255,0.18)',
                 'rgba(255,255,255,0.06)',
               ]}
               start={{ x: 0.1, y: 0.2 }}
@@ -1132,7 +1132,7 @@ export function BloomCard({
         </>
       )}
 
-      {/* Swirling aurora layer */}
+      {/* Swirling aurora layer - blue/white */}
       {!reduceMotionEnabled && (
         <Animated.View
           pointerEvents="none"
@@ -1141,7 +1141,7 @@ export function BloomCard({
             {
               opacity: swirlAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0.22, 0.6],
+                outputRange: [0.15, 0.4],
               }),
               transform: [
                 {
@@ -1175,8 +1175,8 @@ export function BloomCard({
           <LinearGradient
             colors={[
               'rgba(255,255,255,0.12)',
-              'rgba(255,200,240,0.26)',
-              'rgba(205,215,255,0.22)',
+              'rgba(190,225,255,0.18)',
+              'rgba(175,215,255,0.15)',
               'rgba(255,255,255,0.04)',
             ]}
             start={{ x: 0, y: 0 }}
@@ -1186,24 +1186,24 @@ export function BloomCard({
         </Animated.View>
       )}
 
-      {/* Hue overlay shift */}
+      {/* Hue overlay shift - subtle blue */}
       {!reduceMotionEnabled && (
         <Animated.View
           pointerEvents="none"
           style={[
             styles.hueOverlay,
             {
-              opacity: 0.28,
+              opacity: 0.15,
               backgroundColor: hueOverlay.interpolate({
                 inputRange: [0, 1],
-                outputRange: ['rgba(255,190,235,0.75)', 'rgba(190,215,255,0.75)'],
+                outputRange: ['rgba(180,220,255,0.5)', 'rgba(200,235,255,0.5)'],
               }),
             },
           ]}
         />
       )}
 
-      {/* Cinematic light flash */}
+      {/* Cinematic light flash - white/blue */}
       {!reduceMotionEnabled && (
         <Animated.View
           pointerEvents="none"
@@ -1212,16 +1212,16 @@ export function BloomCard({
             {
               opacity: flashAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, 0.75],
+                outputRange: [0, 0.6],
               }),
             },
           ]}
         >
           <LinearGradient
             colors={[
-              'rgba(255,255,255,0.5)',
-              'rgba(255,200,240,0.3)',
-              'rgba(210,225,255,0.12)',
+              'rgba(255,255,255,0.6)',
+              'rgba(200,230,255,0.3)',
+              'rgba(180,220,255,0.12)',
               'rgba(255,255,255,0)',
             ]}
             locations={[0, 0.2, 0.55, 1]}
@@ -1232,7 +1232,7 @@ export function BloomCard({
         </Animated.View>
       )}
 
-      {/* Flares */}
+      {/* Flares - subtle white/blue */}
       {!reduceMotionEnabled && (
         <View style={styles.flareLayer} pointerEvents="none">
           {FLARES.map((flare) => (
@@ -1248,11 +1248,11 @@ export function BloomCard({
                   opacity: Animated.add(
                     flarePulse.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [flare.alpha * 0.6, flare.alpha * 1.4],
+                      outputRange: [flare.alpha * 0.4, flare.alpha * 1.0],
                     }),
                     flashAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [0, 0.28],
+                      outputRange: [0, 0.2],
                     })
                   ),
                   transform: [
@@ -1265,7 +1265,7 @@ export function BloomCard({
                   ],
                   backgroundColor: hueOverlay.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['rgba(255, 190, 245, 0.55)', 'rgba(195, 220, 255, 0.55)'],
+                    outputRange: ['rgba(200, 230, 255, 0.4)', 'rgba(220, 240, 255, 0.4)'],
                   }),
                 },
               ]}
@@ -1274,28 +1274,20 @@ export function BloomCard({
         </View>
       )}
 
-      {/* Particle field */}
+      {/* Shooting stars only - no particles */}
       <ParticleField
         enabled={!reduceMotionEnabled && ((!isBack && !flipped) || (isBack && flipped))}
         reduceMotionEnabled={reduceMotionEnabled}
-        showParticles={!isBack}
+        showParticles={false}
         showStars
       />
 
-      {/* Butterflies - front face only */}
-      {!isBack && (
-        <Butterflies
-          enabled={!reduceMotionEnabled && !flipped}
-          reduceMotionEnabled={reduceMotionEnabled}
-        />
-      )}
-
-      {/* Bottom haze to blend dock */}
+      {/* Bottom haze - white */}
       <LinearGradient
         colors={[
           'rgba(255,255,255,0.0)',
-          'rgba(255,210,236,0.18)',
-          'rgba(245,235,255,0.28)',
+          'rgba(255,255,255,0.15)',
+          'rgba(255,255,255,0.25)',
         ]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
