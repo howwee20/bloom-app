@@ -473,28 +473,22 @@ function ParticleField({
   );
 }
 
-// Simple V-shaped butterflies that flutter around
-const BUTTERFLY_COUNT = 8;
+// Minimal elegant butterflies - just 3, simple V-shapes
+const BUTTERFLY_COUNT = 3;
 
 type Butterfly = {
   x: number;
   y: number;
   centerX: number;
   centerY: number;
-  orbitSpeed: number;
-  orbitPhase: number;
-  orbitAmpX: number;
-  orbitAmpY: number;
-  swaySpeed: number;
-  swayPhase: number;
+  phase: number;
   size: number;
-  flapSpeed: number;
   flapPhase: number;
-  wingAngle: number;
+  opacity: number;
   xVal: Animated.Value;
   yVal: Animated.Value;
   flapVal: Animated.Value;
-  rotation: number;
+  opacityVal: Animated.Value;
 };
 
 function Butterflies({
@@ -511,37 +505,29 @@ function Butterflies({
 
   const initButterflies = (width: number, height: number) => {
     const butterflies: Butterfly[] = [];
+    // Place them in different areas of the card
+    const positions = [
+      { x: 0.25, y: 0.3 },
+      { x: 0.7, y: 0.5 },
+      { x: 0.4, y: 0.7 },
+    ];
     for (let i = 0; i < BUTTERFLY_COUNT; i++) {
-      const margin = 50;
-      const centerX = margin + Math.random() * (width - margin * 2);
-      const centerY = margin + Math.random() * (height - margin * 2);
-      const orbitSpeed = 0.4 + Math.random() * 0.7;
-      const orbitPhase = Math.random() * Math.PI * 2;
-      const orbitAmpX = 18 + Math.random() * 32;
-      const orbitAmpY = 12 + Math.random() * 26;
-      const swaySpeed = 0.8 + Math.random() * 1.2;
-      const swayPhase = Math.random() * Math.PI * 2;
-      const x = centerX;
-      const y = centerY;
+      const pos = positions[i];
+      const centerX = pos.x * width;
+      const centerY = pos.y * height;
       butterflies.push({
-        x,
-        y,
+        x: centerX,
+        y: centerY,
         centerX,
         centerY,
-        orbitSpeed,
-        orbitPhase,
-        orbitAmpX,
-        orbitAmpY,
-        swaySpeed,
-        swayPhase,
-        size: 7 + Math.random() * 6,
-        flapSpeed: 6 + Math.random() * 6,
+        phase: Math.random() * Math.PI * 2,
+        size: 5 + Math.random() * 2,
         flapPhase: Math.random() * Math.PI * 2,
-        wingAngle: 26 + Math.random() * 10,
-        xVal: new Animated.Value(x),
-        yVal: new Animated.Value(y),
+        opacity: 0.4 + Math.random() * 0.25,
+        xVal: new Animated.Value(centerX),
+        yVal: new Animated.Value(centerY),
         flapVal: new Animated.Value(0),
-        rotation: Math.random() * Math.PI * 2,
+        opacityVal: new Animated.Value(0.4 + Math.random() * 0.25),
       });
     }
     butterfliesRef.current = butterflies;
@@ -562,34 +548,23 @@ function Butterflies({
     if (!layout.width || !layout.height) return;
 
     const animate = (time: number) => {
-      const last = lastTimeRef.current ?? time;
-      const dt = Math.min(0.05, (time - last) / 1000);
       lastTimeRef.current = time;
-
-      const width = layout.width;
-      const height = layout.height;
       const butterflies = butterfliesRef.current;
+      const t = time / 1000;
 
       for (let i = 0; i < butterflies.length; i++) {
         const b = butterflies[i];
-        const t = time / 1000;
-        const targetX =
-          b.centerX +
-          Math.sin(t * b.orbitSpeed + b.orbitPhase) * b.orbitAmpX +
-          Math.sin(t * 0.35 + b.swayPhase) * 10;
-        const targetY =
-          b.centerY +
-          Math.cos(t * (b.orbitSpeed * 0.9) + b.orbitPhase) * b.orbitAmpY +
-          Math.sin(t * 0.4 + b.swayPhase) * 8;
+        // Very gentle drift - figure-8 pattern
+        const targetX = b.centerX + Math.sin(t * 0.3 + b.phase) * 25;
+        const targetY = b.centerY + Math.sin(t * 0.5 + b.phase) * Math.cos(t * 0.3 + b.phase) * 18;
 
-        const dx = targetX - b.x;
-        const dy = targetY - b.y;
-        b.x += dx * 0.035;
-        b.y += dy * 0.035;
+        // Smooth movement
+        b.x += (targetX - b.x) * 0.02;
+        b.y += (targetY - b.y) * 0.02;
 
-        b.rotation = Math.atan2(dy, dx) + Math.sin(t * 1.4 + b.swayPhase) * 0.18;
+        // Gentle flapping - slower, more natural
+        const flap = Math.sin(t * 4 + b.flapPhase);
 
-        const flap = Math.sin(t * b.flapSpeed + b.flapPhase);
         b.xVal.setValue(b.x);
         b.yVal.setValue(b.y);
         b.flapVal.setValue(flap);
@@ -623,93 +598,51 @@ function Butterflies({
           style={[
             styles.butterfly,
             {
+              opacity: b.opacity,
               transform: [
                 { translateX: b.xVal },
                 { translateY: b.yVal },
-                { rotate: `${b.rotation}rad` },
               ],
             },
           ]}
         >
-          {/* Left wing */}
+          {/* Simple V-shape: two angled lines */}
           <Animated.View
             style={[
-              styles.butterflyWing,
+              styles.butterflyWingSimple,
               {
-                width: b.size * 1.1,
-                height: b.size * 0.7,
-                borderTopLeftRadius: b.size * 0.55,
-                borderTopRightRadius: b.size * 0.2,
+                width: b.size,
                 transform: [
-                  { translateX: -b.size * 0.32 },
-                  { rotateZ: `-${b.wingAngle}deg` },
-                  {
-                    rotateZ: b.flapVal.interpolate({
-                      inputRange: [-1, 1],
-                      outputRange: ['-18deg', '18deg'],
-                    }),
-                  },
+                  { rotate: '-35deg' },
+                  { translateX: -b.size * 0.3 },
                   {
                     scaleY: b.flapVal.interpolate({
                       inputRange: [-1, 1],
-                      outputRange: [0.85, 1.15],
+                      outputRange: [0.7, 1.3],
                     }),
                   },
                 ],
               },
             ]}
-          >
-            <LinearGradient
-              colors={[
-                'rgba(255,255,255,0.85)',
-                'rgba(255,210,245,0.55)',
-                'rgba(255,255,255,0.2)',
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.butterflyWingFill}
-            />
-          </Animated.View>
-          <View style={styles.butterflyBody} />
-          {/* Right wing */}
+          />
           <Animated.View
             style={[
-              styles.butterflyWing,
+              styles.butterflyWingSimple,
               {
-                width: b.size * 1.1,
-                height: b.size * 0.7,
-                borderBottomLeftRadius: b.size * 0.55,
-                borderBottomRightRadius: b.size * 0.2,
+                width: b.size,
                 transform: [
-                  { translateX: b.size * 0.32 },
-                  { rotateZ: `${b.wingAngle}deg` },
-                  {
-                    rotateZ: b.flapVal.interpolate({
-                      inputRange: [-1, 1],
-                      outputRange: ['18deg', '-18deg'],
-                    }),
-                  },
+                  { rotate: '35deg' },
+                  { translateX: b.size * 0.3 },
                   {
                     scaleY: b.flapVal.interpolate({
                       inputRange: [-1, 1],
-                      outputRange: [0.85, 1.15],
+                      outputRange: [1.3, 0.7],
                     }),
                   },
                 ],
               },
             ]}
-          >
-            <LinearGradient
-              colors={[
-                'rgba(255,255,255,0.85)',
-                'rgba(255,210,245,0.55)',
-                'rgba(255,255,255,0.2)',
-              ]}
-              start={{ x: 1, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={styles.butterflyWingFill}
-            />
-          </Animated.View>
+          />
         </Animated.View>
       ))}
     </View>
@@ -1768,30 +1701,14 @@ const styles = StyleSheet.create({
   },
   butterfly: {
     position: 'absolute',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  butterflyWing: {
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
-    shadowColor: 'rgba(255, 220, 245, 0.8)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 0,
-  },
-  butterflyWingFill: {
-    flex: 1,
-  },
-  butterflyBody: {
-    position: 'absolute',
-    width: 2,
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
-    shadowColor: 'rgba(255, 255, 255, 0.6)',
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
+  butterflyWingSimple: {
+    height: 1.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 1,
   },
   hueOverlay: {
     ...StyleSheet.absoluteFillObject,
