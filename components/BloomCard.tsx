@@ -113,7 +113,17 @@ type ShootingStar = {
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
-function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; reduceMotionEnabled: boolean }) {
+function ParticleField({
+  enabled,
+  reduceMotionEnabled,
+  showParticles,
+  showStars,
+}: {
+  enabled: boolean;
+  reduceMotionEnabled: boolean;
+  showParticles: boolean;
+  showStars: boolean;
+}) {
   const [layout, setLayout] = useState({ width: 0, height: 0 });
   const particlesRef = useRef<Particle[]>([]);
   const starsRef = useRef<ShootingStar[]>([]);
@@ -149,62 +159,58 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
 
   const initParticles = (width: number, height: number) => {
     const particles: Particle[] = [];
-    for (let i = 0; i < PARTICLE_COUNT; i += 1) {
-      const isOrb = Math.random() > 0.82;
-      const radius = isOrb ? 3 + Math.random() * 4.2 : 0.9 + Math.random() * 2.6;
-      const speed = 8 + Math.random() * 18;
-      const angle = Math.random() * Math.PI * 2;
-      const x = radius + Math.random() * (width - radius * 2);
-      const y = radius + Math.random() * (height - radius * 2);
-      const opacityBase = isOrb ? 0.55 + Math.random() * 0.3 : 0.3 + Math.random() * 0.5;
-      const flickerSpeed = 0.3 + Math.random() * 2.8;
-      const flickerPhase = Math.random() * Math.PI * 2;
-      const flickerAmp = isOrb ? 0.05 + Math.random() * 0.08 : 0.08 + Math.random() * 0.1;
-      const wanderSpeed = 0.6 + Math.random() * 1.8;
-      const wanderPhase = Math.random() * Math.PI * 2;
-      const wanderAmp = 6 + Math.random() * 14;
-      const biasX = (Math.random() - 0.5) * 6;
-      const biasY = (Math.random() - 0.5) * 6;
-      particles.push({
-        x,
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        radius,
-        opacityBase,
-        flickerSpeed,
-        flickerPhase,
-        flickerAmp,
-        color: isOrb ? 'rgba(255, 245, 255, 0.98)' : PARTICLE_COLORS[i % PARTICLE_COLORS.length],
-        isOrb,
-        highlightOpacity: 0.5 + Math.random() * 0.35,
-        wanderSpeed,
-        wanderPhase,
-        wanderAmp,
-        biasX,
-        biasY,
-        xVal: new Animated.Value(x - radius),
-        yVal: new Animated.Value(y - radius),
-        opacityVal: new Animated.Value(opacityBase),
-      });
+    if (showParticles) {
+      for (let i = 0; i < PARTICLE_COUNT; i += 1) {
+        const isOrb = Math.random() > 0.82;
+        const radius = isOrb ? 3 + Math.random() * 4.2 : 0.9 + Math.random() * 2.6;
+        const speed = 8 + Math.random() * 18;
+        const angle = Math.random() * Math.PI * 2;
+        const x = radius + Math.random() * (width - radius * 2);
+        const y = radius + Math.random() * (height - radius * 2);
+        const opacityBase = isOrb ? 0.55 + Math.random() * 0.3 : 0.3 + Math.random() * 0.5;
+        const flickerSpeed = 0.3 + Math.random() * 2.8;
+        const flickerPhase = Math.random() * Math.PI * 2;
+        const flickerAmp = isOrb ? 0.05 + Math.random() * 0.08 : 0.08 + Math.random() * 0.1;
+        const wanderSpeed = 0.6 + Math.random() * 1.8;
+        const wanderPhase = Math.random() * Math.PI * 2;
+        const wanderAmp = 6 + Math.random() * 14;
+        const biasX = (Math.random() - 0.5) * 6;
+        const biasY = (Math.random() - 0.5) * 6;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius,
+          opacityBase,
+          flickerSpeed,
+          flickerPhase,
+          flickerAmp,
+          color: isOrb ? 'rgba(255, 245, 255, 0.98)' : PARTICLE_COLORS[i % PARTICLE_COLORS.length],
+          isOrb,
+          highlightOpacity: 0.5 + Math.random() * 0.35,
+          wanderSpeed,
+          wanderPhase,
+          wanderAmp,
+          biasX,
+          biasY,
+          xVal: new Animated.Value(x - radius),
+          yVal: new Animated.Value(y - radius),
+          opacityVal: new Animated.Value(opacityBase),
+        });
+      }
     }
     particlesRef.current = particles;
-    starsRef.current = Array.from({ length: STAR_COUNT }).map(() =>
-      spawnStar(width, height, true)
-    );
+    starsRef.current = showStars
+      ? Array.from({ length: STAR_COUNT }).map(() => spawnStar(width, height, true))
+      : [];
     sizeRef.current = { width, height };
   };
 
   useEffect(() => {
     if (!layout.width || !layout.height) return;
-    if (
-      !particlesRef.current.length ||
-      Math.abs(layout.width - sizeRef.current.width) > 4 ||
-      Math.abs(layout.height - sizeRef.current.height) > 4
-    ) {
-      initParticles(layout.width, layout.height);
-    }
-  }, [layout.width, layout.height]);
+    initParticles(layout.width, layout.height);
+  }, [layout.width, layout.height, showParticles, showStars]);
 
   useEffect(() => {
     if (!enabled || reduceMotionEnabled) {
@@ -219,7 +225,7 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
       });
       return;
     }
-    if (!layout.width || !layout.height || !particlesRef.current.length) return;
+    if (!layout.width || !layout.height) return;
 
     const animate = (time: number) => {
       const last = lastTimeRef.current ?? time;
@@ -228,132 +234,140 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
       const width = layout.width;
       const height = layout.height;
       const particles = particlesRef.current;
+      const runParticles = showParticles && particles.length > 0;
       const maxSpeed = 28;
       const jitter = 12;
       const flowScaleX = 0.2;
       const flowScaleY = 0.2;
       const cellSize = 24;
-      const cols = Math.max(1, Math.floor(width / cellSize));
-      const rows = Math.max(1, Math.floor(height / cellSize));
-      const grid = new Array(cols * rows);
-      for (let i = 0; i < grid.length; i += 1) {
-        grid[i] = [];
-      }
+      let cols = 0;
+      let rows = 0;
+      let grid: number[][] = [];
 
-      for (let i = 0; i < particles.length; i += 1) {
-        const p = particles[i];
-        const flowX = Math.sin((p.y + time * 0.06) / 120) * 16;
-        const flowY = Math.cos((p.x - time * 0.05) / 140) * 16;
-        p.vx += flowX * flowScaleX * dt;
-        p.vy += flowY * flowScaleY * dt;
-        const wanderX = Math.sin(time / 1000 * p.wanderSpeed + p.wanderPhase) * p.wanderAmp;
-        const wanderY = Math.cos(time / 1000 * (p.wanderSpeed * 0.85) + p.wanderPhase) * p.wanderAmp;
-        p.vx += wanderX * dt;
-        p.vy += wanderY * dt;
-        p.vx += p.biasX * dt;
-        p.vy += p.biasY * dt;
-        p.vx += (Math.random() - 0.5) * jitter * dt;
-        p.vy += (Math.random() - 0.5) * jitter * dt;
-        const speed = Math.hypot(p.vx, p.vy);
-        if (speed > maxSpeed) {
-          p.vx = (p.vx / speed) * maxSpeed;
-          p.vy = (p.vy / speed) * maxSpeed;
+      if (runParticles) {
+        cols = Math.max(1, Math.floor(width / cellSize));
+        rows = Math.max(1, Math.floor(height / cellSize));
+        grid = new Array(cols * rows);
+        for (let i = 0; i < grid.length; i += 1) {
+          grid[i] = [];
+        }
+        for (let i = 0; i < particles.length; i += 1) {
+          const p = particles[i];
+          const flowX = Math.sin((p.y + time * 0.06) / 120) * 16;
+          const flowY = Math.cos((p.x - time * 0.05) / 140) * 16;
+          p.vx += flowX * flowScaleX * dt;
+          p.vy += flowY * flowScaleY * dt;
+          const wanderX = Math.sin(time / 1000 * p.wanderSpeed + p.wanderPhase) * p.wanderAmp;
+          const wanderY = Math.cos(time / 1000 * (p.wanderSpeed * 0.85) + p.wanderPhase) * p.wanderAmp;
+          p.vx += wanderX * dt;
+          p.vy += wanderY * dt;
+          p.vx += p.biasX * dt;
+          p.vy += p.biasY * dt;
+          p.vx += (Math.random() - 0.5) * jitter * dt;
+          p.vy += (Math.random() - 0.5) * jitter * dt;
+          const speed = Math.hypot(p.vx, p.vy);
+          if (speed > maxSpeed) {
+            p.vx = (p.vx / speed) * maxSpeed;
+            p.vy = (p.vy / speed) * maxSpeed;
+          }
+
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+
+          if (p.x - p.radius < 0) {
+            p.x = p.radius;
+            p.vx = Math.abs(p.vx) * 0.9;
+          } else if (p.x + p.radius > width) {
+            p.x = width - p.radius;
+            p.vx = -Math.abs(p.vx) * 0.9;
+          }
+          if (p.y - p.radius < 0) {
+            p.y = p.radius;
+            p.vy = Math.abs(p.vy) * 0.9;
+          } else if (p.y + p.radius > height) {
+            p.y = height - p.radius;
+            p.vy = -Math.abs(p.vy) * 0.9;
+          }
+
+          const cx = clamp(Math.floor(p.x / cellSize), 0, cols - 1);
+          const cy = clamp(Math.floor(p.y / cellSize), 0, rows - 1);
+          grid[cx + cy * cols].push(i);
         }
 
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
+        for (let i = 0; i < particles.length; i += 1) {
+          const a = particles[i];
+          const cx = clamp(Math.floor(a.x / cellSize), 0, cols - 1);
+          const cy = clamp(Math.floor(a.y / cellSize), 0, rows - 1);
+          for (let gx = cx - 1; gx <= cx + 1; gx += 1) {
+            for (let gy = cy - 1; gy <= cy + 1; gy += 1) {
+              if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) continue;
+              const cell = grid[gx + gy * cols] as number[];
+              for (let k = 0; k < cell.length; k += 1) {
+                const j = cell[k];
+                if (j <= i) continue;
+                const b = particles[j];
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const dist = Math.hypot(dx, dy);
+                const minDist = a.radius + b.radius + 1;
+                if (dist > 0 && dist < minDist) {
+                  const nx = dx / dist;
+                  const ny = dy / dist;
+                  const overlap = (minDist - dist) * 0.5;
+                  a.x -= nx * overlap;
+                  a.y -= ny * overlap;
+                  b.x += nx * overlap;
+                  b.y += ny * overlap;
 
-        if (p.x - p.radius < 0) {
-          p.x = p.radius;
-          p.vx = Math.abs(p.vx) * 0.9;
-        } else if (p.x + p.radius > width) {
-          p.x = width - p.radius;
-          p.vx = -Math.abs(p.vx) * 0.9;
-        }
-        if (p.y - p.radius < 0) {
-          p.y = p.radius;
-          p.vy = Math.abs(p.vy) * 0.9;
-        } else if (p.y + p.radius > height) {
-          p.y = height - p.radius;
-          p.vy = -Math.abs(p.vy) * 0.9;
-        }
-
-        const cx = clamp(Math.floor(p.x / cellSize), 0, cols - 1);
-        const cy = clamp(Math.floor(p.y / cellSize), 0, rows - 1);
-        grid[cx + cy * cols].push(i);
-      }
-
-      for (let i = 0; i < particles.length; i += 1) {
-        const a = particles[i];
-        const cx = clamp(Math.floor(a.x / cellSize), 0, cols - 1);
-        const cy = clamp(Math.floor(a.y / cellSize), 0, rows - 1);
-        for (let gx = cx - 1; gx <= cx + 1; gx += 1) {
-          for (let gy = cy - 1; gy <= cy + 1; gy += 1) {
-            if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) continue;
-            const cell = grid[gx + gy * cols] as number[];
-            for (let k = 0; k < cell.length; k += 1) {
-              const j = cell[k];
-              if (j <= i) continue;
-              const b = particles[j];
-              const dx = b.x - a.x;
-              const dy = b.y - a.y;
-              const dist = Math.hypot(dx, dy);
-              const minDist = a.radius + b.radius + 1;
-              if (dist > 0 && dist < minDist) {
-                const nx = dx / dist;
-                const ny = dy / dist;
-                const overlap = (minDist - dist) * 0.5;
-                a.x -= nx * overlap;
-                a.y -= ny * overlap;
-                b.x += nx * overlap;
-                b.y += ny * overlap;
-
-                const dvx = b.vx - a.vx;
-                const dvy = b.vy - a.vy;
-                const relVel = dvx * nx + dvy * ny;
-                if (relVel < 0) {
-                  const impulse = -relVel * 0.6;
-                  a.vx -= impulse * nx;
-                  a.vy -= impulse * ny;
-                  b.vx += impulse * nx;
-                  b.vy += impulse * ny;
+                  const dvx = b.vx - a.vx;
+                  const dvy = b.vy - a.vy;
+                  const relVel = dvx * nx + dvy * ny;
+                  if (relVel < 0) {
+                    const impulse = -relVel * 0.6;
+                    a.vx -= impulse * nx;
+                    a.vy -= impulse * ny;
+                    b.vx += impulse * nx;
+                    b.vy += impulse * ny;
+                  }
                 }
               }
             }
           }
         }
-      }
 
-      for (let i = 0; i < particles.length; i += 1) {
-        const p = particles[i];
-        p.xVal.setValue(p.x - p.radius);
-        p.yVal.setValue(p.y - p.radius);
-        const flicker = Math.sin(time / 1000 * p.flickerSpeed + p.flickerPhase) * p.flickerAmp;
-        p.opacityVal.setValue(clamp(p.opacityBase + flicker, 0.3, 0.85));
-      }
-
-      const stars = starsRef.current;
-      for (let i = 0; i < stars.length; i += 1) {
-        const star = stars[i];
-        if (star.delay > 0) {
-          star.delay -= dt;
-          star.opacityVal.setValue(0);
-          continue;
+        for (let i = 0; i < particles.length; i += 1) {
+          const p = particles[i];
+          p.xVal.setValue(p.x - p.radius);
+          p.yVal.setValue(p.y - p.radius);
+          const flicker = Math.sin(time / 1000 * p.flickerSpeed + p.flickerPhase) * p.flickerAmp;
+          p.opacityVal.setValue(clamp(p.opacityBase + flicker, 0.3, 0.85));
         }
-        star.life += dt / star.duration;
-        star.x += star.vx * dt;
-        star.y += star.vy * dt;
-        const lifeFade = Math.sin(Math.PI * clamp(star.life, 0, 1));
-        star.opacityVal.setValue(star.opacityBase * lifeFade);
-        star.xVal.setValue(star.x);
-        star.yVal.setValue(star.y);
+      }
 
-        const offscreen =
-          star.x > width + star.length ||
-          star.y > height + star.length ||
-          star.life >= 1;
-        if (offscreen) {
-          stars[i] = spawnStar(width, height, true);
+      if (showStars) {
+        const stars = starsRef.current;
+        for (let i = 0; i < stars.length; i += 1) {
+          const star = stars[i];
+          if (star.delay > 0) {
+            star.delay -= dt;
+            star.opacityVal.setValue(0);
+            continue;
+          }
+          star.life += dt / star.duration;
+          star.x += star.vx * dt;
+          star.y += star.vy * dt;
+          const lifeFade = Math.sin(Math.PI * clamp(star.life, 0, 1));
+          star.opacityVal.setValue(star.opacityBase * lifeFade);
+          star.xVal.setValue(star.x);
+          star.yVal.setValue(star.y);
+
+          const offscreen =
+            star.x > width + star.length ||
+            star.y > height + star.length ||
+            star.life >= 1;
+          if (offscreen) {
+            stars[i] = spawnStar(width, height, true);
+          }
         }
       }
 
@@ -366,7 +380,7 @@ function ParticleField({ enabled, reduceMotionEnabled }: { enabled: boolean; red
       rafRef.current = null;
       lastTimeRef.current = null;
     };
-  }, [enabled, reduceMotionEnabled, layout.width, layout.height]);
+  }, [enabled, reduceMotionEnabled, layout.width, layout.height, showParticles, showStars]);
 
   return (
     <View
@@ -1069,9 +1083,12 @@ export function BloomCard({
       )}
 
       {/* Particle field */}
-      {!isBack && (
-        <ParticleField enabled={!isBack} reduceMotionEnabled={reduceMotionEnabled} />
-      )}
+      <ParticleField
+        enabled={!reduceMotionEnabled && ((!isBack && !flipped) || (isBack && flipped))}
+        reduceMotionEnabled={reduceMotionEnabled}
+        showParticles={!isBack}
+        showStars={isBack}
+      />
 
       {/* Bottom haze to blend dock */}
       <LinearGradient
