@@ -1778,20 +1778,14 @@ const styles = StyleSheet.create({
   valueText: {
     fontSize: 48,
     fontFamily: 'PlusJakartaSans-SemiBold',
-    color: 'rgba(255, 255, 255, 0.98)',
+    color: '#1a1a2e',
     letterSpacing: -0.4,
-    textShadowColor: 'rgba(0, 0, 0, 0.18)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
   },
   changeText: {
     fontSize: 17,
     fontFamily: 'PlusJakartaSans-Regular',
-    color: 'rgba(255, 255, 255, 0.84)',
+    color: 'rgba(26, 26, 46, 0.7)',
     letterSpacing: 0.1,
-    textShadowColor: 'rgba(0, 0, 0, 0.14)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
   backContent: {
     flex: 1,
@@ -1817,7 +1811,7 @@ const styles = StyleSheet.create({
   sectionTitleMuted: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans-SemiBold',
-    color: 'rgba(255, 255, 255, 0.65)',
+    color: 'rgba(26, 26, 46, 0.5)',
   },
   assetsGrid: {
     flexDirection: 'row',
@@ -1833,18 +1827,18 @@ const styles = StyleSheet.create({
   assetLabel: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans-Medium',
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: 'rgba(26, 26, 46, 0.6)',
   },
   assetValue: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans-SemiBold',
-    color: 'rgba(255, 255, 255, 0.92)',
+    color: '#1a1a2e',
     marginTop: 2,
   },
   sectionTitle: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans-SemiBold',
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#1a1a2e',
     letterSpacing: 0.2,
   },
   paymentList: {
@@ -1862,12 +1856,12 @@ const styles = StyleSheet.create({
   paymentMerchant: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans-SemiBold',
-    color: 'rgba(255, 255, 255, 0.92)',
+    color: '#1a1a2e',
   },
   paymentTime: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans-Regular',
-    color: 'rgba(255, 255, 255, 0.65)',
+    color: 'rgba(26, 26, 46, 0.5)',
     marginTop: 2,
   },
   paymentAmountWrap: {
@@ -1877,13 +1871,13 @@ const styles = StyleSheet.create({
   paymentArrow: {
     fontSize: 12,
     fontFamily: 'PlusJakartaSans-Medium',
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(26, 26, 46, 0.5)',
     marginRight: 6,
   },
   paymentAmount: {
     fontSize: 16,
     fontFamily: 'PlusJakartaSans-SemiBold',
-    color: 'rgba(255, 255, 255, 0.92)',
+    color: '#1a1a2e',
   },
   trendChart: {
     flexDirection: 'row',
@@ -1895,7 +1889,7 @@ const styles = StyleSheet.create({
     width: 14,
     height: 54,
     borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: 'rgba(26, 26, 46, 0.08)',
     overflow: 'hidden',
     marginRight: 6,
   },
@@ -1905,7 +1899,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: 'rgba(26, 26, 46, 0.5)',
   },
   holdingsList: {
     marginTop: 16,
@@ -1921,29 +1915,29 @@ const styles = StyleSheet.create({
   holdingLabel: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans-Medium',
-    color: 'rgba(255, 255, 255, 0.86)',
+    color: 'rgba(26, 26, 46, 0.7)',
   },
   holdingValue: {
     fontSize: 14,
     fontFamily: 'PlusJakartaSans-SemiBold',
-    color: 'rgba(255, 255, 255, 0.92)',
+    color: '#1a1a2e',
   },
   holdingBar: {
     height: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: 'rgba(26, 26, 46, 0.1)',
     marginTop: 6,
     overflow: 'hidden',
   },
   holdingFill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: 'rgba(26, 26, 46, 0.4)',
   },
   breakdownTitle: {
     fontSize: 18,
     fontFamily: 'PlusJakartaSans-SemiBold',
-    color: 'rgba(255, 255, 255, 0.95)',
+    color: '#1a1a2e',
     marginBottom: 6,
     letterSpacing: 0.3,
   },
@@ -1956,17 +1950,17 @@ const styles = StyleSheet.create({
   breakdownLabel: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans-Medium',
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: 'rgba(26, 26, 46, 0.7)',
   },
   breakdownValue: {
     fontSize: 15,
     fontFamily: 'PlusJakartaSans-SemiBold',
-    color: 'rgba(255, 255, 255, 0.95)',
+    color: '#1a1a2e',
   },
   breakdownHint: {
     fontSize: 13,
     fontFamily: 'PlusJakartaSans-Regular',
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(26, 26, 46, 0.5)',
     marginTop: 10,
     textAlign: 'center',
   },
