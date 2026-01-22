@@ -1375,8 +1375,8 @@ export function BloomCard({
       />
 
       {/* Footer dock inside card */}
-      {/* Footer dock (command bar) - both sides */}
-      {footer && (
+      {/* Footer dock (command bar) - back only */}
+      {isBack && footer && (
         <View
           style={[
             styles.footerDock,
