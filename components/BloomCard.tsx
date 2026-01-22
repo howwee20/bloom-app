@@ -473,8 +473,8 @@ function ParticleField({
   );
 }
 
-// Minimal elegant butterflies - just 3, simple V-shapes
-const BUTTERFLY_COUNT = 3;
+// Minimal elegant butterflies - just 2, simple V-shapes
+const BUTTERFLY_COUNT = 2;
 
 type Butterfly = {
   x: number;
@@ -507,9 +507,8 @@ function Butterflies({
     const butterflies: Butterfly[] = [];
     // Place them in different areas of the card
     const positions = [
-      { x: 0.25, y: 0.3 },
-      { x: 0.7, y: 0.5 },
-      { x: 0.4, y: 0.7 },
+      { x: 0.28, y: 0.3 },
+      { x: 0.68, y: 0.6 },
     ];
     for (let i = 0; i < BUTTERFLY_COUNT; i++) {
       const pos = positions[i];
@@ -521,13 +520,13 @@ function Butterflies({
         centerX,
         centerY,
         phase: Math.random() * Math.PI * 2,
-        size: 5 + Math.random() * 2,
+        size: 4 + Math.random() * 1.6,
         flapPhase: Math.random() * Math.PI * 2,
-        opacity: 0.4 + Math.random() * 0.25,
+        opacity: 0.28 + Math.random() * 0.18,
         xVal: new Animated.Value(centerX),
         yVal: new Animated.Value(centerY),
         flapVal: new Animated.Value(0),
-        opacityVal: new Animated.Value(0.4 + Math.random() * 0.25),
+        opacityVal: new Animated.Value(0.28 + Math.random() * 0.18),
       });
     }
     butterfliesRef.current = butterflies;
@@ -555,15 +554,17 @@ function Butterflies({
       for (let i = 0; i < butterflies.length; i++) {
         const b = butterflies[i];
         // Very gentle drift - figure-8 pattern
-        const targetX = b.centerX + Math.sin(t * 0.3 + b.phase) * 25;
-        const targetY = b.centerY + Math.sin(t * 0.5 + b.phase) * Math.cos(t * 0.3 + b.phase) * 18;
+        const targetX = b.centerX + Math.sin(t * 0.22 + b.phase) * 18;
+        const targetY =
+          b.centerY +
+          Math.sin(t * 0.36 + b.phase) * Math.cos(t * 0.22 + b.phase) * 12;
 
         // Smooth movement
-        b.x += (targetX - b.x) * 0.02;
-        b.y += (targetY - b.y) * 0.02;
+        b.x += (targetX - b.x) * 0.018;
+        b.y += (targetY - b.y) * 0.018;
 
         // Gentle flapping - slower, more natural
-        const flap = Math.sin(t * 4 + b.flapPhase);
+        const flap = Math.sin(t * 3 + b.flapPhase);
 
         b.xVal.setValue(b.x);
         b.yVal.setValue(b.y);
@@ -613,12 +614,12 @@ function Butterflies({
               {
                 width: b.size,
                 transform: [
-                  { rotate: '-35deg' },
+                  { rotate: '-30deg' },
                   { translateX: -b.size * 0.3 },
                   {
                     scaleY: b.flapVal.interpolate({
                       inputRange: [-1, 1],
-                      outputRange: [0.7, 1.3],
+                      outputRange: [0.8, 1.1],
                     }),
                   },
                 ],
@@ -631,12 +632,12 @@ function Butterflies({
               {
                 width: b.size,
                 transform: [
-                  { rotate: '35deg' },
+                  { rotate: '30deg' },
                   { translateX: b.size * 0.3 },
                   {
                     scaleY: b.flapVal.interpolate({
                       inputRange: [-1, 1],
-                      outputRange: [1.3, 0.7],
+                      outputRange: [1.1, 0.8],
                     }),
                   },
                 ],
@@ -1706,9 +1707,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   butterflyWingSimple: {
-    height: 1.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    height: 1,
+    backgroundColor: 'rgba(255, 235, 250, 0.55)',
     borderRadius: 1,
+    shadowColor: 'rgba(255, 220, 245, 0.6)',
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
   },
   hueOverlay: {
     ...StyleSheet.absoluteFillObject,
