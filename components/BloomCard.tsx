@@ -1484,8 +1484,6 @@ export function BloomCard({
               </View>
             </View>
           </View>
-
-          <Text style={styles.breakdownHint}>Tap to return</Text>
         </View>
       )}
     </>
@@ -1707,9 +1705,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: 999,
     overflow: 'hidden',
+    shadowColor: 'rgba(255, 225, 250, 0.9)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 12,
   },
   shootingStarGradient: {
     flex: 1,
+  },
+  shootingStarCore: {
+    position: 'absolute',
+    right: 0,
+    top: -2,
+    bottom: -2,
+    width: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   butterflyLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -1814,17 +1825,16 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 28,
     paddingVertical: 30,
-    justifyContent: 'space-between',
-    gap: 14,
+    justifyContent: 'flex-start',
   },
   paymentsSection: {
-    flexBasis: '22%',
+    marginBottom: 16,
   },
   investmentsSection: {
-    flexBasis: '52%',
+    marginBottom: 16,
   },
   assetsSection: {
-    flexBasis: '20%',
+    marginBottom: 8,
   },
   assetsHeader: {
     flexDirection: 'row',
