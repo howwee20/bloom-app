@@ -1,6 +1,8 @@
 import { CardService } from '../card';
 import { AchService } from '../ach';
+import { ExternalLinkService } from '../externalLinks';
 import { LedgerService } from '../ledger';
+import { getBankAccountBalance, isColumnConfigured } from './columnClient';
 
 export type ColumnAuthPayload = {
   external_id: string;
@@ -32,14 +34,31 @@ export class ColumnAdapter {
   private cardService = new CardService();
   private achService = new AchService();
   private ledger = new LedgerService();
+  private externalLinks = new ExternalLinkService();
 
   async createAccount() {
     return { ok: true, provider: 'column', account_id: null };
   }
 
   async getBalanceTruth(userId: string) {
-    const cash = await this.ledger.getUserCashBalanceCents(userId);
-    return { cash_balance_cents: cash };
+    if (!isColumnConfigured()) {
+      const cash = await this.ledger.getUserCashBalanceCents(userId);
+      return { cash_balance_cents: cash };
+    }
+
+    const link = await this.externalLinks.getLink(userId, 'column');
+    if (!link?.bank_account_id) {
+      const cash = await this.ledger.getUserCashBalanceCents(userId);
+      return { cash_balance_cents: cash };
+    }
+
+    const response = await getBankAccountBalance(link.bank_account_id);
+    if (!response.ok) {
+      const cash = await this.ledger.getUserCashBalanceCents(userId);
+      return { cash_balance_cents: cash };
+    }
+
+    return { cash_balance_cents: response.data.balances?.available_amount ?? 0 };
   }
 
   async handleAuthRequest(payload: ColumnAuthPayload, rawEventId?: string | null) {

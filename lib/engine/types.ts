@@ -23,9 +23,26 @@ export type ReceiptInput = {
 };
 
 export type CommandPreview = {
-  action: 'buy' | 'sell' | 'convert' | 'transfer' | 'balance' | 'breakdown' | 'support';
+  action:
+    | 'buy'
+    | 'sell'
+    | 'convert'
+    | 'transfer'
+    | 'balance'
+    | 'breakdown'
+    | 'support'
+    | 'dd_details'
+    | 'card_status'
+    | 'card_freeze'
+    | 'card_unfreeze'
+    | 'set_buffer'
+    | 'allocate'
+    | 'holdings'
+    | 'btc_quote'
+    | 'stock_quote';
   symbol?: string;
   notional_cents?: number;
+  allocation_targets?: { stocks_pct: number; btc_pct: number };
   preview_title: string;
   preview_body: string;
   confirm_required: boolean;
@@ -36,5 +53,6 @@ export type CommandConfirmRequest = {
   action: CommandPreview['action'];
   symbol?: string;
   notional_cents?: number;
+  allocation_targets?: { stocks_pct: number; btc_pct: number };
   idempotency_key: string;
 };

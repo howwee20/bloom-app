@@ -86,6 +86,10 @@ export async function listEntities() {
   return columnRequest<{ entities: ColumnEntity[]; has_more: boolean }>('/entities');
 }
 
+export async function getEntity(entityId: string) {
+  return columnRequest<ColumnEntity>(`/entities/${entityId}`);
+}
+
 export async function createPersonEntity(data: {
   first_name: string;
   last_name: string;
