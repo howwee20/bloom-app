@@ -324,7 +324,9 @@ export default function HomeScreen() {
   };
 
   const handleCommandSubmit = async () => {
+    console.log('[CMD] handleCommandSubmit called');
     const trimmed = commandQuery.trim();
+    console.log('[CMD] Query:', trimmed, 'Loading:', commandLoading);
     if (!trimmed || commandLoading) return;
 
     if (Platform.OS !== 'web' && !apiBaseUrl) {
@@ -338,6 +340,7 @@ export default function HomeScreen() {
     if (session?.user?.id) {
       headers['x-user-id'] = session.user.id;
     }
+    console.log('[CMD] Fetching preview from:', `${apiBaseUrl}/api/command`);
 
     try {
       const previewRes = await fetch(`${apiBaseUrl}/api/command`, {
@@ -345,25 +348,32 @@ export default function HomeScreen() {
         headers,
         body: JSON.stringify({ text: trimmed }),
       });
+      console.log('[CMD] Preview response status:', previewRes.status);
 
       if (!previewRes.ok) {
         throw new Error(`Command preview failed (${previewRes.status})`);
       }
 
       const preview = await previewRes.json();
+      console.log('[CMD] Preview result:', preview);
 
       const execute = async (showSuccess: boolean) => {
+        console.log('[CMD] Executing confirm for:', preview.action);
         const confirmRes = await fetch(`${apiBaseUrl}/api/command/confirm`, {
           method: 'POST',
           headers,
           body: JSON.stringify(preview),
         });
+        console.log('[CMD] Confirm response status:', confirmRes.status);
 
         if (!confirmRes.ok) {
+          const errText = await confirmRes.text();
+          console.log('[CMD] Confirm error:', errText);
           throw new Error(`Command failed (${confirmRes.status})`);
         }
 
         const payload = await confirmRes.json();
+        console.log('[CMD] Confirm result:', payload);
 
         if (preview.action === 'balance' && typeof payload.spendable_cents === 'number') {
           setSpendableCents(payload.spendable_cents);
@@ -400,6 +410,7 @@ export default function HomeScreen() {
         await execute(true);
       }
     } catch (error) {
+      console.log('[CMD] Error:', error);
       const message = error instanceof Error ? error.message : 'Command failed.';
       showAlert('Command failed', message);
     } finally {

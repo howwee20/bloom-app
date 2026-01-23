@@ -69,6 +69,14 @@ export function CommandBar({
     }
   };
 
+  const handleKeyPress = (e: any) => {
+    // Handle Enter key on web
+    if (e.key === 'Enter' || e.nativeEvent?.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
   const handleFocus = () => {
     setIsFocused(true);
     onFocus();
@@ -149,6 +157,7 @@ export function CommandBar({
           onFocus={handleFocus}
           onBlur={handleBlur}
           onSubmitEditing={handleSubmit}
+          onKeyPress={handleKeyPress}
           placeholder="Pay, buy, sell..."
           placeholderTextColor="#9A9A9A"
           returnKeyType="search"
