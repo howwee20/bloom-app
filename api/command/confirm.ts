@@ -1,5 +1,6 @@
 import { CommandService } from '@/lib/engine/command';
 import { getUserIdFromRequest } from '@/lib/server/auth';
+import { logAdapterSummary } from '@/lib/server/envSummary';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -7,6 +8,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    logAdapterSummary();
     const userId = await getUserIdFromRequest(req);
     const payload = req.body || {};
     if (!payload.action || !payload.idempotency_key) {

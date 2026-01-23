@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/server/supabaseAdmin';
+import { EventStore } from '../eventStore';
 import { LedgerService } from '../ledger';
 import { ReceiptBuilder } from '../receipts';
 
@@ -10,7 +11,7 @@ type PlaceOrderInput = {
   idempotency_key: string;
 };
 
-type OrderRecord = {
+export type OrderRecord = {
   id: string;
   user_id: string;
   instrument_id: string;
@@ -20,9 +21,18 @@ type OrderRecord = {
   external_order_id?: string | null;
 };
 
-export class BrokerageAdapter {
+export type Quote = { symbol: string; price_cents: number; as_of: string };
+
+export interface BrokerageAdapterContract {
+  placeOrder(input: PlaceOrderInput): Promise<OrderRecord>;
+  fillOrder(order: OrderRecord): Promise<void>;
+  getQuote(symbol: string): Promise<Quote>;
+}
+
+export class PaperBrokerageAdapter implements BrokerageAdapterContract {
   private ledger = new LedgerService();
   private receipts = new ReceiptBuilder();
+  private eventStore = new EventStore();
 
   async ensureInstrument(symbol: string) {
     const { data: existing } = await supabaseAdmin
@@ -58,6 +68,17 @@ export class BrokerageAdapter {
 
     if (existing) return existing as OrderRecord;
 
+    await this.eventStore.recordNormalizedEvent({
+      source: 'brokerage',
+      domain: 'trade',
+      event_type: 'order_placed',
+      external_id: input.idempotency_key,
+      user_id: input.user_id,
+      status: 'placed',
+      amount_cents: input.notional_cents,
+      metadata: { symbol: input.symbol, side: input.side },
+    });
+
     const { data, error } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -65,7 +86,7 @@ export class BrokerageAdapter {
         instrument_id: instrument.id,
         side: input.side,
         notional_cents: input.notional_cents,
-        status: 'submitted',
+        status: 'placed',
         external_order_id: input.idempotency_key,
       })
       .select('*')
@@ -78,7 +99,7 @@ export class BrokerageAdapter {
   async fillOrder(order: OrderRecord) {
     await supabaseAdmin
       .from('orders')
-      .update({ status: 'filled' })
+      .update({ status: 'filled', filled_cents: Math.abs(order.notional_cents), updated_at: new Date().toISOString() })
       .eq('id', order.id);
 
     const instrument = await supabaseAdmin
@@ -148,5 +169,58 @@ export class BrokerageAdapter {
       order.side,
       order.external_order_id || order.id
     );
+
+    await this.eventStore.recordNormalizedEvent({
+      source: 'brokerage',
+      domain: 'trade',
+      event_type: 'order_filled',
+      external_id: order.external_order_id || order.id,
+      user_id: order.user_id,
+      status: 'filled',
+      amount_cents: Math.abs(order.notional_cents),
+      metadata: { symbol: instrument.data.symbol, side: order.side },
+    });
+  }
+
+  async getQuote(symbol: string): Promise<Quote> {
+    const price_cents = symbol === 'SPY' ? 50000 : 10000;
+    return { symbol, price_cents, as_of: new Date().toISOString() };
+  }
+}
+
+export class AlpacaBrokerageAdapter implements BrokerageAdapterContract {
+  async placeOrder(input: PlaceOrderInput): Promise<OrderRecord> {
+    if (!process.env.ALPACA_API_KEY || !process.env.ALPACA_SECRET_KEY) {
+      throw new Error('Missing ALPACA_API_KEY or ALPACA_SECRET_KEY');
+    }
+    return new PaperBrokerageAdapter().placeOrder(input);
+  }
+
+  async fillOrder(order: OrderRecord) {
+    return new PaperBrokerageAdapter().fillOrder(order);
+  }
+
+  async getQuote(symbol: string): Promise<Quote> {
+    return new PaperBrokerageAdapter().getQuote(symbol);
+  }
+}
+
+export class BrokerageAdapter implements BrokerageAdapterContract {
+  private impl: BrokerageAdapterContract;
+
+  constructor() {
+    this.impl = process.env.ALPACA_API_KEY ? new AlpacaBrokerageAdapter() : new PaperBrokerageAdapter();
+  }
+
+  placeOrder(input: PlaceOrderInput) {
+    return this.impl.placeOrder(input);
+  }
+
+  fillOrder(order: OrderRecord) {
+    return this.impl.fillOrder(order);
+  }
+
+  getQuote(symbol: string) {
+    return this.impl.getQuote(symbol);
   }
 }

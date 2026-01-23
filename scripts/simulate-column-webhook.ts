@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createHmac, randomUUID } from 'crypto';
 
 const baseUrl = (process.env.BLOOM_API_BASE_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -58,6 +59,7 @@ async function run() {
     user_id: userId,
     amount_cents: 25000,
     direction: 'credit',
+    status: 'posted',
   });
 }
 

@@ -18,7 +18,7 @@ type JournalEntry = {
   created_at: string;
 };
 
-const ACCOUNT_KINDS = ['cash', 'clearing', 'fees'] as const;
+const ACCOUNT_KINDS = ['cash', 'clearing', 'fees', 'bridge_receivable', 'bridge_offset'] as const;
 
 export class LedgerService {
   async ensureAccount(userId: string, kind: string, currency = 'USD'): Promise<LedgerAccount> {
@@ -84,33 +84,28 @@ export class LedgerService {
       return existing as JournalEntry;
     }
 
+    const { data: entryId, error: rpcError } = await supabaseAdmin.rpc('post_journal_entry', {
+      p_user_id: input.user_id,
+      p_external_source: input.external_source,
+      p_external_id: input.external_id,
+      p_memo: input.memo ?? null,
+      p_postings: input.postings,
+    });
+
+    if (rpcError) {
+      throw rpcError;
+    }
+
     const { data: entry, error: entryError } = await supabaseAdmin
       .from('ledger_journal_entries')
-      .insert({
-        user_id: input.user_id,
-        external_source: input.external_source,
-        external_id: input.external_id,
-        memo: input.memo ?? null,
-      })
       .select('*')
+      .eq('id', entryId)
       .single();
 
     if (entryError || !entry) {
       throw entryError;
     }
 
-    const postingsPayload = input.postings.map((posting: LedgerPostingInput) => ({
-      journal_entry_id: entry.id,
-      ledger_account_id: posting.ledger_account_id,
-      direction: posting.direction,
-      amount_cents: posting.amount_cents,
-    }));
-
-    const { error: postingsError } = await supabaseAdmin
-      .from('ledger_postings')
-      .insert(postingsPayload);
-
-    if (postingsError) throw postingsError;
     return entry as JournalEntry;
   }
 
@@ -130,6 +125,11 @@ export class LedgerService {
 
   async getUserCashBalanceCents(userId: string): Promise<number> {
     const account = await this.ensureAccount(userId, 'cash');
+    return this.getAccountBalanceCents(account.id);
+  }
+
+  async getUserBalanceByKind(userId: string, kind: string): Promise<number> {
+    const account = await this.ensureAccount(userId, kind);
     return this.getAccountBalanceCents(account.id);
   }
 

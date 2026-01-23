@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '../lib/server/supabaseAdmin';
 import { ColumnAdapter } from '../lib/engine/integrations/column';
@@ -16,9 +17,11 @@ async function ensureDevUser(): Promise<string> {
   const email = process.env.DEV_USER_EMAIL || DEFAULT_EMAIL;
   const password = process.env.DEV_USER_PASSWORD || DEFAULT_PASSWORD;
 
-  const existing = await supabaseAdmin.auth.admin.getUserByEmail(email);
-  if (existing.data?.user) {
-    return existing.data.user.id;
+  // Search for existing user by email using listUsers
+  const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+  const existingUser = listData?.users?.find((u) => u.email === email);
+  if (existingUser) {
+    return existingUser.id;
   }
 
   const created = await supabaseAdmin.auth.admin.createUser({
@@ -35,13 +38,27 @@ async function ensureDevUser(): Promise<string> {
 }
 
 async function clearUserData(userId: string) {
-  await supabaseAdmin.from('card_holds').delete().eq('user_id', userId);
-  await supabaseAdmin.from('receipts').delete().eq('user_id', userId);
-  await supabaseAdmin.from('orders').delete().eq('user_id', userId);
-  await supabaseAdmin.from('positions').delete().eq('user_id', userId);
-  await supabaseAdmin.from('ledger_journal_entries').delete().eq('user_id', userId);
-  await supabaseAdmin.from('ledger_accounts').delete().eq('user_id', userId);
-  await supabaseAdmin.from('policy').delete().eq('user_id', userId);
+  const tables = [
+    'card_holds',
+    'card_auths',
+    'receipts',
+    'orders',
+    'positions',
+    'ledger_journal_entries',
+    'ledger_accounts',
+    'policy',
+    'raw_events',
+    'normalized_events',
+    'liquidation_jobs',
+    'ach_transfers',
+    'reconciliation_reports',
+    'internal_alerts',
+  ];
+
+  for (const table of tables) {
+    const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
+    if (error) throw error;
+  }
 }
 
 async function seed() {
@@ -52,6 +69,7 @@ async function seed() {
     user_id: userId,
     buffer_cents: 3000,
     buffer_percent: null,
+    balance_mode: 'debit',
     liquidation_order_json: ['cash', 'stocks', 'btc'],
     bridge_enabled_bool: false,
   }, { onConflict: 'user_id' });

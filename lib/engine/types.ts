@@ -23,7 +23,7 @@ export type ReceiptInput = {
 };
 
 export type CommandPreview = {
-  action: 'buy' | 'sell' | 'convert' | 'balance' | 'breakdown' | 'support';
+  action: 'buy' | 'sell' | 'convert' | 'transfer' | 'balance' | 'breakdown' | 'support';
   symbol?: string;
   notional_cents?: number;
   preview_title: string;

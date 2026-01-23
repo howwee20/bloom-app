@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'crypto';
 import { after, before, beforeEach, test } from 'node:test';
@@ -5,6 +6,7 @@ import { supabaseAdmin } from '../lib/server/supabaseAdmin';
 import { ColumnAdapter } from '../lib/engine/integrations/column';
 import { BrokerageAdapter } from '../lib/engine/integrations/brokerage';
 import { SpendableEngine } from '../lib/engine/spendable';
+import { CardService } from '../lib/engine/card';
 
 const TEST_PASSWORD = 'testpass123';
 
@@ -32,12 +34,19 @@ async function ensureTestUser(): Promise<string> {
 async function clearUserData(userId: string) {
   const tables = [
     'card_holds',
+    'card_auths',
     'receipts',
     'orders',
     'positions',
     'ledger_journal_entries',
     'ledger_accounts',
     'policy',
+    'raw_events',
+    'normalized_events',
+    'liquidation_jobs',
+    'ach_transfers',
+    'reconciliation_reports',
+    'internal_alerts',
   ];
 
   for (const table of tables) {
@@ -108,6 +117,14 @@ test('computeSpendableNow respects active holds and buffer', async () => {
 test('column webhooks are idempotent', async () => {
   const column = new ColumnAdapter();
 
+  // First deposit funds so auth requests can be approved
+  await column.handleAchEvent({
+    external_id: `ach-${randomUUID()}`,
+    user_id: userId,
+    amount_cents: 10000,
+    direction: 'credit',
+  });
+
   const authExternalId = `auth-${randomUUID()}`;
   await column.handleAuthRequest({
     external_id: authExternalId,
@@ -159,7 +176,7 @@ test('column webhooks are idempotent', async () => {
     supabaseAdmin
       .from('ledger_journal_entries')
       .select('id')
-      .eq('external_source', 'column')
+      .eq('external_source', 'card')
       .eq('external_id', txnExternalId)
   );
   assert.equal(entries.length, 1);
@@ -177,6 +194,7 @@ test('column webhooks are idempotent', async () => {
 test('flow: deposit, trade, auth, settlement, refund', async () => {
   const column = new ColumnAdapter();
   const brokerage = new BrokerageAdapter();
+  const card = new CardService();
   const spendable = new SpendableEngine();
 
   await column.handleAchEvent({
@@ -196,27 +214,28 @@ test('flow: deposit, trade, auth, settlement, refund', async () => {
   await brokerage.fillOrder(order);
 
   const authExternalId = `auth-${randomUUID()}`;
-  await column.handleAuthRequest({
+  await card.handleAuthRequest({
     external_id: authExternalId,
     user_id: userId,
     merchant_name: 'Blue Bottle',
     amount_cents: 1200,
-  });
+  }, { source: 'test' });
 
-  await column.handleTransactionPosted({
+  await card.handleSettlement({
     external_id: `txn-${randomUUID()}`,
     user_id: userId,
     merchant_name: 'Blue Bottle',
     amount_cents: 1200,
     auth_id: authExternalId,
-  });
+  }, { source: 'test' });
 
-  await column.handleTransactionPosted({
+  await card.handleRefund({
     external_id: `refund-${randomUUID()}`,
     user_id: userId,
     merchant_name: 'Blue Bottle',
-    amount_cents: -600,
-  });
+    amount_cents: 600,
+    auth_id: authExternalId,
+  }, { source: 'test' });
 
   const result = await spendable.computeSpendableNow(userId);
   assert.equal(result.spendable_cents, 20000 - 5000 - 1200 + 600);
@@ -233,4 +252,35 @@ test('flow: deposit, trade, auth, settlement, refund', async () => {
   assert.ok(types.includes('auth_hold'));
   assert.ok(types.includes('settlement'));
   assert.ok(types.includes('refund'));
+});
+
+test('out-of-order card events converge', async () => {
+  const card = new CardService();
+
+  const authId = `auth-${randomUUID()}`;
+  await card.handleSettlement({
+    external_id: `settle-${randomUUID()}`,
+    user_id: userId,
+    merchant_name: 'Notion',
+    amount_cents: 2500,
+    auth_id: authId,
+  }, { source: 'test' });
+
+  await card.handleAuthRequest({
+    external_id: authId,
+    user_id: userId,
+    merchant_name: 'Notion',
+    amount_cents: 2500,
+  }, { source: 'test' });
+
+  const authState = await unwrap(
+    supabaseAdmin
+      .from('card_auths')
+      .select('status, captured_cents')
+      .eq('auth_id', authId)
+      .single()
+  );
+
+  assert.equal(authState.status, 'settled');
+  assert.equal(Number(authState.captured_cents), 2500);
 });

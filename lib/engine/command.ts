@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-import { LedgerService } from './ledger';
 import { ReceiptBuilder } from './receipts';
 import type { CommandConfirmRequest, CommandPreview } from './types';
 import { BrokerageAdapter } from './integrations/brokerage';
@@ -7,7 +6,6 @@ import { CryptoAdapter } from './integrations/crypto';
 import { SpendableEngine } from './spendable';
 
 export class CommandService {
-  private ledger = new LedgerService();
   private receipts = new ReceiptBuilder();
   private spendable = new SpendableEngine();
   private brokerage = new BrokerageAdapter();
@@ -44,6 +42,35 @@ export class CommandService {
         preview_title: 'Support request',
         preview_body: 'We will connect you with Bloom support.',
         confirm_required: false,
+        idempotency_key: idempotencyKey,
+      };
+    }
+
+    const transferMatch = trimmed.match(/transfer\s+\$?([\d,.]+)/i);
+    if (transferMatch) {
+      const notional = Math.round(parseFloat(transferMatch[1].replace(/,/g, '')) * 100);
+      return {
+        action: 'transfer',
+        notional_cents: notional,
+        preview_title: 'Transfer',
+        preview_body: `$${(notional / 100).toFixed(2)} transfer request`,
+        confirm_required: true,
+        idempotency_key: idempotencyKey,
+      };
+    }
+
+    const convertMatch = trimmed.match(/convert\s+\$?([\d,.]+)\s+([a-zA-Z]+)\s+to\s+([a-zA-Z]+)/i);
+    if (convertMatch) {
+      const notional = Math.round(parseFloat(convertMatch[1].replace(/,/g, '')) * 100);
+      const fromAsset = convertMatch[2].toUpperCase();
+      const toAsset = convertMatch[3].toUpperCase();
+      return {
+        action: 'convert',
+        symbol: fromAsset,
+        notional_cents: notional,
+        preview_title: `Convert ${fromAsset} to ${toAsset}`,
+        preview_body: `$${(notional / 100).toFixed(2)} conversion`,
+        confirm_required: true,
         idempotency_key: idempotencyKey,
       };
     }
@@ -112,6 +139,23 @@ export class CommandService {
       return { ok: true };
     }
 
+    if (payload.action === 'transfer') {
+      await this.receipts.recordReceipt({
+        user_id: userId,
+        type: 'transfer_request',
+        title: 'Transfer requested',
+        subtitle: 'Awaiting processing',
+        amount_cents: payload.notional_cents ?? 0,
+        metadata: {
+          idempotency_key: payload.idempotency_key,
+          what_happened: 'Transfer request created.',
+          what_changed: 'No balance change yet.',
+          whats_next: 'Funds will move when processed.',
+        },
+      });
+      return { ok: true };
+    }
+
     if (!payload.symbol || !payload.notional_cents) {
       throw new Error('Missing order details');
     }
@@ -119,6 +163,39 @@ export class CommandService {
     const symbol = payload.symbol.toUpperCase();
     const notional = payload.notional_cents;
     const isCrypto = ['BTC', 'ETH', 'SOL'].includes(symbol);
+
+    if (payload.action === 'convert') {
+      const targetSymbol = isCrypto
+        ? (process.env.BLOOM_DEFAULT_ETF_SYMBOL || 'SPY')
+        : 'BTC';
+      const adapter = isCrypto ? this.crypto : this.brokerage;
+      const order = await adapter.placeOrder({
+        user_id: userId,
+        symbol,
+        side: 'sell',
+        notional_cents: notional,
+        idempotency_key: payload.idempotency_key,
+      });
+
+      await adapter.fillOrder(order);
+
+      await this.receipts.recordReceipt({
+        user_id: userId,
+        type: 'convert',
+        title: `Converted ${symbol} to ${targetSymbol}`,
+        subtitle: 'Conversion executed',
+        amount_cents: notional,
+        metadata: {
+          idempotency_key: payload.idempotency_key,
+          what_happened: 'Conversion filled.',
+          what_changed: `${symbol} reduced, ${targetSymbol} increased.`,
+          whats_next: 'Holdings updated.',
+        },
+      });
+
+      return { ok: true, order_id: order.id };
+    }
+
     const adapter = isCrypto ? this.crypto : this.brokerage;
 
     const order = await adapter.placeOrder({

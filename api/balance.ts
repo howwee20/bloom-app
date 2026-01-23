@@ -1,5 +1,6 @@
 import { SpendableEngine } from '@/lib/engine/spendable';
 import { getUserIdFromRequest } from '@/lib/server/auth';
+import { logAdapterSummary } from '@/lib/server/envSummary';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
@@ -7,6 +8,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    logAdapterSummary();
     const userId = await getUserIdFromRequest(req);
     const engine = new SpendableEngine();
     const spendable = await engine.computeSpendableNow(userId);
@@ -19,6 +21,9 @@ export default async function handler(req: any, res: any) {
       total_value_cents: totalValueCents,
       day_pnl_cents: 0,
       updated_at: new Date().toISOString(),
+      spend_power_cents: spendable.spend_power_cents,
+      bridge_outstanding_cents: spendable.bridge_outstanding_cents,
+      balance_mode: spendable.balance_mode,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error';

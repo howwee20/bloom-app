@@ -25,6 +25,9 @@ Recommended:
 - `DEV_USER_EMAIL`, `DEV_USER_PASSWORD` (used by seed script if `DEV_USER_ID` is not set)
 - `EXPO_PUBLIC_API_BASE_URL` (native/mobile only, e.g. `https://your-vercel-url`)
 - `COLUMN_WEBHOOK_SECRET` (optional; enables webhook signature verification)
+- `ADMIN_API_KEY` or `DEV_ADMIN_KEY` (for admin endpoints)
+- `BLOOM_BALANCE_MODE` (`debit` or `spend_power`)
+- `BRIDGE_ENABLED` (true/false)
 
 3) Run database migrations
 
@@ -59,12 +62,45 @@ npx vercel dev
 - `POST /api/webhooks/column/auth_request`
 - `POST /api/webhooks/column/transaction_posted`
 - `POST /api/webhooks/column/ach_event`
+- `POST /api/webhooks/card/auth`
+- `POST /api/webhooks/card/settlement`
+- `POST /api/webhooks/card/refund`
+- `POST /api/webhooks/card/reversal`
+- `POST /api/webhooks/card/dispute`
+- `POST /api/cron/liquidate`
+- `POST /api/cron/reconcile`
 
 ## Scripts
 
 - `npm run seed:ledger` – seeds a demo user + ledger data
 - `npm run simulate:column` – posts mock Column webhooks
+- `npm run run:liquidate` – runs liquidation loop for `DEV_USER_ID`
+- `npm run reconcile` – runs reconciliation loop for `DEV_USER_ID`
+- `npm run e2e:kernel` – end-to-end kernel smoke test (mock mode)
 - `npm test` – runs backend engine tests (requires env + migrated DB)
+
+## Mock vs Real Mode
+
+Adapters auto-switch based on env vars:
+
+- Bank/BaaS: `COLUMN_API_KEY` → real, otherwise mock
+- Card Processor: `CARD_PROCESSOR_API_KEY` → real, otherwise mock
+- Brokerage: `ALPACA_API_KEY` → real, otherwise paper
+- Crypto: `COINBASE_API_KEY` or `ZEROHASH_API_KEY` → real, otherwise paper
+
+## Day Column Keys Arrive (Checklist)
+
+1) Set env vars in Vercel:
+   - `COLUMN_API_KEY`
+   - `COLUMN_WEBHOOK_SECRET`
+2) Point Column webhooks at:
+   - `/api/webhooks/column/auth_request`
+   - `/api/webhooks/column/transaction_posted`
+   - `/api/webhooks/column/ach_event`
+3) Set `BLOOM_BALANCE_MODE=debit` (safe default) and `BRIDGE_ENABLED=false` for first dogfood.
+4) Run `npm run reconcile` and verify drift reports are zero.
+5) Enable card processor keys and point their webhooks to `/api/webhooks/card/*`.
+6) Enable brokerage + crypto keys when ready.
 
 ## Notes
 

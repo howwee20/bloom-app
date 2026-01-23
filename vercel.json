@@ -9,6 +9,14 @@
     {
       "path": "/api/cron/update-prices",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/liquidate",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile",
+      "schedule": "0 * * * *"
     }
   ]
 }

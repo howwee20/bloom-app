@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/server/supabaseAdmin';
+import { EventStore } from '../eventStore';
 import { LedgerService } from '../ledger';
 import { ReceiptBuilder } from '../receipts';
 
@@ -10,7 +11,7 @@ type PlaceOrderInput = {
   idempotency_key: string;
 };
 
-type OrderRecord = {
+export type OrderRecord = {
   id: string;
   user_id: string;
   instrument_id: string;
@@ -20,9 +21,18 @@ type OrderRecord = {
   external_order_id?: string | null;
 };
 
-export class CryptoAdapter {
+export type Quote = { symbol: string; price_cents: number; as_of: string };
+
+export interface CryptoAdapterContract {
+  placeOrder(input: PlaceOrderInput): Promise<OrderRecord>;
+  fillOrder(order: OrderRecord): Promise<void>;
+  getQuote(symbol: string): Promise<Quote>;
+}
+
+export class PaperCryptoAdapter implements CryptoAdapterContract {
   private ledger = new LedgerService();
   private receipts = new ReceiptBuilder();
+  private eventStore = new EventStore();
 
   async ensureInstrument(symbol: string) {
     const { data: existing } = await supabaseAdmin
@@ -58,6 +68,17 @@ export class CryptoAdapter {
 
     if (existing) return existing as OrderRecord;
 
+    await this.eventStore.recordNormalizedEvent({
+      source: 'crypto',
+      domain: 'trade',
+      event_type: 'order_placed',
+      external_id: input.idempotency_key,
+      user_id: input.user_id,
+      status: 'placed',
+      amount_cents: input.notional_cents,
+      metadata: { symbol: input.symbol, side: input.side },
+    });
+
     const { data, error } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -65,7 +86,7 @@ export class CryptoAdapter {
         instrument_id: instrument.id,
         side: input.side,
         notional_cents: input.notional_cents,
-        status: 'submitted',
+        status: 'placed',
         external_order_id: input.idempotency_key,
       })
       .select('*')
@@ -78,7 +99,7 @@ export class CryptoAdapter {
   async fillOrder(order: OrderRecord) {
     await supabaseAdmin
       .from('orders')
-      .update({ status: 'filled' })
+      .update({ status: 'filled', filled_cents: Math.abs(order.notional_cents), updated_at: new Date().toISOString() })
       .eq('id', order.id);
 
     const instrument = await supabaseAdmin
@@ -148,5 +169,60 @@ export class CryptoAdapter {
       order.side,
       order.external_order_id || order.id
     );
+
+    await this.eventStore.recordNormalizedEvent({
+      source: 'crypto',
+      domain: 'trade',
+      event_type: 'order_filled',
+      external_id: order.external_order_id || order.id,
+      user_id: order.user_id,
+      status: 'filled',
+      amount_cents: Math.abs(order.notional_cents),
+      metadata: { symbol: instrument.data.symbol, side: order.side },
+    });
+  }
+
+  async getQuote(symbol: string): Promise<Quote> {
+    const price_cents = symbol === 'BTC' ? 6000000 : 1000000;
+    return { symbol, price_cents, as_of: new Date().toISOString() };
+  }
+}
+
+export class PlaceholderCryptoAdapter implements CryptoAdapterContract {
+  async placeOrder(input: PlaceOrderInput): Promise<OrderRecord> {
+    if (!process.env.COINBASE_API_KEY && !process.env.ZEROHASH_API_KEY) {
+      throw new Error('Missing crypto provider API keys');
+    }
+    return new PaperCryptoAdapter().placeOrder(input);
+  }
+
+  async fillOrder(order: OrderRecord) {
+    return new PaperCryptoAdapter().fillOrder(order);
+  }
+
+  async getQuote(symbol: string): Promise<Quote> {
+    return new PaperCryptoAdapter().getQuote(symbol);
+  }
+}
+
+export class CryptoAdapter implements CryptoAdapterContract {
+  private impl: CryptoAdapterContract;
+
+  constructor() {
+    this.impl = process.env.COINBASE_API_KEY || process.env.ZEROHASH_API_KEY
+      ? new PlaceholderCryptoAdapter()
+      : new PaperCryptoAdapter();
+  }
+
+  placeOrder(input: PlaceOrderInput) {
+    return this.impl.placeOrder(input);
+  }
+
+  fillOrder(order: OrderRecord) {
+    return this.impl.fillOrder(order);
+  }
+
+  getQuote(symbol: string) {
+    return this.impl.getQuote(symbol);
   }
 }
