@@ -22,6 +22,12 @@ interface BloomCardProps {
   footer?: ReactNode;
   footerOffset?: number;
   footerHeight?: number;
+  flipData?: {
+    payments: { id?: string; title: string; time_label: string; amount_cents: number }[];
+    holdings: { label: string; amount_cents: number; kind?: string }[];
+    other_assets?: { label: string; amount_cents: number }[];
+    liabilities?: { label: string; amount_cents: number }[];
+  };
 }
 
 const RECENT_PAYMENTS = [
@@ -659,6 +665,7 @@ export function BloomCard({
   footer,
   footerOffset = 16,
   footerHeight = 52,
+  flipData,
 }: BloomCardProps) {
   const [flipped, setFlipped] = useState(false);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
@@ -890,6 +897,17 @@ export function BloomCard({
     }).format(value)} today`;
   };
 
+  const formatCents = (value: number) => {
+    const abs = Math.abs(value);
+    const formatted = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(abs / 100);
+    return value < 0 ? `-${formatted}` : formatted;
+  };
+
   const toggleFlip = () => {
     const next = !flipped;
     setFlipped(next);
@@ -933,6 +951,40 @@ export function BloomCard({
 
   const displayValue = totalValue > 0 ? formatValue(totalValue) : '$47,291';
   const displayChange = totalValue > 0 ? formatChange(dailyChange) : '+ $127 today';
+  const payments = flipData?.payments?.length
+    ? flipData.payments.map((p) => ({
+        merchant: p.title,
+        amount: formatCents(p.amount_cents),
+        time: p.time_label,
+      }))
+    : RECENT_PAYMENTS;
+
+  const holdingsRaw = flipData?.holdings?.length
+    ? flipData.holdings.map((h) => ({
+        label: h.label,
+        value: formatCents(h.amount_cents),
+        amount: h.amount_cents,
+      }))
+    : HOLDINGS.map((h) => ({
+        label: h.label,
+        value: h.value,
+        amount: Math.round(h.pct * 10000),
+      }));
+
+  const holdingsTotal = holdingsRaw.reduce((sum, h) => sum + Math.max(h.amount, 0), 0) || 1;
+  const holdings = holdingsRaw.map((h) => ({
+    label: h.label,
+    value: h.value,
+    pct: Math.max(h.amount, 0) / holdingsTotal,
+  }));
+
+  const otherAssets = flipData?.other_assets?.length
+    ? flipData.other_assets.map((a) => ({ label: a.label, value: formatCents(a.amount_cents) }))
+    : OTHER_ASSETS;
+
+  const liabilities = flipData?.liabilities?.length
+    ? flipData.liabilities.map((l) => ({ label: l.label, value: formatCents(l.amount_cents) }))
+    : LIABILITIES;
 
   const renderCardFace = (isBack: boolean) => (
     <>
@@ -1389,7 +1441,7 @@ export function BloomCard({
           <View style={styles.paymentsSection}>
             <Text style={styles.sectionTitle}>Payments</Text>
             <View style={styles.paymentList}>
-              {RECENT_PAYMENTS.map((item) => (
+              {payments.map((item) => (
                 <View key={item.merchant} style={styles.paymentRow}>
                   <View style={styles.paymentMeta}>
                     <Text style={styles.paymentMerchant}>{item.merchant}</Text>
@@ -1414,7 +1466,7 @@ export function BloomCard({
               ))}
             </View>
             <View style={styles.holdingsList}>
-              {HOLDINGS.map((item) => (
+              {holdings.map((item) => (
                 <View key={item.label} style={styles.holdingRow}>
                   <View style={styles.holdingMeta}>
                     <Text style={styles.holdingLabel}>{item.label}</Text>
@@ -1435,7 +1487,7 @@ export function BloomCard({
             </View>
             <View style={styles.assetsGrid}>
               <View style={styles.assetsColumn}>
-                {OTHER_ASSETS.map((item) => (
+                {otherAssets.map((item) => (
                   <View key={item.label} style={styles.assetRow}>
                     <Text style={styles.assetLabel}>{item.label}</Text>
                     <Text style={styles.assetValue}>{item.value}</Text>
@@ -1443,7 +1495,7 @@ export function BloomCard({
                 ))}
               </View>
               <View style={styles.assetsColumn}>
-                {LIABILITIES.map((item) => (
+                {liabilities.map((item) => (
                   <View key={item.label} style={styles.assetRow}>
                     <Text style={styles.assetLabel}>{item.label}</Text>
                     <Text style={styles.assetValue}>{item.value}</Text>

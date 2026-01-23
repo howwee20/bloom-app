@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 import { fonts, theme } from '../../constants/Colors';
-import { CommandBar, parseCommand, getSearchQuery } from '../../components/CommandBar';
+import { CommandBar } from '../../components/CommandBar';
 import { BloomCard } from '../../components/BloomCard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -69,6 +69,13 @@ interface BloomOffer {
   condition: 'new' | 'used' | 'deadstock';
   source_url: string;
   last_updated_at: string;
+}
+
+interface FlipPayload {
+  payments: { id?: string; title: string; time_label: string; amount_cents: number }[];
+  holdings: { label: string; amount_cents: number; kind?: string }[];
+  other_assets: { label: string; amount_cents: number }[];
+  liabilities: { label: string; amount_cents: number }[];
 }
 
 // Source colors for offer cards
@@ -220,15 +227,18 @@ export default function HomeScreen() {
   // Command bar state
   const [commandActive, setCommandActive] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
-const [commandResults, setCommandResults] = useState<BloomOffer[]>([]);
-const [commandLoading, setCommandLoading] = useState(false);
-const [selectedOffer, setSelectedOffer] = useState<BloomOffer | null>(null);
-const [showBuyModal, setShowBuyModal] = useState(false);
-const [buySize, setBuySize] = useState('');
-const [purchasing, setPurchasing] = useState(false);
-const [keyboardHeight, setKeyboardHeight] = useState(0);
-const commandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-const insets = useSafeAreaInsets();
+  const [commandLoading, setCommandLoading] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState<BloomOffer | null>(null);
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [buySize, setBuySize] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const insets = useSafeAreaInsets();
+  const [spendableCents, setSpendableCents] = useState<number | null>(null);
+  const [dayPnlCents, setDayPnlCents] = useState<number | null>(null);
+  const [flipData, setFlipData] = useState<FlipPayload | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const cardMaxWidth = 9999; // allow full bleed on phone
   const topOffset = 0;
@@ -238,6 +248,56 @@ const insets = useSafeAreaInsets();
   const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
   const cardHeight = Math.max(viewportHeight - topPadding - insets.bottom, 520);
   const cardWidth = Math.min(Math.round(viewportWidth * 1), cardMaxWidth);
+  const apiBaseUrl = Platform.OS === 'web'
+    ? ''
+    : (process.env.EXPO_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+
+  const fetchBloomSummary = useCallback(async (options?: { silent?: boolean }) => {
+    if (Platform.OS !== 'web' && !apiBaseUrl) {
+      if (!options?.silent) {
+        setBalanceError('Missing EXPO_PUBLIC_API_BASE_URL for native API calls.');
+      }
+      return;
+    }
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.user?.id) {
+      headers['x-user-id'] = session.user.id;
+    }
+
+    if (!options?.silent) {
+      setBalanceLoading(true);
+    }
+
+    try {
+      const [balanceRes, flipRes] = await Promise.all([
+        fetch(`${apiBaseUrl}/api/balance`, { headers }),
+        fetch(`${apiBaseUrl}/api/flip`, { headers }),
+      ]);
+
+      if (!balanceRes.ok) {
+        throw new Error(`Balance request failed (${balanceRes.status})`);
+      }
+      if (!flipRes.ok) {
+        throw new Error(`Flip request failed (${flipRes.status})`);
+      }
+
+      const balanceJson = await balanceRes.json();
+      const flipJson = await flipRes.json();
+
+      setSpendableCents(balanceJson.spendable_cents ?? null);
+      setDayPnlCents(balanceJson.day_pnl_cents ?? 0);
+      setFlipData(flipJson);
+      setBalanceError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch Bloom balance.';
+      setBalanceError(message);
+    } finally {
+      if (!options?.silent) {
+        setBalanceLoading(false);
+      }
+    }
+  }, [apiBaseUrl, session?.user?.id]);
 
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
@@ -246,50 +306,6 @@ const insets = useSafeAreaInsets();
   // Command bar handlers
   const handleCommandQueryChange = (query: string) => {
     setCommandQuery(query);
-
-    // Clear previous debounce
-    if (commandDebounceRef.current) {
-      clearTimeout(commandDebounceRef.current);
-    }
-
-    // Get the actual search query (strips buy/sell prefixes)
-    const searchQuery = getSearchQuery(query);
-    if (!searchQuery) {
-      setCommandResults([]);
-      setCommandLoading(false);
-      return;
-    }
-
-    // Debounced search
-    setCommandLoading(true);
-    commandDebounceRef.current = setTimeout(async () => {
-      try {
-        const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-        const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-        const response = await fetch(
-          `${supabaseUrl}/functions/v1/get-offers?q=${encodeURIComponent(searchQuery)}&limit=20`,
-          {
-            headers: {
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setCommandResults(data.offers || []);
-        } else {
-          setCommandResults([]);
-        }
-      } catch (error) {
-        console.error('Command search error:', error);
-        setCommandResults([]);
-      } finally {
-        setCommandLoading(false);
-      }
-    }, 300);
   };
 
   const handleCommandFocus = () => {
@@ -303,22 +319,95 @@ const insets = useSafeAreaInsets();
   const handleCommandClear = () => {
     setCommandQuery('');
     setCommandActive(false);
-    setCommandResults([]);
     setCommandLoading(false);
     Keyboard.dismiss();
   };
 
-  const handleCommandSubmit = () => {
-    const intent = parseCommand(commandQuery);
+  const handleCommandSubmit = async () => {
+    const trimmed = commandQuery.trim();
+    if (!trimmed || commandLoading) return;
 
-    if (intent.type === 'sell') {
-      // Open sell modal
-      setShowSellModal(true);
+    if (Platform.OS !== 'web' && !apiBaseUrl) {
+      showAlert('Missing API base URL', 'Set EXPO_PUBLIC_API_BASE_URL for native requests.');
       return;
     }
 
-    // For buy/search, results are already shown
-    // User will tap an offer to proceed
+    setCommandLoading(true);
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.user?.id) {
+      headers['x-user-id'] = session.user.id;
+    }
+
+    try {
+      const previewRes = await fetch(`${apiBaseUrl}/api/command`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ text: trimmed }),
+      });
+
+      if (!previewRes.ok) {
+        throw new Error(`Command preview failed (${previewRes.status})`);
+      }
+
+      const preview = await previewRes.json();
+
+      const execute = async (showSuccess: boolean) => {
+        const confirmRes = await fetch(`${apiBaseUrl}/api/command/confirm`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(preview),
+        });
+
+        if (!confirmRes.ok) {
+          throw new Error(`Command failed (${confirmRes.status})`);
+        }
+
+        const payload = await confirmRes.json();
+
+        if (preview.action === 'balance' && typeof payload.spendable_cents === 'number') {
+          setSpendableCents(payload.spendable_cents);
+        }
+        if (preview.action === 'balance' && typeof payload.day_pnl_cents === 'number') {
+          setDayPnlCents(payload.day_pnl_cents);
+        }
+        if (preview.action === 'breakdown' && payload?.payments) {
+          setFlipData(payload);
+        }
+
+        await fetchBloomSummary({ silent: true });
+
+        if (showSuccess) {
+          showAlert(preview.preview_title, preview.preview_body);
+        }
+      };
+
+      if (preview.confirm_required) {
+        showAlert(preview.preview_title, preview.preview_body, [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Confirm',
+            style: 'destructive',
+            onPress: () => {
+              execute(false).catch((error) => {
+                const message = error instanceof Error ? error.message : 'Command failed.';
+                showAlert('Command failed', message);
+              });
+            },
+          },
+        ]);
+      } else {
+        await execute(true);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Command failed.';
+      showAlert('Command failed', message);
+    } finally {
+      setCommandLoading(false);
+      setCommandQuery('');
+      setCommandActive(false);
+      Keyboard.dismiss();
+    }
   };
 
   const handleSelectOffer = (offer: BloomOffer) => {
@@ -432,8 +521,9 @@ const insets = useSafeAreaInsets();
       setIsFocused(true);
       setLoading(true);
       fetchPortfolio();
+      fetchBloomSummary();
       return () => setIsFocused(false);
-    }, [fetchPortfolio])
+    }, [fetchPortfolio, fetchBloomSummary])
   );
 
   useEffect(() => {
@@ -492,15 +582,17 @@ const insets = useSafeAreaInsets();
 
     const interval = setInterval(() => {
       fetchPortfolio({ silent: true });
+      fetchBloomSummary({ silent: true });
     }, pollIntervalMs);
 
     return () => clearInterval(interval);
-  }, [session, isForeground, isFocused, pollIntervalMs, fetchPortfolio, loading]);
+  }, [session, isForeground, isFocused, pollIntervalMs, fetchPortfolio, fetchBloomSummary, loading]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchPortfolio();
-  }, [fetchPortfolio]);
+    fetchBloomSummary();
+  }, [fetchPortfolio, fetchBloomSummary]);
 
   // For market prices - shows "Updating..." when price is unavailable
   const formatPrice = (price: number | null | undefined) => {
@@ -1015,8 +1107,12 @@ const insets = useSafeAreaInsets();
   })();
 
   // Always show bloom custody value - no toggles, no options
-  const displayedTotalValue = portfolioValue;
-  const displayedTotalPnl = portfolioPnl;
+  const displayedTotalValue = spendableCents !== null
+    ? spendableCents / 100
+    : 0;
+  const displayedTotalPnl = dayPnlCents !== null
+    ? dayPnlCents / 100
+    : 0;
   const hasItems = tokens.length > 0 || ownedAssets.length > 0;
 
   const totalPnlColor = !displayedTotalPnl || displayedTotalPnl === 0
@@ -1080,12 +1176,13 @@ const insets = useSafeAreaInsets();
           ]}
         >
           <BloomCard
-            totalValue={portfolioValue + homeValue}
+            totalValue={displayedTotalValue}
             dailyChange={displayedTotalPnl || 0}
             style={{
               height: cardHeight,
               width: cardWidth,
             }}
+            flipData={flipData || undefined}
             footerOffset={commandBarBottom}
             footerHeight={commandBarHeight}
             footer={
