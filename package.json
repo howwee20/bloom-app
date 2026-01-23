@@ -12,6 +12,7 @@
     "simulate:column": "npx tsx scripts/simulate-column-webhook.ts",
     "column:test": "npx tsx scripts/test-column.ts",
     "column:setup": "npx tsx scripts/column-setup.ts",
+    "column:import": "npx tsx scripts/column-import.ts",
     "run:liquidate": "npx tsx scripts/run-liquidate.ts",
     "reconcile": "npx tsx scripts/run-reconcile.ts",
     "e2e:kernel": "npx tsx scripts/e2e-kernel.ts",

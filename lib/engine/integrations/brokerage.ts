@@ -11,6 +11,25 @@ type PlaceOrderInput = {
   idempotency_key: string;
 };
 
+type AlpacaConfig = {
+  key: string;
+  secret: string;
+  baseUrl: string;
+  dataUrl: string;
+};
+
+function resolveAlpacaConfig(): AlpacaConfig | null {
+  const key = process.env.ALPACA_API_KEY || process.env.ALPACA_KEY;
+  const secret = process.env.ALPACA_SECRET_KEY || process.env.ALPACA_SECRET;
+  if (!key || !secret) return null;
+  return {
+    key,
+    secret,
+    baseUrl: process.env.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets',
+    dataUrl: process.env.ALPACA_DATA_URL || 'https://data.alpaca.markets',
+  };
+}
+
 export type OrderRecord = {
   id: string;
   user_id: string;
@@ -22,11 +41,18 @@ export type OrderRecord = {
 };
 
 export type Quote = { symbol: string; price_cents: number; as_of: string };
+export type BrokeragePosition = {
+  symbol: string;
+  qty: number;
+  market_value_cents: number;
+  cost_basis_cents: number;
+};
 
 export interface BrokerageAdapterContract {
   placeOrder(input: PlaceOrderInput): Promise<OrderRecord>;
   fillOrder(order: OrderRecord): Promise<void>;
   getQuote(symbol: string): Promise<Quote>;
+  getPositions(userId: string): Promise<BrokeragePosition[]>;
 }
 
 export class PaperBrokerageAdapter implements BrokerageAdapterContract {
@@ -180,6 +206,22 @@ export class PaperBrokerageAdapter implements BrokerageAdapterContract {
       amount_cents: Math.abs(order.notional_cents),
       metadata: { symbol: instrument.data.symbol, side: order.side },
     });
+  }
+
+  async getPositions(userId: string): Promise<BrokeragePosition[]> {
+    const { data, error } = await supabaseAdmin
+      .from('positions')
+      .select('qty, cost_basis_cents, instruments(symbol)')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    return (data || []).map((row) => ({
+      symbol: row.instruments?.symbol || 'UNKNOWN',
+      qty: Number(row.qty || 0),
+      market_value_cents: Number(row.cost_basis_cents || 0),
+      cost_basis_cents: Number(row.cost_basis_cents || 0),
+    }));
   }
 
   async getQuote(symbol: string): Promise<Quote> {
