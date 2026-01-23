@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { LiquidationEngine } from '../lib/engine/liquidation';
 
 async function run() {

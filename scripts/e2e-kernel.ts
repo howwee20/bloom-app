@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '../lib/server/supabaseAdmin';
 import { ColumnAdapter } from '../lib/engine/integrations/column';
@@ -12,8 +13,9 @@ const DEFAULT_EMAIL = 'e2e@bloom.local';
 const DEFAULT_PASSWORD = 'e2e-pass-123';
 
 async function ensureUser() {
-  const existing = await supabaseAdmin.auth.admin.getUserByEmail(DEFAULT_EMAIL);
-  if (existing.data?.user) return existing.data.user.id;
+  const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+  const existingUser = listData?.users?.find((u) => u.email === DEFAULT_EMAIL);
+  if (existingUser) return existingUser.id;
 
   const created = await supabaseAdmin.auth.admin.createUser({
     email: DEFAULT_EMAIL,

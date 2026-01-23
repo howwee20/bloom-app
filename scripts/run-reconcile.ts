@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { ReconciliationService } from '../lib/engine/reconcile';
 
 async function run() {
