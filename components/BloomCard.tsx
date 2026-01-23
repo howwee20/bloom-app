@@ -1353,10 +1353,10 @@ export function BloomCard({
         pointerEvents="none"
       />
 
-      {/* Footer dock inside card */}
-      {/* Footer dock (command bar) - back only */}
-      {isBack && footer && (
-        <View
+      {/* Footer dock inside card - visible on both faces */}
+      {footer && (
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
           style={[
             styles.footerDock,
             {
@@ -1367,7 +1367,7 @@ export function BloomCard({
           ]}
         >
           {footer}
-        </View>
+        </Pressable>
       )}
 
       {/* Content */}
