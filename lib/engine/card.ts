@@ -3,6 +3,7 @@ import { EventStore } from './eventStore';
 import { LedgerService } from './ledger';
 import { ReceiptBuilder } from './receipts';
 import { SpendableEngine } from './spendable';
+import { receiptCatalog } from './receiptCatalog';
 
 export type CardAuthPayload = {
   external_id: string;
@@ -231,6 +232,15 @@ export class CardService {
     const approved = canCover || bridgeAllowed;
 
     if (!approved) {
+      await this.receipts.recordReceipt({
+        user_id: payload.user_id,
+        ...receiptCatalog.cardAuthDeclined({
+          merchant: payload.merchant_name,
+          amount_cents: payload.amount_cents,
+          reason: 'Insufficient funds',
+          external_id: payload.external_id,
+        }),
+      });
       return { approved: false, reason_code: 'insufficient_funds' };
     }
 
@@ -370,16 +380,9 @@ export class CardService {
 
       await this.receipts.recordReceipt({
         user_id: payload.user_id,
-        type: 'reversal',
-        title: 'Authorization released',
-        subtitle: 'Hold removed',
-        amount_cents: 0,
-        metadata: {
+        ...receiptCatalog.cardReversal({
           external_id: payload.external_id,
-          what_happened: 'Authorization reversed.',
-          what_changed: 'Hold released.',
-          whats_next: 'Spendable restored.',
-        },
+        }),
       });
     }
   }
@@ -443,16 +446,11 @@ export class CardService {
 
     await this.receipts.recordReceipt({
       user_id: payload.user_id,
-      type: 'refund',
-      title: payload.merchant_name,
-      subtitle: 'Refund posted',
-      amount_cents: Math.abs(payload.amount_cents),
-      metadata: {
+      ...receiptCatalog.cardRefund({
+        merchant: payload.merchant_name,
+        amount_cents: Math.abs(payload.amount_cents),
         external_id: payload.external_id,
-        what_happened: 'Refund posted.',
-        what_changed: 'Cash balance increased.',
-        whats_next: 'Funds are available now.',
-      },
+      }),
     });
   }
 
@@ -480,16 +478,10 @@ export class CardService {
 
     await this.receipts.recordReceipt({
       user_id: payload.user_id,
-      type: 'dispute',
-      title: 'Dispute filed',
-      subtitle: payload.reason ?? 'Card dispute',
-      amount_cents: 0,
-      metadata: {
+      ...receiptCatalog.cardDispute({
+        reason: payload.reason ?? undefined,
         external_id: payload.external_id,
-        what_happened: 'Dispute opened.',
-        what_changed: 'Funds under review.',
-        whats_next: 'We will notify you with the outcome.',
-      },
+      }),
     });
   }
 }

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/server/supabaseAdmin';
 import type { ReceiptInput } from './types';
+import { receiptCatalog } from './receiptCatalog';
 
 export class ReceiptBuilder {
   async recordReceipt(input: ReceiptInput) {
@@ -44,65 +45,45 @@ export class ReceiptBuilder {
   async recordAuthHold(userId: string, merchant: string, amountCents: number, externalId: string) {
     return this.recordReceipt({
       user_id: userId,
-      type: 'auth_hold',
-      title: merchant,
-      subtitle: 'Card authorization',
-      amount_cents: -Math.abs(amountCents),
-      metadata: {
+      ...receiptCatalog.cardAuthHold({
+        merchant,
+        amount_cents: amountCents,
         external_id: externalId,
-        what_happened: 'Card authorization placed.',
-        what_changed: 'Spendable reduced until settlement.',
-        whats_next: 'Hold will settle or release shortly.',
-      },
+      }),
     });
   }
 
   async recordSettlement(userId: string, merchant: string, amountCents: number, externalId: string) {
     return this.recordReceipt({
       user_id: userId,
-      type: 'settlement',
-      title: merchant,
-      subtitle: 'Settlement posted',
-      amount_cents: -Math.abs(amountCents),
-      metadata: {
+      ...receiptCatalog.cardSettlement({
+        merchant,
+        amount_cents: amountCents,
         external_id: externalId,
-        what_happened: 'Card settlement posted.',
-        what_changed: 'Cash balance decreased.',
-        whats_next: 'Receipt is final.',
-      },
+      }),
     });
   }
 
   async recordDeposit(userId: string, amountCents: number, externalId: string) {
     return this.recordReceipt({
       user_id: userId,
-      type: 'deposit_posted',
-      title: 'Deposit',
-      subtitle: 'Funds added',
-      amount_cents: Math.abs(amountCents),
-      metadata: {
+      ...receiptCatalog.achPosted({
+        direction: 'credit',
+        amount_cents: amountCents,
         external_id: externalId,
-        what_happened: 'Deposit posted.',
-        what_changed: 'Cash balance increased.',
-        whats_next: 'Funds are spendable now.',
-      },
+      }),
     });
   }
 
   async recordTradeFill(userId: string, title: string, amountCents: number, side: 'buy' | 'sell', externalId: string) {
     return this.recordReceipt({
       user_id: userId,
-      type: 'trade_filled',
-      title,
-      subtitle: side === 'buy' ? 'Trade filled' : 'Trade sold',
-      amount_cents: side === 'buy' ? -Math.abs(amountCents) : Math.abs(amountCents),
-      metadata: {
-        external_id: externalId,
+      ...receiptCatalog.tradeFilled({
+        symbol: title,
+        amount_cents: amountCents,
         side,
-        what_happened: 'Trade filled.',
-        what_changed: side === 'buy' ? 'Cash moved into investments.' : 'Cash released from holdings.',
-        whats_next: 'Holdings updated.',
-      },
+        external_id: externalId,
+      }),
     });
   }
 }

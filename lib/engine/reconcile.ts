@@ -1,10 +1,13 @@
 import { supabaseAdmin } from '@/lib/server/supabaseAdmin';
 import { getBankAdapter } from './adapters/bank';
 import { LedgerService } from './ledger';
+import { ReceiptBuilder } from './receipts';
+import { receiptCatalog } from './receiptCatalog';
 
 export class ReconciliationService {
   private ledger = new LedgerService();
   private bank = getBankAdapter();
+  private receipts = new ReceiptBuilder();
 
   async reconcileUser(userId: string) {
     const partner = await this.bank.getBalanceTruth(userId);
@@ -40,6 +43,21 @@ export class ReconciliationService {
           message: `Drift detected: ${drift} cents`,
           metadata: { partner_balance_cents: partner.cash_balance_cents, ledger_balance_cents: ledgerBalance },
         });
+
+      await this.receipts.recordReceipt({
+        user_id: userId,
+        ...receiptCatalog.reconcileDrift({
+          drift_cents: drift,
+          external_id: data.id,
+        }),
+      });
+    } else {
+      await this.receipts.recordReceipt({
+        user_id: userId,
+        ...receiptCatalog.reconcileCleared({
+          external_id: data.id,
+        }),
+      });
     }
 
     return data;

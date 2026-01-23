@@ -323,6 +323,27 @@ export default function HomeScreen() {
     Keyboard.dismiss();
   };
 
+  const handleCommandHelp = () => {
+    const examples = [
+      'Try:',
+      'balance / spendable',
+      'breakdown',
+      'holdings',
+      'support',
+      'direct deposit details (dd)',
+      'card status',
+      'freeze card / unfreeze card',
+      'set buffer $500',
+      'allocate 70% stocks 30% btc',
+      'btc quote / stock quote',
+      'transfer $100',
+      'convert $50 btc to stocks',
+      'buy $50 btc',
+      'sell $50 btc',
+    ];
+    showAlert('Command bar', examples.join('\n'));
+  };
+
   const handleCommandSubmit = async () => {
     console.log('[CMD] handleCommandSubmit called');
     const trimmed = commandQuery.trim();
@@ -381,7 +402,8 @@ export default function HomeScreen() {
         if (preview.action === 'balance' && typeof payload.day_pnl_cents === 'number') {
           setDayPnlCents(payload.day_pnl_cents);
         }
-        if (preview.action === 'breakdown' && payload?.payments) {
+        if ((preview.action === 'breakdown' || preview.action === 'holdings')
+          && (payload?.payments || payload?.holdings)) {
           setFlipData(payload);
         }
 
@@ -1209,6 +1231,8 @@ export default function HomeScreen() {
                   onClear={handleCommandClear}
                   onSubmit={handleCommandSubmit}
                   isActive={commandActive}
+                  isLoading={commandLoading}
+                  onHelp={handleCommandHelp}
                 />
               </KeyboardAvoidingView>
             }
@@ -1216,7 +1240,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Command Bar - stays above keyboard */}
+      {/* Command bar lives on the back of the card */}
       {/* Buy Intent Modal and Route Home Modal removed - now navigating to /buy */}
 
       {/* Sell Modal */}

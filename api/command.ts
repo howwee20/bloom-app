@@ -9,14 +9,14 @@ export default async function handler(req: any, res: any) {
 
   try {
     logAdapterSummary();
-    await getUserIdFromRequest(req);
+    const userId = await getUserIdFromRequest(req);
     const { text } = req.body || {};
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: 'Missing text' });
     }
 
     const command = new CommandService();
-    const preview = command.parse(text);
+    const preview = await command.preview(userId, text);
     return res.status(200).json(preview);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error';

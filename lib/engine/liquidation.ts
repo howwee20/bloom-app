@@ -4,6 +4,7 @@ import { CryptoAdapter } from './integrations/crypto';
 import { LedgerService } from './ledger';
 import { ReceiptBuilder } from './receipts';
 import { SpendableEngine } from './spendable';
+import { receiptCatalog } from './receiptCatalog';
 
 const DEFAULT_LIQUIDATION_ORDER = ['cash', 'stocks', 'btc'];
 
@@ -116,15 +117,11 @@ export class LiquidationEngine {
         if (!isMarketOpen()) {
           await this.receipts.recordReceipt({
             user_id: job.user_id,
-            type: 'liquidation_queued',
-            title: 'Liquidation queued',
-            subtitle: 'Market closed',
-            amount_cents: remaining,
-            metadata: {
-              what_happened: 'Equity liquidation queued for market open.',
-              what_changed: 'No immediate sale executed.',
-              whats_next: 'We will sell at next open.',
-            },
+            ...receiptCatalog.liquidationQueued({
+              amount_cents: remaining,
+              reason: 'Market closed',
+              external_id: `liq-${job.id}`,
+            }),
           });
           break;
         }
@@ -192,15 +189,10 @@ export class LiquidationEngine {
     if (finalStatus === 'completed') {
       await this.receipts.recordReceipt({
         user_id: job.user_id,
-        type: 'liquidation_completed',
-        title: 'Liquidation complete',
-        subtitle: 'Balance restored',
-        amount_cents: job.required_cents,
-        metadata: {
-          what_happened: 'Liquidation executed.',
-          what_changed: 'Cash balance increased.',
-          whats_next: 'Spendable restored.',
-        },
+        ...receiptCatalog.liquidationCompleted({
+          amount_cents: job.required_cents,
+          external_id: `liq-${job.id}`,
+        }),
       });
     }
   }

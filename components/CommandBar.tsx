@@ -3,6 +3,7 @@
 
 import React, { useRef } from 'react';
 import {
+  ActivityIndicator,
   View,
   TextInput,
   Pressable,
@@ -53,6 +54,8 @@ interface CommandBarProps {
   onClear: () => void;
   onSubmit: () => void;
   isActive: boolean;
+  isLoading?: boolean;
+  onHelp?: () => void;
 }
 
 export function CommandBar({
@@ -63,6 +66,8 @@ export function CommandBar({
   onClear,
   onSubmit,
   isActive,
+  isLoading = false,
+  onHelp,
 }: CommandBarProps) {
   const inputRef = useRef<TextInput>(null);
 
@@ -72,10 +77,17 @@ export function CommandBar({
   };
 
   const handleSubmit = () => {
-    if (query.trim()) {
+    if (!isLoading && query.trim()) {
       onSubmit();
     }
   };
+
+  const handleHelp = () => {
+    onHelp?.();
+  };
+
+  const showClear = !isLoading && (query.length > 0 || isActive);
+  const showHelp = !isLoading && !!onHelp;
 
   const containerStyle = [
     styles.container,
@@ -107,15 +119,28 @@ export function CommandBar({
         onFocus={onFocus}
         onBlur={onBlur}
         onSubmitEditing={handleSubmit}
-        placeholder="Pay, buy, sell..."
+        placeholder="Balance, breakdown, transfer, buy, sell..."
         placeholderTextColor="rgba(255, 255, 255, 0.55)"
         returnKeyType="search"
         autoCapitalize="none"
         autoCorrect={false}
+        editable={!isLoading}
       />
-      {(query.length > 0 || isActive) && (
+      {isLoading && (
+        <ActivityIndicator
+          size="small"
+          color="rgba(255, 255, 255, 0.7)"
+          style={styles.loading}
+        />
+      )}
+      {showClear && (
         <Pressable onPress={handleClear} style={styles.clearButton}>
           <Ionicons name="close-circle" size={16} color="rgba(255, 255, 255, 0.6)" />
+        </Pressable>
+      )}
+      {showHelp && (
+        <Pressable onPress={handleHelp} style={styles.helpButton}>
+          <Ionicons name="help-circle-outline" size={16} color="rgba(255, 255, 255, 0.7)" />
         </Pressable>
       )}
     </LinearGradient>
@@ -161,6 +186,13 @@ const styles = StyleSheet.create({
   clearButton: {
     marginLeft: 5,
     padding: 2,
+  },
+  helpButton: {
+    marginLeft: 4,
+    padding: 2,
+  },
+  loading: {
+    marginLeft: 6,
   },
 });
 

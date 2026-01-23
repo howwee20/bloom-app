@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/server/supabaseAdmin';
 import { EventStore } from './eventStore';
 import { LedgerService } from './ledger';
 import { ReceiptBuilder } from './receipts';
+import { receiptCatalog } from './receiptCatalog';
 
 type AchEventPayload = {
   external_id: string;
@@ -100,18 +101,24 @@ export class AchService {
       } else {
         await this.receipts.recordReceipt({
           user_id: payload.user_id,
-          type: 'transfer',
-          title: 'ACH withdrawal',
-          subtitle: 'Transfer out',
-          amount_cents: -Math.abs(payload.amount_cents),
-          metadata: {
+          ...receiptCatalog.achPosted({
+            direction: 'debit',
+            amount_cents: payload.amount_cents,
             external_id: payload.external_id,
-            what_happened: 'ACH withdrawal posted.',
-            what_changed: 'Cash balance decreased.',
-            whats_next: 'Funds are outbound.',
-          },
+          }),
         });
       }
+    }
+
+    if (payload.status === 'pending') {
+      await this.receipts.recordReceipt({
+        user_id: payload.user_id,
+        ...receiptCatalog.achPending({
+          direction: payload.direction,
+          amount_cents: payload.amount_cents,
+          external_id: payload.external_id,
+        }),
+      });
     }
 
     if (payload.status === 'returned') {
@@ -138,16 +145,11 @@ export class AchService {
 
       await this.receipts.recordReceipt({
         user_id: payload.user_id,
-        type: 'ach_return',
-        title: 'ACH return',
-        subtitle: 'Transfer reversed',
-        amount_cents: isCredit ? -Math.abs(payload.amount_cents) : Math.abs(payload.amount_cents),
-        metadata: {
+        ...receiptCatalog.achReturn({
+          direction: payload.direction,
+          amount_cents: payload.amount_cents,
           external_id: payload.external_id,
-          what_happened: 'ACH returned.',
-          what_changed: 'Cash balance adjusted.',
-          whats_next: 'Contact support if unexpected.',
-        },
+        }),
       });
     }
   }

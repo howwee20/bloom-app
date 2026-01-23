@@ -3,6 +3,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   TextInput,
   Pressable,
@@ -42,6 +43,8 @@ interface CommandBarProps {
   onClear: () => void;
   onSubmit: () => void;
   isActive: boolean;
+  isLoading?: boolean;
+  onHelp?: () => void;
 }
 
 export function CommandBar({
@@ -52,6 +55,8 @@ export function CommandBar({
   onClear,
   onSubmit,
   isActive,
+  isLoading = false,
+  onHelp,
 }: CommandBarProps) {
   const inputRef = useRef<TextInput>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -64,7 +69,7 @@ export function CommandBar({
   };
 
   const handleSubmit = () => {
-    if (query.trim()) {
+    if (!isLoading && query.trim()) {
       onSubmit();
     }
   };
@@ -86,6 +91,13 @@ export function CommandBar({
     setIsFocused(false);
     onBlur();
   };
+
+  const handleHelp = () => {
+    onHelp?.();
+  };
+
+  const showClear = !isLoading && (query.length > 0 || isFocused);
+  const showHelp = !isLoading && !!onHelp;
 
   // Inject styles for backdrop-filter
   useEffect(() => {
@@ -158,15 +170,24 @@ export function CommandBar({
           onBlur={handleBlur}
           onSubmitEditing={handleSubmit}
           onKeyPress={handleKeyPress}
-          placeholder="Pay, buy, sell..."
+          placeholder="Balance, breakdown, transfer, buy, sell..."
           placeholderTextColor="#9A9A9A"
           returnKeyType="search"
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!isLoading}
         />
-        {(query.length > 0 || isFocused) && (
+        {isLoading && (
+          <ActivityIndicator size="small" color="#9A9A9A" style={styles.loading} />
+        )}
+        {showClear && (
           <Pressable onPress={handleClear} style={styles.clearButton}>
             <Ionicons name="close-circle" size={20} color="#9A9A9A" />
+          </Pressable>
+        )}
+        {showHelp && (
+          <Pressable onPress={handleHelp} style={styles.helpButton}>
+            <Ionicons name="help-circle-outline" size={20} color="#9A9A9A" />
           </Pressable>
         )}
       </div>
@@ -193,6 +214,13 @@ const styles = StyleSheet.create({
   clearButton: {
     marginLeft: 8,
     padding: 4,
+  },
+  helpButton: {
+    marginLeft: 6,
+    padding: 4,
+  },
+  loading: {
+    marginLeft: 8,
   },
 });
 

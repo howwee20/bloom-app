@@ -1353,8 +1353,8 @@ export function BloomCard({
         pointerEvents="none"
       />
 
-      {/* Footer dock inside card - visible on both faces */}
-      {footer && (
+      {/* Footer dock inside card - back face only */}
+      {footer && isBack && (
         <Pressable
           onPress={(e) => e.stopPropagation()}
           style={[

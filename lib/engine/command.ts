@@ -6,6 +6,7 @@ import { CryptoAdapter } from './integrations/crypto';
 import { SpendableEngine } from './spendable';
 import { supabaseAdmin } from '@/lib/server/supabaseAdmin';
 import { AccountService } from './account';
+import { receiptCatalog } from './receiptCatalog';
 
 export class CommandService {
   private receipts = new ReceiptBuilder();
@@ -80,21 +81,21 @@ export class CommandService {
       };
     }
 
-    if (lower.includes('freeze card')) {
-      return {
-        action: 'card_freeze',
-        preview_title: 'Freeze card',
-        preview_body: 'Freeze this card until you unfreeze it.',
-        confirm_required: true,
-        idempotency_key: idempotencyKey,
-      };
-    }
-
     if (lower.includes('unfreeze card')) {
       return {
         action: 'card_unfreeze',
         preview_title: 'Unfreeze card',
         preview_body: 'Unfreeze this card.',
+        confirm_required: true,
+        idempotency_key: idempotencyKey,
+      };
+    }
+
+    if (lower.includes('freeze card')) {
+      return {
+        action: 'card_freeze',
+        preview_title: 'Freeze card',
+        preview_body: 'Freeze this card until you unfreeze it.',
         confirm_required: true,
         idempotency_key: idempotencyKey,
       };
@@ -231,6 +232,33 @@ export class CommandService {
     };
   }
 
+  async preview(userId: string, text: string): Promise<CommandPreview> {
+    const preview = this.parse(text);
+
+    if (preview.action === 'dd_details') {
+      const details = await this.account.getDirectDepositDetails(userId);
+      preview.preview_body = `Routing: ${details.routing_number}\nAccount: ${details.account_number}`;
+    }
+
+    if (preview.action === 'card_status') {
+      const status = await this.account.getCardStatus(userId);
+      preview.preview_body = `Status: ${status.status}\n•••• ${status.last4}`;
+    }
+
+    if (preview.action === 'btc_quote') {
+      const quote = await this.crypto.getQuote('BTC');
+      preview.preview_body = `BTC: $${(quote.price_cents / 100).toFixed(2)}`;
+    }
+
+    if (preview.action === 'stock_quote') {
+      const symbol = process.env.BLOOM_STOCK_TICKER || 'SPY';
+      const quote = await this.brokerage.getQuote(symbol);
+      preview.preview_body = `${symbol}: $${(quote.price_cents / 100).toFixed(2)}`;
+    }
+
+    return preview;
+  }
+
   async confirm(userId: string, payload: CommandConfirmRequest) {
     if (payload.action === 'balance') {
       return this.spendable.computeSpendableNow(userId);
@@ -243,15 +271,7 @@ export class CommandService {
     if (payload.action === 'support') {
       await this.receipts.recordReceipt({
         user_id: userId,
-        type: 'support_request',
-        title: 'Support',
-        subtitle: 'We will reach out shortly.',
-        amount_cents: 0,
-        metadata: {
-          what_happened: 'Support request opened.',
-          what_changed: 'No balance change.',
-          whats_next: 'A Bloom specialist will contact you.',
-        },
+        ...receiptCatalog.supportRequest(),
       });
       return { ok: true };
     }
@@ -265,17 +285,12 @@ export class CommandService {
     }
 
     if (payload.action === 'card_freeze' || payload.action === 'card_unfreeze') {
+      const externalId = payload.idempotency_key || randomUUID();
       await this.receipts.recordReceipt({
         user_id: userId,
-        type: payload.action === 'card_freeze' ? 'card_freeze' : 'card_unfreeze',
-        title: payload.action === 'card_freeze' ? 'Card freeze requested' : 'Card unfreeze requested',
-        subtitle: 'Pending write access',
-        amount_cents: 0,
-        metadata: {
-          what_happened: 'Card control requested.',
-          what_changed: 'Awaiting processor write access.',
-          whats_next: 'We will apply once enabled.',
-        },
+        ...(payload.action === 'card_freeze'
+          ? receiptCatalog.cardFreeze({ external_id: externalId })
+          : receiptCatalog.cardUnfreeze({ external_id: externalId })),
       });
       return { ok: true, pending: true };
     }
@@ -285,15 +300,10 @@ export class CommandService {
       await this.upsertPolicy(userId, { buffer_cents: payload.notional_cents });
       await this.receipts.recordReceipt({
         user_id: userId,
-        type: 'policy_update',
-        title: 'Buffer updated',
-        subtitle: 'Savings buffer set',
-        amount_cents: payload.notional_cents,
-        metadata: {
-          what_happened: 'Buffer updated.',
-          what_changed: 'Spendable policy adjusted.',
-          whats_next: 'New buffer applies immediately.',
-        },
+        ...receiptCatalog.policyBufferUpdated({
+          amount_cents: payload.notional_cents,
+          external_id: payload.idempotency_key || randomUUID(),
+        }),
       });
       return { ok: true };
     }
@@ -303,15 +313,10 @@ export class CommandService {
       await this.upsertPolicy(userId, { allocation_targets_json: payload.allocation_targets });
       await this.receipts.recordReceipt({
         user_id: userId,
-        type: 'allocation_set',
-        title: 'Allocation set',
-        subtitle: `${payload.allocation_targets.stocks_pct}% stocks · ${payload.allocation_targets.btc_pct}% BTC`,
-        amount_cents: 0,
-        metadata: {
-          what_happened: 'Allocation updated.',
-          what_changed: 'Targets stored.',
-          whats_next: 'Execute allocation when ready.',
-        },
+        ...receiptCatalog.allocationSet({
+          label: `${payload.allocation_targets.stocks_pct}% stocks · ${payload.allocation_targets.btc_pct}% BTC`,
+          external_id: payload.idempotency_key || randomUUID(),
+        }),
       });
       return { ok: true, allocation_targets: payload.allocation_targets };
     }
@@ -332,16 +337,10 @@ export class CommandService {
     if (payload.action === 'transfer') {
       await this.receipts.recordReceipt({
         user_id: userId,
-        type: 'transfer_request',
-        title: 'Transfer requested',
-        subtitle: 'Awaiting processing',
-        amount_cents: payload.notional_cents ?? 0,
-        metadata: {
-          idempotency_key: payload.idempotency_key,
-          what_happened: 'Transfer request created.',
-          what_changed: 'No balance change yet.',
-          whats_next: 'Funds will move when processed.',
-        },
+        ...receiptCatalog.transferRequest({
+          amount_cents: payload.notional_cents ?? 0,
+          external_id: payload.idempotency_key || randomUUID(),
+        }),
       });
       return { ok: true };
     }
@@ -371,16 +370,12 @@ export class CommandService {
 
       await this.receipts.recordReceipt({
         user_id: userId,
-        type: 'convert',
-        title: `Converted ${symbol} to ${targetSymbol}`,
-        subtitle: 'Conversion executed',
-        amount_cents: notional,
-        metadata: {
-          idempotency_key: payload.idempotency_key,
-          what_happened: 'Conversion filled.',
-          what_changed: `${symbol} reduced, ${targetSymbol} increased.`,
-          whats_next: 'Holdings updated.',
-        },
+        ...receiptCatalog.convert({
+          from: symbol,
+          to: targetSymbol,
+          amount_cents: notional,
+          external_id: payload.idempotency_key || randomUUID(),
+        }),
       });
 
       return { ok: true, order_id: order.id };

@@ -11,6 +11,16 @@ type PlaceOrderInput = {
   idempotency_key: string;
 };
 
+type CryptoProvider = 'mock' | 'coinbase' | 'zerohash';
+
+function resolveCryptoProvider(): CryptoProvider {
+  const raw = (process.env.CRYPTO_PROVIDER || 'mock').toLowerCase();
+  if (raw === 'coinbase' || raw === 'zerohash' || raw === 'mock') {
+    return raw;
+  }
+  return 'mock';
+}
+
 export type OrderRecord = {
   id: string;
   user_id: string;
@@ -189,19 +199,39 @@ export class PaperCryptoAdapter implements CryptoAdapterContract {
 }
 
 export class PlaceholderCryptoAdapter implements CryptoAdapterContract {
+  protected ensureConfigured() {
+    return;
+  }
+
   async placeOrder(input: PlaceOrderInput): Promise<OrderRecord> {
-    if (!process.env.COINBASE_API_KEY && !process.env.ZEROHASH_API_KEY) {
-      throw new Error('Missing crypto provider API keys');
-    }
+    this.ensureConfigured();
     return new PaperCryptoAdapter().placeOrder(input);
   }
 
   async fillOrder(order: OrderRecord) {
+    this.ensureConfigured();
     return new PaperCryptoAdapter().fillOrder(order);
   }
 
   async getQuote(symbol: string): Promise<Quote> {
+    this.ensureConfigured();
     return new PaperCryptoAdapter().getQuote(symbol);
+  }
+}
+
+export class CoinbaseCryptoAdapter extends PlaceholderCryptoAdapter {
+  protected ensureConfigured() {
+    if (!process.env.COINBASE_API_KEY || !process.env.COINBASE_API_SECRET) {
+      throw new Error('Missing COINBASE_API_KEY or COINBASE_API_SECRET');
+    }
+  }
+}
+
+export class ZerohashCryptoAdapter extends PlaceholderCryptoAdapter {
+  protected ensureConfigured() {
+    if (!process.env.ZEROHASH_API_KEY || !process.env.ZEROHASH_API_SECRET) {
+      throw new Error('Missing ZEROHASH_API_KEY or ZEROHASH_API_SECRET');
+    }
   }
 }
 
@@ -209,9 +239,14 @@ export class CryptoAdapter implements CryptoAdapterContract {
   private impl: CryptoAdapterContract;
 
   constructor() {
-    this.impl = process.env.COINBASE_API_KEY || process.env.ZEROHASH_API_KEY
-      ? new PlaceholderCryptoAdapter()
-      : new PaperCryptoAdapter();
+    const provider = resolveCryptoProvider();
+    if (provider === 'coinbase') {
+      this.impl = new CoinbaseCryptoAdapter();
+    } else if (provider === 'zerohash') {
+      this.impl = new ZerohashCryptoAdapter();
+    } else {
+      this.impl = new PaperCryptoAdapter();
+    }
   }
 
   placeOrder(input: PlaceOrderInput) {

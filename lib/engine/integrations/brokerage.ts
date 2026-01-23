@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/server/supabaseAdmin';
 import { EventStore } from '../eventStore';
 import { LedgerService } from '../ledger';
 import { ReceiptBuilder } from '../receipts';
+import { receiptCatalog } from '../receiptCatalog';
 
 type PlaceOrderInput = {
   user_id: string;
@@ -231,19 +232,206 @@ export class PaperBrokerageAdapter implements BrokerageAdapterContract {
 }
 
 export class AlpacaBrokerageAdapter implements BrokerageAdapterContract {
-  async placeOrder(input: PlaceOrderInput): Promise<OrderRecord> {
-    if (!process.env.ALPACA_API_KEY || !process.env.ALPACA_SECRET_KEY) {
-      throw new Error('Missing ALPACA_API_KEY or ALPACA_SECRET_KEY');
+  private config: AlpacaConfig;
+  private eventStore = new EventStore();
+  private local = new PaperBrokerageAdapter();
+  private receipts = new ReceiptBuilder();
+
+  constructor() {
+    const config = resolveAlpacaConfig();
+    if (!config) {
+      throw new Error('Missing Alpaca API credentials');
     }
-    return new PaperBrokerageAdapter().placeOrder(input);
+    this.config = config;
+  }
+
+  private async request<T>(
+    path: string,
+    method: 'GET' | 'POST' | 'PATCH' = 'GET',
+    body?: unknown,
+    useDataApi = false
+  ): Promise<{ ok: boolean; status: number; data: T }> {
+    const baseUrl = useDataApi ? this.config.dataUrl : this.config.baseUrl;
+    const res = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: {
+        'APCA-API-KEY-ID': this.config.key,
+        'APCA-API-SECRET-KEY': this.config.secret,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const text = await res.text();
+    let data: T;
+    try {
+      data = JSON.parse(text) as T;
+    } catch {
+      data = text as unknown as T;
+    }
+
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  private async ensureInstrument(symbol: string) {
+    const { data: existing } = await supabaseAdmin
+      .from('instruments')
+      .select('id, symbol, type')
+      .eq('symbol', symbol)
+      .maybeSingle();
+
+    if (existing) return existing;
+
+    const { data, error } = await supabaseAdmin
+      .from('instruments')
+      .insert({
+        symbol,
+        type: 'ETF',
+        quote_source: 'alpaca',
+      })
+      .select('id, symbol, type')
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async placeOrder(input: PlaceOrderInput): Promise<OrderRecord> {
+    const instrument = await this.ensureInstrument(input.symbol);
+
+    const { data: existing } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('external_order_id', input.idempotency_key)
+      .maybeSingle();
+
+    if (existing) return existing as OrderRecord;
+
+    const response = await this.request<{ id: string; status: string }>(
+      '/v2/orders',
+      'POST',
+      {
+        symbol: input.symbol,
+        notional: (input.notional_cents / 100).toFixed(2),
+        side: input.side,
+        type: 'market',
+        time_in_force: 'day',
+        client_order_id: input.idempotency_key,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Alpaca order failed (${response.status})`);
+    }
+
+    await this.eventStore.recordNormalizedEvent({
+      source: 'brokerage',
+      domain: 'trade',
+      event_type: 'order_placed',
+      external_id: input.idempotency_key,
+      user_id: input.user_id,
+      status: response.data.status || 'placed',
+      amount_cents: input.notional_cents,
+      metadata: { symbol: input.symbol, side: input.side, alpaca_order_id: response.data.id },
+    });
+
+    const { data, error } = await supabaseAdmin
+      .from('orders')
+      .insert({
+        user_id: input.user_id,
+        instrument_id: instrument.id,
+        side: input.side,
+        notional_cents: input.notional_cents,
+        status: response.data.status || 'placed',
+        external_order_id: input.idempotency_key,
+      })
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data as OrderRecord;
   }
 
   async fillOrder(order: OrderRecord) {
-    return new PaperBrokerageAdapter().fillOrder(order);
+    if (!order.external_order_id) {
+      await this.local.fillOrder(order);
+      return;
+    }
+
+    const response = await this.request<{ status: string }>(
+      `/v2/orders:by_client_order_id?client_order_id=${order.external_order_id}`,
+      'GET'
+    );
+
+    if (!response.ok) {
+      throw new Error(`Alpaca order lookup failed (${response.status})`);
+    }
+
+    const status = response.data.status;
+    if (status === 'filled' || status === 'partially_filled') {
+      await this.local.fillOrder(order);
+      return;
+    }
+
+    await supabaseAdmin
+      .from('orders')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', order.id);
+
+    const { data: instrument } = await supabaseAdmin
+      .from('instruments')
+      .select('symbol')
+      .eq('id', order.instrument_id)
+      .maybeSingle();
+    const symbol = instrument?.symbol || 'Trade';
+    await this.receipts.recordReceipt({
+      user_id: order.user_id,
+      ...receiptCatalog.tradeQueued({
+        symbol,
+        amount_cents: order.notional_cents,
+        external_id: order.external_order_id,
+      }),
+    });
   }
 
   async getQuote(symbol: string): Promise<Quote> {
-    return new PaperBrokerageAdapter().getQuote(symbol);
+    const response = await this.request<{ bar?: { c?: number }; quote?: { ap?: number; bp?: number } }>(
+      `/v2/stocks/${symbol}/bars/latest`,
+      'GET',
+      undefined,
+      true
+    );
+
+    if (!response.ok) {
+      return this.local.getQuote(symbol);
+    }
+
+    const barPrice = response.data.bar?.c;
+    const quotePrice = response.data.quote?.ap ?? response.data.quote?.bp;
+    const price = barPrice ?? quotePrice;
+
+    if (!price || Number.isNaN(price)) {
+      return this.local.getQuote(symbol);
+    }
+
+    return { symbol, price_cents: Math.round(price * 100), as_of: new Date().toISOString() };
+  }
+
+  async getPositions(_: string): Promise<BrokeragePosition[]> {
+    const response = await this.request<Array<{ symbol: string; qty: string; market_value: string; cost_basis: string }>>(
+      '/v2/positions'
+    );
+
+    if (!response.ok) {
+      throw new Error(`Alpaca positions failed (${response.status})`);
+    }
+
+    return (response.data || []).map((position) => ({
+      symbol: position.symbol,
+      qty: Number(position.qty || 0),
+      market_value_cents: Math.round(Number(position.market_value || 0) * 100),
+      cost_basis_cents: Math.round(Number(position.cost_basis || 0) * 100),
+    }));
   }
 }
 
@@ -251,7 +439,7 @@ export class BrokerageAdapter implements BrokerageAdapterContract {
   private impl: BrokerageAdapterContract;
 
   constructor() {
-    this.impl = process.env.ALPACA_API_KEY ? new AlpacaBrokerageAdapter() : new PaperBrokerageAdapter();
+    this.impl = resolveAlpacaConfig() ? new AlpacaBrokerageAdapter() : new PaperBrokerageAdapter();
   }
 
   placeOrder(input: PlaceOrderInput) {
@@ -264,5 +452,9 @@ export class BrokerageAdapter implements BrokerageAdapterContract {
 
   getQuote(symbol: string) {
     return this.impl.getQuote(symbol);
+  }
+
+  getPositions(userId: string) {
+    return this.impl.getPositions(userId);
   }
 }
