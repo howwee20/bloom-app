@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ColumnAdapter } from '@/lib/engine/integrations/column';
 import { EventStore } from '@/lib/engine/eventStore';
+import { MetricsService } from '@/lib/engine/metrics';
 import { checkRateLimit } from '@/lib/server/rateLimit';
 import { verifyWebhookSignature } from '@/lib/server/webhook';
 import { logAdapterSummary } from '@/lib/server/envSummary';
@@ -55,6 +56,16 @@ export default async function handler(req: any, res: any) {
 
     const adapter = new ColumnAdapter();
     await adapter.handleAchEvent(payload, rawEvent.event.id);
+
+    const metrics = new MetricsService();
+    const receivedAt = new Date(rawEvent.event.received_at).getTime();
+    await metrics.record({
+      user_id: payload.user_id,
+      name: 'webhook_lag_ms',
+      value: Date.now() - receivedAt,
+      metadata: { source: 'column', event_type: 'ach_event' },
+    });
+
     return res.status(200).json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error';

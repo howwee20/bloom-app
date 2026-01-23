@@ -389,7 +389,7 @@ export class AlpacaBrokerageAdapter implements BrokerageAdapterContract {
       ...receiptCatalog.tradeQueued({
         symbol,
         amount_cents: order.notional_cents,
-        external_id: order.external_order_id,
+        external_id: order.external_order_id || order.id,
       }),
     });
   }

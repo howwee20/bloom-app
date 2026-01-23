@@ -98,6 +98,7 @@ export function CommandBar({
 
   const showClear = !isLoading && (query.length > 0 || isFocused);
   const showHelp = !isLoading && !!onHelp;
+  const showSubmit = !isLoading && query.trim().length > 0;
 
   // Inject styles for backdrop-filter
   useEffect(() => {
@@ -170,7 +171,7 @@ export function CommandBar({
           onBlur={handleBlur}
           onSubmitEditing={handleSubmit}
           onKeyPress={handleKeyPress}
-          placeholder="Balance, breakdown, transfer, buy, sell..."
+          placeholder="Direct deposit, transfer, invest, buy, sell..."
           placeholderTextColor="#9A9A9A"
           returnKeyType="search"
           autoCapitalize="none"
@@ -183,6 +184,11 @@ export function CommandBar({
         {showClear && (
           <Pressable onPress={handleClear} style={styles.clearButton}>
             <Ionicons name="close-circle" size={20} color="#9A9A9A" />
+          </Pressable>
+        )}
+        {showSubmit && (
+          <Pressable onPress={handleSubmit} style={styles.submitButton}>
+            <Ionicons name="arrow-up-circle" size={20} color="#1a1a1a" />
           </Pressable>
         )}
         {showHelp && (
@@ -213,6 +219,10 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     marginLeft: 8,
+    padding: 4,
+  },
+  submitButton: {
+    marginLeft: 6,
     padding: 4,
   },
   helpButton: {

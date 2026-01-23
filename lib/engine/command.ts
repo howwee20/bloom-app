@@ -187,6 +187,24 @@ export class CommandService {
       };
     }
 
+    const investMatch = trimmed.match(/invest\s+\$?([\d,.]+)(?:\s+in)?\s*([a-zA-Z]+)?/i);
+    if (investMatch) {
+      const notional = Math.round(parseFloat(investMatch[1].replace(/,/g, '')) * 100);
+      const symbolRaw = (investMatch[2] || 'STOCKS').toUpperCase();
+      const symbol = symbolRaw === 'STOCKS' || symbolRaw === 'STOCK'
+        ? (process.env.BLOOM_STOCK_TICKER || 'SPY')
+        : symbolRaw;
+      return {
+        action: 'buy',
+        symbol,
+        notional_cents: notional,
+        preview_title: `Invest in ${symbol}`,
+        preview_body: `$${(notional / 100).toFixed(2)} notional`,
+        confirm_required: true,
+        idempotency_key: idempotencyKey,
+      };
+    }
+
     const buyMatch = trimmed.match(/buy\s+\$?([\d,.]+)\s+([a-zA-Z]+)/i);
     if (buyMatch) {
       const notional = Math.round(parseFloat(buyMatch[1].replace(/,/g, '')) * 100);

@@ -88,6 +88,7 @@ export function CommandBar({
 
   const showClear = !isLoading && (query.length > 0 || isActive);
   const showHelp = !isLoading && !!onHelp;
+  const showSubmit = !isLoading && query.trim().length > 0;
 
   const containerStyle = [
     styles.container,
@@ -119,7 +120,7 @@ export function CommandBar({
         onFocus={onFocus}
         onBlur={onBlur}
         onSubmitEditing={handleSubmit}
-        placeholder="Balance, breakdown, transfer, buy, sell..."
+        placeholder="Direct deposit, transfer, invest, buy, sell..."
         placeholderTextColor="rgba(255, 255, 255, 0.55)"
         returnKeyType="search"
         autoCapitalize="none"
@@ -136,6 +137,11 @@ export function CommandBar({
       {showClear && (
         <Pressable onPress={handleClear} style={styles.clearButton}>
           <Ionicons name="close-circle" size={16} color="rgba(255, 255, 255, 0.6)" />
+        </Pressable>
+      )}
+      {showSubmit && (
+        <Pressable onPress={handleSubmit} style={styles.submitButton}>
+          <Ionicons name="arrow-up-circle" size={18} color="rgba(255, 255, 255, 0.85)" />
         </Pressable>
       )}
       {showHelp && (
@@ -185,6 +191,10 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     marginLeft: 5,
+    padding: 2,
+  },
+  submitButton: {
+    marginLeft: 4,
     padding: 2,
   },
   helpButton: {

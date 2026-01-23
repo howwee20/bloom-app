@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { EventStore } from '@/lib/engine/eventStore';
 import { getCardProcessorAdapter } from '@/lib/engine/adapters/cardProcessor';
+import { MetricsService } from '@/lib/engine/metrics';
 import { checkRateLimit } from '@/lib/server/rateLimit';
 import { verifyWebhookSignature } from '@/lib/server/webhook';
 import { logAdapterSummary } from '@/lib/server/envSummary';
@@ -34,6 +35,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    const start = Date.now();
     const payload = z.object({
       external_id: z.string(),
       user_id: z.string(),
@@ -56,6 +58,16 @@ export default async function handler(req: any, res: any) {
 
     const adapter = getCardProcessorAdapter();
     const result = await adapter.handleAuthWebhook(payload, rawEvent.event.id);
+
+    const metrics = new MetricsService();
+    const receivedAt = new Date(rawEvent.event.received_at).getTime();
+    await metrics.record({
+      user_id: payload.user_id,
+      name: 'webhook_lag_ms',
+      value: Date.now() - receivedAt,
+      metadata: { source: 'card_processor', event_type: 'auth' },
+    });
+    await metrics.recordLatency('auth_decision_latency_ms', start, { source: 'card_processor' }, payload.user_id);
 
     return res.status(200).json(result);
   } catch (error) {

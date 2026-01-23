@@ -5,6 +5,7 @@ import { LedgerService } from './ledger';
 import { ReceiptBuilder } from './receipts';
 import { SpendableEngine } from './spendable';
 import { receiptCatalog } from './receiptCatalog';
+import { MetricsService } from './metrics';
 
 const DEFAULT_LIQUIDATION_ORDER = ['cash', 'stocks', 'btc'];
 
@@ -37,6 +38,7 @@ export class LiquidationEngine {
   private crypto = new CryptoAdapter();
   private receipts = new ReceiptBuilder();
   private spendable = new SpendableEngine();
+  private metrics = new MetricsService();
 
   async enqueueIfNeeded(userId: string) {
     const spendable = await this.spendable.computeSpendableNow(userId);
@@ -80,6 +82,8 @@ export class LiquidationEngine {
       .limit(limit);
 
     if (error) throw error;
+
+    await this.metrics.record('liquidation_queue_length', jobs?.length || 0, {}, null);
 
     for (const job of jobs || []) {
       await this.processJob(job.id);

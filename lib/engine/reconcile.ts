@@ -3,11 +3,13 @@ import { getBankAdapter } from './adapters/bank';
 import { LedgerService } from './ledger';
 import { ReceiptBuilder } from './receipts';
 import { receiptCatalog } from './receiptCatalog';
+import { MetricsService } from './metrics';
 
 export class ReconciliationService {
   private ledger = new LedgerService();
   private bank = getBankAdapter();
   private receipts = new ReceiptBuilder();
+  private metrics = new MetricsService();
 
   async reconcileUser(userId: string) {
     const partner = await this.bank.getBalanceTruth(userId);
@@ -51,6 +53,9 @@ export class ReconciliationService {
           external_id: data.id,
         }),
       });
+
+      await this.metrics.recordCount('reconcile_drift_count', 1, { drift_cents: drift }, userId);
+      await this.metrics.record('unexplained_delta_cents', drift, { partner_balance_cents: partner.cash_balance_cents }, userId);
     } else {
       await this.receipts.recordReceipt({
         user_id: userId,
@@ -58,6 +63,8 @@ export class ReconciliationService {
           external_id: data.id,
         }),
       });
+
+      await this.metrics.recordCount('reconcile_drift_cleared', 1, {}, userId);
     }
 
     return data;

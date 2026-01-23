@@ -78,6 +78,13 @@ interface FlipPayload {
   liabilities: { label: string; amount_cents: number }[];
 }
 
+interface CommandResult {
+  title: string;
+  body: string;
+  status: 'success' | 'error' | 'info';
+  timestamp: number;
+}
+
 // Source colors for offer cards
 const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
   stockx: { label: 'StockX', color: '#006340' },
@@ -228,6 +235,7 @@ export default function HomeScreen() {
   const [commandActive, setCommandActive] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
   const [commandLoading, setCommandLoading] = useState(false);
+  const [commandResult, setCommandResult] = useState<CommandResult | null>(null);
   const [selectedOffer, setSelectedOffer] = useState<BloomOffer | null>(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [buySize, setBuySize] = useState('');
@@ -248,9 +256,7 @@ export default function HomeScreen() {
   const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
   const cardHeight = Math.max(viewportHeight - topPadding - insets.bottom, 520);
   const cardWidth = Math.min(Math.round(viewportWidth * 1), cardMaxWidth);
-  const apiBaseUrl = Platform.OS === 'web'
-    ? ''
-    : (process.env.EXPO_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+  const apiBaseUrl = (process.env.EXPO_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
 
   const fetchBloomSummary = useCallback(async (options?: { silent?: boolean }) => {
     if (Platform.OS !== 'web' && !apiBaseUrl) {
@@ -338,10 +344,133 @@ export default function HomeScreen() {
       'btc quote / stock quote',
       'transfer $100',
       'convert $50 btc to stocks',
+      'invest $50 stocks',
       'buy $50 btc',
       'sell $50 btc',
     ];
     showAlert('Command bar', examples.join('\n'));
+  };
+
+  const setCommandResultFromPreview = (preview: { preview_title: string; preview_body: string }) => {
+    setCommandResult({
+      title: preview.preview_title,
+      body: preview.preview_body,
+      status: 'info',
+      timestamp: Date.now(),
+    });
+  };
+
+  const buildCommandResult = (
+    preview: {
+      action: string;
+      preview_title: string;
+      preview_body: string;
+      notional_cents?: number;
+      symbol?: string;
+      allocation_targets?: { stocks_pct: number; btc_pct: number };
+    },
+    payload: any
+  ): CommandResult => {
+    const title = preview.preview_title || 'Command result';
+
+    switch (preview.action) {
+      case 'balance': {
+        const spendable = typeof payload?.spendable_cents === 'number'
+          ? formatCents(payload.spendable_cents)
+          : null;
+        const dayPnl = typeof payload?.day_pnl_cents === 'number'
+          ? formatCents(payload.day_pnl_cents)
+          : null;
+        const body = spendable
+          ? `Spendable ${spendable}${dayPnl ? ` · Today ${dayPnl}` : ''}`
+          : preview.preview_body;
+        return { title, body, status: 'success', timestamp: Date.now() };
+      }
+      case 'breakdown':
+      case 'holdings': {
+        return {
+          title: 'Holdings refreshed',
+          body: 'Bloom Card holdings + payments updated.',
+          status: 'success',
+          timestamp: Date.now(),
+        };
+      }
+      case 'dd_details': {
+        const routing = payload?.routing_number;
+        const account = payload?.account_number;
+        const body = routing && account
+          ? `Routing ${routing}\nAccount ${account}`
+          : preview.preview_body;
+        return { title, body, status: 'success', timestamp: Date.now() };
+      }
+      case 'card_status': {
+        const status = payload?.status;
+        const last4 = payload?.last4;
+        const body = status && last4
+          ? `Status ${status} · •••• ${last4}`
+          : preview.preview_body;
+        return { title, body, status: 'success', timestamp: Date.now() };
+      }
+      case 'btc_quote':
+      case 'stock_quote': {
+        const price = typeof payload?.price_cents === 'number'
+          ? formatCents(payload.price_cents)
+          : null;
+        const symbol = payload?.symbol || preview.symbol;
+        const body = price
+          ? `${symbol || (preview.action === 'btc_quote' ? 'BTC' : 'Stock')}: ${price}`
+          : preview.preview_body;
+        return { title, body, status: 'success', timestamp: Date.now() };
+      }
+      case 'transfer': {
+        const amount = formatCents(preview.notional_cents ?? payload?.notional_cents);
+        return {
+          title,
+          body: `Transfer requested ${amount}`,
+          status: 'success',
+          timestamp: Date.now(),
+        };
+      }
+      case 'set_buffer': {
+        const amount = formatCents(preview.notional_cents ?? payload?.notional_cents);
+        return { title, body: `Buffer set to ${amount}`, status: 'success', timestamp: Date.now() };
+      }
+      case 'allocate': {
+        const stocksPct = payload?.allocation_targets?.stocks_pct ?? preview.allocation_targets?.stocks_pct;
+        const btcPct = payload?.allocation_targets?.btc_pct ?? preview.allocation_targets?.btc_pct;
+        const body = (typeof stocksPct === 'number' && typeof btcPct === 'number')
+          ? `${stocksPct}% stocks · ${btcPct}% BTC`
+          : preview.preview_body;
+        return { title, body, status: 'success', timestamp: Date.now() };
+      }
+      case 'card_freeze':
+      case 'card_unfreeze': {
+        const body = payload?.pending
+          ? `${preview.preview_body} (pending)`
+          : preview.preview_body;
+        return { title, body, status: 'success', timestamp: Date.now() };
+      }
+      case 'buy':
+      case 'sell':
+      case 'convert': {
+        const amount = formatCents(preview.notional_cents ?? payload?.notional_cents);
+        const symbol = preview.symbol || payload?.symbol || '';
+        const actionLabel = preview.action.toUpperCase();
+        const body = `${actionLabel} ${amount} ${symbol}`.trim();
+        return { title, body, status: 'success', timestamp: Date.now() };
+      }
+      case 'support': {
+        return {
+          title,
+          body: 'Support request sent. We will reach out shortly.',
+          status: 'success',
+          timestamp: Date.now(),
+        };
+      }
+      default: {
+        return { title, body: preview.preview_body, status: 'success', timestamp: Date.now() };
+      }
+    }
   };
 
   const handleCommandSubmit = async () => {
@@ -352,6 +481,12 @@ export default function HomeScreen() {
 
     if (Platform.OS !== 'web' && !apiBaseUrl) {
       showAlert('Missing API base URL', 'Set EXPO_PUBLIC_API_BASE_URL for native requests.');
+      setCommandResult({
+        title: 'Command unavailable',
+        body: 'Missing API base URL for native requests.',
+        status: 'error',
+        timestamp: Date.now(),
+      });
       return;
     }
 
@@ -377,6 +512,7 @@ export default function HomeScreen() {
 
       const preview = await previewRes.json();
       console.log('[CMD] Preview result:', preview);
+      setCommandResultFromPreview(preview);
 
       const execute = async (showSuccess: boolean) => {
         console.log('[CMD] Executing confirm for:', preview.action);
@@ -395,6 +531,7 @@ export default function HomeScreen() {
 
         const payload = await confirmRes.json();
         console.log('[CMD] Confirm result:', payload);
+        setCommandResult(buildCommandResult(preview, payload));
 
         if (preview.action === 'balance' && typeof payload.spendable_cents === 'number') {
           setSpendableCents(payload.spendable_cents);
@@ -435,6 +572,12 @@ export default function HomeScreen() {
       console.log('[CMD] Error:', error);
       const message = error instanceof Error ? error.message : 'Command failed.';
       showAlert('Command failed', message);
+      setCommandResult({
+        title: 'Command failed',
+        body: message,
+        status: 'error',
+        timestamp: Date.now(),
+      });
     } finally {
       setCommandLoading(false);
       setCommandQuery('');
@@ -644,6 +787,11 @@ export default function HomeScreen() {
       currency: 'USD',
       minimumFractionDigits: 2,
     }).format(value);
+  };
+
+  const formatCents = (value?: number | null) => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '--';
+    return formatCurrency(value / 100);
   };
 
   const formatPnL = (value: number | null) => {
@@ -1185,6 +1333,14 @@ export default function HomeScreen() {
   const pricingFresh = lastUpdatedAt
     ? (now - lastUpdatedAt.getTime()) <= PRICE_FRESHNESS_MINUTES * 60 * 1000
     : false;
+  const commandResultDisplay = commandResult
+    ? {
+        title: commandResult.title,
+        body: commandResult.body,
+        status: commandResult.status,
+        timeLabel: formatRelativeTime(new Date(commandResult.timestamp)),
+      }
+    : undefined;
 
   return (
     <View style={styles.container}>
@@ -1216,6 +1372,7 @@ export default function HomeScreen() {
               width: cardWidth,
             }}
             flipData={flipData || undefined}
+            commandResult={commandResultDisplay}
             footerOffset={commandBarBottom}
             footerHeight={commandBarHeight}
             footer={

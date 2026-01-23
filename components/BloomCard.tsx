@@ -22,6 +22,12 @@ interface BloomCardProps {
   footer?: ReactNode;
   footerOffset?: number;
   footerHeight?: number;
+  commandResult?: {
+    title: string;
+    body: string;
+    status?: 'success' | 'error' | 'info';
+    timeLabel?: string;
+  };
   flipData?: {
     payments: { id?: string; title: string; time_label: string; amount_cents: number }[];
     holdings: { label: string; amount_cents: number; kind?: string }[];
@@ -665,6 +671,7 @@ export function BloomCard({
   footer,
   footerOffset = 16,
   footerHeight = 52,
+  commandResult,
   flipData,
 }: BloomCardProps) {
   const [flipped, setFlipped] = useState(false);
@@ -985,6 +992,18 @@ export function BloomCard({
   const liabilities = flipData?.liabilities?.length
     ? flipData.liabilities.map((l) => ({ label: l.label, value: formatCents(l.amount_cents) }))
     : LIABILITIES;
+
+  const commandResultCardStyle = [
+    styles.commandResultCard,
+    commandResult?.status === 'success' && styles.commandResultSuccess,
+    commandResult?.status === 'error' && styles.commandResultError,
+  ];
+
+  const commandResultTitleStyle = [
+    styles.commandResultTitle,
+    commandResult?.status === 'success' && styles.commandResultTitleSuccess,
+    commandResult?.status === 'error' && styles.commandResultTitleError,
+  ];
 
   const renderCardFace = (isBack: boolean) => (
     <>
@@ -1438,6 +1457,16 @@ export function BloomCard({
         </View>
       ) : (
         <View style={styles.backContent}>
+          {commandResult && (
+            <View style={commandResultCardStyle}>
+              <Text style={styles.commandResultLabel}>Last command</Text>
+              <Text style={commandResultTitleStyle}>{commandResult.title}</Text>
+              <Text style={styles.commandResultBody}>{commandResult.body}</Text>
+              {commandResult.timeLabel && (
+                <Text style={styles.commandResultTime}>{commandResult.timeLabel}</Text>
+              )}
+            </View>
+          )}
           <View style={styles.paymentsSection}>
             <Text style={styles.sectionTitle}>Payments</Text>
             <View style={styles.paymentList}>
@@ -1846,6 +1875,54 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 30,
     justifyContent: 'flex-start',
+  },
+  commandResultCard: {
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(26, 26, 46, 0.08)',
+  },
+  commandResultSuccess: {
+    backgroundColor: 'rgba(210, 245, 227, 0.7)',
+    borderColor: 'rgba(31, 122, 79, 0.2)',
+  },
+  commandResultError: {
+    backgroundColor: 'rgba(255, 225, 225, 0.7)',
+    borderColor: 'rgba(180, 35, 24, 0.2)',
+  },
+  commandResultLabel: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans-Medium',
+    color: 'rgba(26, 26, 46, 0.55)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+  commandResultTitle: {
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    color: '#1a1a2e',
+    marginBottom: 4,
+  },
+  commandResultTitleSuccess: {
+    color: '#1f7a4f',
+  },
+  commandResultTitleError: {
+    color: '#b42318',
+  },
+  commandResultBody: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans-Regular',
+    color: 'rgba(26, 26, 46, 0.7)',
+    lineHeight: 16,
+  },
+  commandResultTime: {
+    marginTop: 6,
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans-Regular',
+    color: 'rgba(26, 26, 46, 0.5)',
   },
   paymentsSection: {
     marginBottom: 16,
