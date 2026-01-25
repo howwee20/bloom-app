@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bloom</title>
+  <meta name="description" content="What you can spend, right now.">
+  <meta property="og:title" content="Bloom">
+  <meta property="og:description" content="What you can spend, right now.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://paywithbloom.com">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Bloom">
+  <meta name="twitter:description" content="What you can spend, right now.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23000' width='100' height='100' rx='16'/><text x='50' y='65' font-size='44' text-anchor='middle' fill='%23fff' font-weight='500' font-family='-apple-system,system-ui'>b</text></svg>">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --black: #000000;
+      --white: #ffffff;
+      --secondary: #888888;
+      --card: #1a1a1a;
+      --card-border: #333333;
+      --aura: rgba(78, 92, 255, 0.25);
+      --aura-soft: rgba(120, 86, 255, 0.18);
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --space-8: 8px;
+      --space-16: 16px;
+      --space-24: 24px;
+      --space-32: 32px;
+      --space-40: 40px;
+      --space-48: 48px;
+      --space-64: 64px;
+      --space-80: 80px;
+      --space-120: 120px;
+      --space-160: 160px;
+    }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--black);
+      color: var(--white);
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 20%, var(--aura), transparent 55%),
+        radial-gradient(circle at 80% 10%, var(--aura-soft), transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: -20% 0 0 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+      background-size: 6px 6px;
+      opacity: 0.08;
+      animation: dustFloat 18s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+    }
+
+    .demo {
+      height: 420vh;
+      position: relative;
+    }
+
+    .demo-sticky {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-80) var(--space-24);
+      text-align: center;
+    }
+
+    .hero-copy,
+    .story-copy {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-24);
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+      pointer-events: none;
+    }
+
+    .hero-copy.is-active,
+    .story-copy.is-active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .card-stage {
+      position: relative;
+      perspective: 1200px;
+      margin-bottom: var(--space-24);
+    }
+
+    .card-stage::after {
+      content: "";
+      position: absolute;
+      inset: -40px;
+      background: radial-gradient(circle at 50% 50%, rgba(90, 110, 255, 0.2), transparent 65%);
+      opacity: 0.5;
+      z-index: -1;
+      filter: blur(20px);
+    }
+
+    .card-3d {
+      width: min(460px, 80vw);
+      aspect-ratio: 1.586 / 1;
+      transform-style: preserve-3d;
+      border-radius: 18px;
+      transition: transform 0.6s var(--ease-out);
+      will-change: transform;
+    }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 18px;
+      backface-visibility: hidden;
+      background: linear-gradient(135deg, #1b1b1b, #0f0f0f);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+
+    .card-face::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 42%);
+      opacity: 0.6;
+    }
+
+    .card-face::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 4px 4px;
+      opacity: 0.15;
+    }
+
+    .card-front {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px 22px;
+    }
+
+    .card-logo {
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      text-transform: lowercase;
+    }
+
+    .card-number {
+      font-size: 14px;
+      letter-spacing: 0.2em;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      align-self: flex-end;
+    }
+
+    .card-back {
+      transform: rotateY(180deg);
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .proof-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .proof-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .proof-row {
+      display: flex;
+      justify-content: space-between;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .proof-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-top: auto;
+    }
+
+    .proof-pill {
+      padding: 6px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+    }
+
+    .spend-number {
+      font-size: clamp(72px, 12vw, 140px);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      animation: fadeUp 0.8s var(--ease-out) 0.1s both;
+    }
+
+    .hero-sub {
+      font-size: clamp(18px, 2.5vw, 24px);
+      color: var(--secondary);
+      line-height: 1.4;
+      max-width: 520px;
+      animation: fadeUp 0.8s var(--ease-out) 0.2s both;
+    }
+
+    .waitlist {
+      display: flex;
+      gap: var(--space-16);
+      flex-wrap: wrap;
+      justify-content: center;
+      animation: fadeUp 0.8s var(--ease-out) 0.3s both;
+    }
+
+    .waitlist input {
+      width: min(320px, 100%);
+      padding: 14px 18px;
+      font-size: 15px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      color: var(--white);
+      outline: none;
+      transition: border-color 0.6s var(--ease-out);
+    }
+
+    .waitlist input::placeholder {
+      color: #555555;
+    }
+
+    .waitlist input:focus {
+      border-color: rgba(120, 130, 255, 0.6);
+    }
+
+    .waitlist button {
+      padding: 14px 24px;
+      font-size: 15px;
+      font-weight: 500;
+      border: none;
+      border-radius: 10px;
+      background: var(--white);
+      color: var(--black);
+      cursor: pointer;
+      transition: transform 0.6s var(--ease-out), opacity 0.6s var(--ease-out);
+    }
+
+    .waitlist button:hover {
+      transform: translateY(-1px);
+      opacity: 0.92;
+    }
+
+    .waitlist-note,
+    .waitlist-success {
+      font-size: 13px;
+      color: var(--secondary);
+      animation: fadeUp 0.8s var(--ease-out) 0.35s both;
+    }
+
+    .waitlist-success {
+      display: none;
+    }
+
+    .hero-copy.success .waitlist {
+      display: none;
+    }
+
+    .hero-copy.success .waitlist-note {
+      display: none;
+    }
+
+    .hero-copy.success .waitlist-success {
+      display: block;
+    }
+
+    .micro-cta {
+      margin-top: var(--space-16);
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.35);
+      animation: fadeUp 0.8s var(--ease-out) 0.45s both;
+    }
+
+    .story-copy {
+      gap: var(--space-40);
+    }
+
+    .story-step {
+      display: none;
+      flex-direction: column;
+      gap: var(--space-16);
+      max-width: 620px;
+      font-size: clamp(28px, 4vw, 48px);
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      color: var(--white);
+      transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+    }
+
+    .story-step.is-active {
+      display: flex;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .story-kicker {
+      font-size: 12px;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-32) var(--space-24) var(--space-48);
+      color: var(--secondary);
+      font-size: 14px;
+      letter-spacing: 0.02em;
+    }
+
+    footer a {
+      color: var(--secondary);
+      text-decoration: none;
+      transition: color 0.6s var(--ease-out);
+    }
+
+    footer a:hover {
+      color: var(--white);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes dustFloat {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(120px); }
+    }
+
+    @media (max-width: 720px) {
+      .demo {
+        height: 360vh;
+      }
+
+      .demo-sticky {
+        padding: var(--space-64) var(--space-24);
+      }
+
+      .card-3d {
+        width: min(360px, 82vw);
+      }
+
+      .waitlist {
+        flex-direction: column;
+      }
+
+      .waitlist button,
+      .waitlist input {
+        width: min(360px, 100%);
+      }
+
+      .micro-cta {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card-3d,
+      .spend-number,
+      .hero-sub,
+      .waitlist,
+      .waitlist-note,
+      .micro-cta {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="demo" id="demo">
+      <div class="demo-sticky">
+        <div class="hero-copy is-active" id="hero-copy">
+          <div class="card-stage">
+            <div class="card-3d" id="bloom-card" aria-hidden="true">
+              <div class="card-face card-front">
+                <div class="card-logo">bloom</div>
+                <div class="card-number">•••• 4821</div>
+              </div>
+              <div class="card-face card-back">
+                <div class="proof-header">
+                  <span>Proof</span>
+                  <span>•••• 4821</span>
+                </div>
+                <div class="proof-list">
+                  <div class="proof-row"><span>Apple</span><span>-$9</span></div>
+                  <div class="proof-row"><span>Blue Bottle</span><span>-$7</span></div>
+                  <div class="proof-row"><span>Spotify</span><span>-$12</span></div>
+                </div>
+                <div class="proof-meta">
+                  <span class="proof-pill">Holds: $32</span>
+                  <span class="proof-pill">Dispute ready</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="spend-number">$4,821</div>
+          <div class="hero-sub">What you can spend, right now.</div>
+          <form class="waitlist" id="waitlist-form">
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              required
+              autocomplete="email"
+              autocapitalize="off"
+            >
+            <input
+              type="tel"
+              name="phone"
+              placeholder="Phone (optional)"
+              autocomplete="tel"
+            >
+            <button type="submit">Get early access</button>
+          </form>
+          <div class="waitlist-note">No spam. We&apos;ll reach out when it&apos;s your turn.</div>
+          <div class="waitlist-success">You&apos;re in.</div>
+          <div class="micro-cta">Flip for proof</div>
+        </div>
+
+        <div class="story-copy" id="story-copy">
+          <div class="story-step is-active" data-step="0">
+            <span class="story-kicker">Spend Power</span>
+            <span>Your balance is what will clear.</span>
+          </div>
+          <div class="story-step" data-step="1">
+            <span class="story-kicker">Flip for Proof</span>
+            <span>Every change explained instantly.</span>
+          </div>
+          <div class="story-step" data-step="2">
+            <span class="story-kicker">Defense</span>
+            <span>Disputes handled. No calls.</span>
+          </div>
+          <div class="story-step" data-step="3">
+            <span class="story-kicker">Future</span>
+            <span>Residency → Verify → Closed loop.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Bloom</span>
+    <a href="mailto:hello@paywithbloom.com">Contact</a>
+  </footer>
+
+  <script>
+    const demo = document.getElementById('demo');
+    const card = document.getElementById('bloom-card');
+    const heroCopy = document.getElementById('hero-copy');
+    const storyCopy = document.getElementById('story-copy');
+    const storySteps = Array.from(document.querySelectorAll('.story-step'));
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const lerp = (start, end, t) => start + (end - start) * t;
+    const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+    const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+    const smoothstep = (edge0, edge1, x) => {
+      const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+      return t * t * (3 - 2 * t);
+    };
+
+    let ticking = false;
+
+    const updateScroll = () => {
+      const total = demo.offsetHeight - window.innerHeight;
+      const rect = demo.getBoundingClientRect();
+      const progress = total > 0 ? clamp(-rect.top / total, 0, 1) : 0;
+
+      const heroCut = 0.18;
+      if (progress < heroCut) {
+        heroCopy.classList.add('is-active');
+        storyCopy.classList.remove('is-active');
+      } else {
+        heroCopy.classList.remove('is-active');
+        storyCopy.classList.add('is-active');
+      }
+
+      const tiltT = clamp(progress / 0.4, 0, 1);
+      const tilt = lerp(0, 10, easeOut(tiltT));
+      let flipT = clamp((progress - 0.4) / 0.4, 0, 1);
+      flipT = easeInOut(flipT);
+      const snap = smoothstep(0.48, 0.52, flipT);
+      flipT = lerp(flipT, snap, 0.35);
+      const rotateY = flipT * 180;
+      const settleT = clamp((progress - 0.8) / 0.2, 0, 1);
+      const settle = lerp(tilt, 2, easeOut(settleT));
+      const rotateZ = lerp(0, -2, easeOut(tiltT));
+      card.style.transform = `rotateX(${settle}deg) rotateY(${rotateY}deg) rotateZ(${rotateZ}deg)`;
+
+      const storyProgress = clamp((progress - heroCut) / (1 - heroCut), 0, 1);
+      const stepIndex = Math.min(storySteps.length - 1, Math.floor(storyProgress * storySteps.length));
+      storySteps.forEach((step, index) => {
+        step.classList.toggle('is-active', index === stepIndex);
+      });
+
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateScroll);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll);
+    window.addEventListener('resize', updateScroll);
+    updateScroll();
+
+    document.getElementById('waitlist-form').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const email = this.email.value.trim();
+      const phone = this.phone.value.trim();
+
+      if (!email) return;
+
+      try {
+        const response = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, phone })
+        });
+
+        if (!response.ok) {
+          throw new Error('Waitlist endpoint unavailable');
+        }
+      } catch (error) {
+        const stored = JSON.parse(localStorage.getItem('bloom_waitlist') || '[]');
+        stored.push({ email, phone, timestamp: new Date().toISOString() });
+        localStorage.setItem('bloom_waitlist', JSON.stringify(stored));
+      }
+
+      heroCopy.classList.add('success');
+    });
+  </script>
+</body>
+</html>
