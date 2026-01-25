@@ -226,6 +226,16 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      background:
+        linear-gradient(165deg,
+          #e8e8ed 0%,
+          #d4d4d8 15%,
+          #f0f0f2 30%,
+          #c8c8cc 50%,
+          #e0e0e4 70%,
+          #d0d0d4 85%,
+          #e8e8ec 100%
+        );
     }
 
     .card-back {
@@ -796,13 +806,13 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       };
 
-      // Create nebulae with different colors
+      // Create nebulae with different colors - cosmic palette
       const colors = [
-        { r: 80, g: 60, b: 180 },   // Deep purple
-        { r: 40, g: 80, b: 200 },   // Blue
-        { r: 120, g: 50, b: 160 },  // Magenta
-        { r: 30, g: 100, b: 180 },  // Teal blue
-        { r: 90, g: 40, b: 140 },   // Violet
+        { r: 20, g: 60, b: 120 },   // Deep space blue
+        { r: 60, g: 20, b: 100 },   // Dark purple
+        { r: 15, g: 80, b: 130 },   // Ocean blue
+        { r: 80, g: 30, b: 120 },   // Violet
+        { r: 30, g: 50, b: 100 },   // Midnight blue
       ];
 
       const seedNebulae = () => {
@@ -861,7 +871,7 @@
           );
 
           // Color intensity pulses
-          const intensity = 0.15 + Math.sin(time * 0.0008 + neb.phase) * 0.05;
+          const intensity = 0.25 + Math.sin(time * 0.0008 + neb.phase) * 0.08;
 
           gradient.addColorStop(0, `rgba(${neb.color.r}, ${neb.color.g}, ${neb.color.b}, ${intensity})`);
           gradient.addColorStop(0.4, `rgba(${neb.color.r}, ${neb.color.g}, ${neb.color.b}, ${intensity * 0.5})`);
@@ -872,13 +882,13 @@
         });
 
         // Add subtle aurora waves at the top
-        const auroraGradient = ctx.createLinearGradient(0, 0, 0, h * 0.5);
-        const auroraIntensity = 0.08 + Math.sin(time * 0.0005) * 0.03;
-        const hueShift = Math.sin(time * 0.0003) * 20;
+        const auroraGradient = ctx.createLinearGradient(0, 0, 0, h * 0.6);
+        const auroraIntensity = 0.12 + Math.sin(time * 0.0004) * 0.04;
+        const hueShift = Math.sin(time * 0.0002) * 15;
 
-        auroraGradient.addColorStop(0, `hsla(${240 + hueShift}, 70%, 50%, ${auroraIntensity})`);
-        auroraGradient.addColorStop(0.3, `hsla(${280 + hueShift}, 60%, 40%, ${auroraIntensity * 0.6})`);
-        auroraGradient.addColorStop(0.6, `hsla(${260 + hueShift}, 50%, 30%, ${auroraIntensity * 0.3})`);
+        auroraGradient.addColorStop(0, `hsla(${220 + hueShift}, 60%, 25%, ${auroraIntensity})`);
+        auroraGradient.addColorStop(0.25, `hsla(${250 + hueShift}, 50%, 20%, ${auroraIntensity * 0.7})`);
+        auroraGradient.addColorStop(0.5, `hsla(${270 + hueShift}, 45%, 18%, ${auroraIntensity * 0.4})`);
         auroraGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
         ctx.fillStyle = auroraGradient;
