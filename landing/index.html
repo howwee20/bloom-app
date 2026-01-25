@@ -43,7 +43,6 @@
     html,
     body {
       height: 100%;
-      overflow: hidden;
       overscroll-behavior: none;
     }
 
@@ -51,30 +50,17 @@
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
       background: var(--black);
       color: var(--white);
-      touch-action: none;
+      overflow-x: hidden;
+      touch-action: pan-y;
     }
 
-    body::before {
-      content: "";
+    #space-bg {
       position: fixed;
       inset: 0;
-      background:
-        radial-gradient(circle at 50% 20%, var(--aura), transparent 55%),
-        radial-gradient(circle at 80% 10%, var(--aura-soft), transparent 60%);
-      pointer-events: none;
+      width: 100%;
+      height: 100%;
       z-index: 0;
-    }
-
-    body::after {
-      content: "";
-      position: fixed;
-      inset: -20% 0 0 0;
-      background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-      background-size: 6px 6px;
-      opacity: 0.08;
-      animation: dustFloat 18s linear infinite;
       pointer-events: none;
-      z-index: 0;
     }
 
     header {
@@ -103,12 +89,22 @@
     main {
       position: relative;
       z-index: 1;
-      height: 100vh;
+      min-height: 200vh;
+    }
+
+    .sticky-layer {
+      position: sticky;
+      top: 0;
+      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: var(--space-80) var(--space-24);
       text-align: center;
+    }
+
+    .scroll-section {
+      height: 100vh;
     }
 
     .stage {
@@ -141,6 +137,7 @@
       width: min(460px, 80vw);
       aspect-ratio: 1.586 / 1;
       transform-style: preserve-3d;
+      -webkit-transform-style: preserve-3d;
       border-radius: 18px;
       transition: transform 0.6s var(--ease-out);
       will-change: transform;
@@ -151,6 +148,7 @@
       inset: 0;
       border-radius: 18px;
       backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
       background:
         linear-gradient(165deg,
           #e8e8ed 0%,
@@ -169,6 +167,11 @@
         0 10px 20px rgba(0, 0, 0, 0.2),
         0 0 0 1px rgba(0, 0, 0, 0.05);
       overflow: hidden;
+    }
+
+    .card-3d.is-back .card-front {
+      opacity: 0;
+      pointer-events: none;
     }
 
 
@@ -227,10 +230,17 @@
 
     .card-back {
       transform: rotateY(180deg);
-      padding: 16px 18px;
+      padding: 10px;
       display: flex;
-      flex-direction: column;
-      font-size: 11px;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(160deg, #1a1b1f 0%, #0b0c10 100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.08) inset,
+        0 -1px 0 rgba(0, 0, 0, 0.4) inset,
+        0 40px 70px rgba(0, 0, 0, 0.45),
+        0 12px 24px rgba(0, 0, 0, 0.35);
     }
 
     .card-content {
@@ -272,130 +282,137 @@
       z-index: 3;
     }
 
-    /* Back card - dashboard layout */
-    .back-content {
-      display: flex;
-      flex-direction: column;
+    /* Back card - phone mock */
+    .phone-shell {
+      width: 100%;
       height: 100%;
-      gap: 10px;
-      color: #1a1a1a;
-      position: relative;
-      z-index: 3;
-      transform: scaleX(-1);
-    }
-
-    .section-label {
-      font-size: 10px;
-      font-weight: 600;
-      color: rgba(0, 0, 0, 0.6);
-      margin-bottom: 4px;
-    }
-
-    .payments-list {
+      border-radius: 26px;
+      background: linear-gradient(180deg, rgba(20, 20, 24, 0.9), rgba(12, 12, 16, 0.95));
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
     }
 
-    .payment-row {
+    .phone-notch {
+      width: 80px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 0 auto 10px;
+    }
+
+    .phone-screen {
+      flex: 1;
+      border-radius: 20px;
+      background: linear-gradient(180deg, #0b0c12 0%, #0a0b0f 100%);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      color: #f2f2f7;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    .app-title {
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .app-balance {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .app-balance-number {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .app-balance-delta {
+      font-size: 10px;
+      color: #58d68d;
+      font-weight: 600;
+    }
+
+    .app-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .app-section-title {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .app-row {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.78);
     }
 
-    .payment-name {
-      font-weight: 500;
-      color: #1a1a1a;
-    }
-
-    .payment-time {
-      font-size: 9px;
-      color: rgba(0, 0, 0, 0.4);
+    .app-row small {
+      color: rgba(255, 255, 255, 0.4);
       margin-left: 6px;
     }
 
-    .payment-amount {
-      color: rgba(0, 0, 0, 0.5);
+    .app-amount {
+      color: rgba(255, 255, 255, 0.6);
       font-size: 10px;
     }
 
-    .investments-section {
-      margin-top: 6px;
-    }
-
-    .investment-bars {
+    .app-holding {
       display: flex;
-      gap: 3px;
-      height: 24px;
-      align-items: flex-end;
-      margin-bottom: 6px;
-    }
-
-    .inv-bar {
-      width: 8px;
-      background: rgba(0, 0, 0, 0.12);
-      border-radius: 2px;
-    }
-
-    .investment-row {
-      display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 3px 0;
-      border-top: 1px solid rgba(0, 0, 0, 0.06);
-    }
-
-    .investment-row:first-of-type {
-      border-top: none;
-    }
-
-    .inv-label {
+      gap: 8px;
       font-size: 10px;
-      color: rgba(0, 0, 0, 0.5);
     }
 
-    .inv-bar-track {
+    .app-hold-label {
+      width: 40px;
+      color: rgba(255, 255, 255, 0.55);
+    }
+
+    .app-bar-track {
       flex: 1;
       height: 3px;
-      background: rgba(0, 0, 0, 0.08);
-      margin: 0 8px;
-      border-radius: 2px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
       overflow: hidden;
     }
 
-    .inv-bar-fill {
+    .app-bar-fill {
       height: 100%;
-      background: rgba(0, 0, 0, 0.25);
-      border-radius: 2px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.6);
     }
 
-    .inv-amount {
-      font-size: 10px;
-      color: #1a1a1a;
-      font-weight: 500;
-      min-width: 45px;
+    .app-hold-amount {
+      min-width: 46px;
       text-align: right;
+      color: rgba(255, 255, 255, 0.8);
     }
 
-    .command-bar {
+    .app-command {
       margin-top: auto;
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      background: rgba(0, 0, 0, 0.04);
-      border-radius: 8px;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-    }
-
-    .command-icon {
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.6);
       font-size: 10px;
-      color: rgba(0, 0, 0, 0.4);
-    }
-
-    .command-text {
-      font-size: 10px;
-      color: rgba(0, 0, 0, 0.4);
     }
 
     #bg-particles {
@@ -578,6 +595,7 @@
   </style>
 </head>
 <body>
+  <canvas id="space-bg"></canvas>
   <canvas id="bg-particles"></canvas>
 
   <header>
@@ -585,90 +603,90 @@
   </header>
 
   <main>
-    <div class="stage">
-      <div class="card-stage">
-        <div class="card-3d" id="bloom-card" aria-hidden="true">
-          <div class="card-face card-front" id="card-front">
-            <div class="front-content">
-              <div class="spend-number">$47,291</div>
-              <div class="spend-delta">+$127 today</div>
-            </div>
-          </div>
-          <div class="card-face card-back" id="card-back">
-            <div class="back-content">
-              <div class="payments-section">
-                <div class="section-label">Payments</div>
-                <div class="payments-list">
-                  <div class="payment-row">
-                    <span><span class="payment-name">Spotify</span><span class="payment-time">9:24a</span></span>
-                    <span class="payment-amount">-$12</span>
-                  </div>
-                  <div class="payment-row">
-                    <span><span class="payment-name">Blue Bottle</span><span class="payment-time">8:11a</span></span>
-                    <span class="payment-amount">-$7</span>
-                  </div>
-                  <div class="payment-row">
-                    <span><span class="payment-name">Apple</span><span class="payment-time">Yesterday</span></span>
-                    <span class="payment-amount">-$3</span>
-                  </div>
-                </div>
-              </div>
-              <div class="investments-section">
-                <div class="section-label">Investments</div>
-                <div class="investment-bars">
-                  <div class="inv-bar" style="height: 60%"></div>
-                  <div class="inv-bar" style="height: 45%"></div>
-                  <div class="inv-bar" style="height: 80%"></div>
-                  <div class="inv-bar" style="height: 55%"></div>
-                  <div class="inv-bar" style="height: 70%"></div>
-                  <div class="inv-bar" style="height: 40%"></div>
-                  <div class="inv-bar" style="height: 90%"></div>
-                </div>
-                <div class="investment-row">
-                  <span class="inv-label">Cash</span>
-                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 35%"></div></div>
-                  <span class="inv-amount">$12,480</span>
-                </div>
-                <div class="investment-row">
-                  <span class="inv-label">Stocks</span>
-                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 55%"></div></div>
-                  <span class="inv-amount">$21,940</span>
-                </div>
-                <div class="investment-row">
-                  <span class="inv-label">BTC</span>
-                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 22%"></div></div>
-                  <span class="inv-amount">$7,820</span>
-                </div>
-              </div>
-              <div class="command-bar">
-                <span class="command-icon">⌘</span>
-                <span class="command-text">Balance, transfer, buy, sell...</span>
+    <div class="sticky-layer">
+      <div class="stage">
+        <div class="card-stage">
+          <div class="card-3d" id="bloom-card" aria-hidden="true">
+            <div class="card-face card-front" id="card-front">
+              <div class="front-content">
+                <div class="spend-number">$47,291</div>
+                <div class="spend-delta">+$127 today</div>
               </div>
             </div>
+            <div class="card-face card-back" id="card-back">
+              <div class="phone-shell">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                  <div class="app-title">Bloom</div>
+                  <div class="app-balance">
+                    <div class="app-balance-number">$47,291</div>
+                    <div class="app-balance-delta">+$127 today</div>
+                  </div>
+                  <div class="app-section">
+                    <div class="app-section-title">Payments</div>
+                    <div class="app-row">
+                      <span>Spotify <small>9:24a</small></span>
+                      <span class="app-amount">-$12</span>
+                    </div>
+                    <div class="app-row">
+                      <span>Blue Bottle <small>8:11a</small></span>
+                      <span class="app-amount">-$7</span>
+                    </div>
+                    <div class="app-row">
+                      <span>Apple <small>Yesterday</small></span>
+                      <span class="app-amount">-$3</span>
+                    </div>
+                  </div>
+                  <div class="app-section">
+                    <div class="app-section-title">Investments</div>
+                    <div class="app-holding">
+                      <span class="app-hold-label">Cash</span>
+                      <div class="app-bar-track"><div class="app-bar-fill" style="width: 35%"></div></div>
+                      <span class="app-hold-amount">$12,480</span>
+                    </div>
+                    <div class="app-holding">
+                      <span class="app-hold-label">Stocks</span>
+                      <div class="app-bar-track"><div class="app-bar-fill" style="width: 55%"></div></div>
+                      <span class="app-hold-amount">$21,940</span>
+                    </div>
+                    <div class="app-holding">
+                      <span class="app-hold-label">BTC</span>
+                      <div class="app-bar-track"><div class="app-bar-fill" style="width: 22%"></div></div>
+                      <span class="app-hold-amount">$7,820</span>
+                    </div>
+                  </div>
+                  <div class="app-command">
+                    <span>⌘</span>
+                    <span>Balance, transfer, buy, sell...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="copy" id="copy">
-        <div class="copy-block" id="copy-front">
-          <div class="headline">All your money. One card.</div>
-          <div class="subhead">Cash, stocks, crypto. All spendable.</div>
-        </div>
-        <div class="copy-block" id="copy-back">
-          <div class="headline">See everything. Do everything.</div>
-          <div class="subhead">Buy, sell, send — all from one place.</div>
-          <div class="subhead">Disputes, fraud, errors — handled for you.</div>
-        </div>
+        <div class="copy" id="copy">
+          <div class="copy-block" id="copy-front">
+            <div class="headline">All your money. One card.</div>
+            <div class="subhead">Cash, stocks, crypto. All spendable.</div>
+          </div>
+          <div class="copy-block" id="copy-back">
+            <div class="headline">See everything. Do everything.</div>
+            <div class="subhead">Buy, sell, send — all from one place.</div>
+          </div>
 
-        <form class="waitlist" id="waitlist-form">
-          <input type="email" name="email" placeholder="Email" required autocomplete="email" autocapitalize="off">
-          <input type="tel" name="phone" placeholder="Phone (optional)" autocomplete="tel">
-          <button type="submit">Get early access</button>
-        </form>
-        <div class="waitlist-note">No spam. We&apos;ll reach out when it&apos;s your turn.</div>
-        <div class="waitlist-success">You&apos;re in.</div>
+          <form class="waitlist" id="waitlist-form">
+            <input type="email" name="email" placeholder="Email" required autocomplete="email" autocapitalize="off">
+            <input type="tel" name="phone" placeholder="Phone (optional)" autocomplete="tel">
+            <button type="submit">Get early access</button>
+          </form>
+          <div class="waitlist-note">No spam. We&apos;ll reach out when it&apos;s your turn.</div>
+          <div class="waitlist-success">You&apos;re in.</div>
+        </div>
       </div>
     </div>
+    <section class="scroll-section" aria-hidden="true"></section>
+    <section class="scroll-section" aria-hidden="true"></section>
   </main>
 
   <footer>
@@ -689,24 +707,31 @@
     let currentProgress = 0;
     let pointerX = 0;
     let pointerY = 0;
+    let cardMetrics = null;
 
-    const handleWheel = (event) => {
-      event.preventDefault();
-      targetProgress = clamp(targetProgress + event.deltaY * 0.001, 0, 1);
+    const updateMetrics = () => {
+      const cardWidth = Math.min(460, window.innerWidth * 0.8);
+      const cardHeight = cardWidth / 1.586;
+      let phoneWidth = Math.min(320, window.innerWidth * 0.7);
+      let phoneHeight = phoneWidth * 2.05;
+      const maxPhoneHeight = window.innerHeight * 0.72;
+
+      if (phoneHeight > maxPhoneHeight) {
+        phoneHeight = maxPhoneHeight;
+        phoneWidth = phoneHeight / 2.05;
+      }
+
+      cardMetrics = {
+        cardWidth,
+        cardHeight,
+        phoneWidth,
+        phoneHeight,
+        cardRadius: 18,
+        phoneRadius: 34
+      };
     };
 
-    let touchStartY = 0;
-    const handleTouchStart = (event) => {
-      touchStartY = event.touches[0].clientY;
-    };
-
-    const handleTouchMove = (event) => {
-      event.preventDefault();
-      const currentY = event.touches[0].clientY;
-      const delta = touchStartY - currentY;
-      touchStartY = currentY;
-      targetProgress = clamp(targetProgress + delta * 0.003, 0, 1);
-    };
+    updateMetrics();
 
     const handlePointerMove = (event) => {
       const x = event.clientX / window.innerWidth;
@@ -718,24 +743,161 @@
     const animate = () => {
       currentProgress = lerp(currentProgress, targetProgress, 0.08);
 
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const scrollRange = window.innerHeight || 1;
+      targetProgress = clamp(scrollTop / scrollRange, 0, 1);
+      currentProgress = lerp(currentProgress, targetProgress, 0.12);
+
       const rotateY = currentProgress * 180;
-      const tiltX = 5 + pointerY * -3;
-      const tiltY = pointerX * 5;
+      const tiltStrength = lerp(6, 2, currentProgress);
+      const tiltX = 4 + pointerY * -tiltStrength;
+      const tiltY = pointerX * tiltStrength;
+
+      if (cardMetrics) {
+        const width = lerp(cardMetrics.cardWidth, cardMetrics.phoneWidth, currentProgress);
+        const height = lerp(cardMetrics.cardHeight, cardMetrics.phoneHeight, currentProgress);
+        const radius = lerp(cardMetrics.cardRadius, cardMetrics.phoneRadius, currentProgress);
+        card.style.width = `${width.toFixed(2)}px`;
+        card.style.height = `${height.toFixed(2)}px`;
+        card.style.borderRadius = `${radius.toFixed(2)}px`;
+      }
 
       card.style.transform = `rotateX(${tiltX.toFixed(2)}deg) rotateY(${(rotateY + tiltY).toFixed(2)}deg)`;
 
       const showBack = currentProgress > 0.5;
-      copyFront.style.display = showBack ? 'none' : 'flex';
-      copyBack.style.display = showBack ? 'flex' : 'none';
+      card.classList.toggle('is-back', showBack);
+
+      const backOpacity = clamp((currentProgress - 0.35) / 0.3, 0, 1);
+      const frontOpacity = 1 - backOpacity;
+      copyFront.style.opacity = frontOpacity.toFixed(2);
+      copyFront.style.transform = `translateY(${(1 - frontOpacity) * 8}px)`;
+      copyBack.style.opacity = backOpacity.toFixed(2);
+      copyBack.style.transform = `translateY(${(1 - backOpacity) * -8}px)`;
 
       requestAnimationFrame(animate);
     };
 
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    window.addEventListener('touchstart', handleTouchStart, { passive: false });
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('resize', updateMetrics);
 
+    // Animated space background with nebulae and auroras
+    const createSpaceBackground = (canvas) => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      let time = 0;
+      const nebulae = [];
+      const nebulaCount = 5;
+
+      const resize = () => {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+
+      // Create nebulae with different colors
+      const colors = [
+        { r: 80, g: 60, b: 180 },   // Deep purple
+        { r: 40, g: 80, b: 200 },   // Blue
+        { r: 120, g: 50, b: 160 },  // Magenta
+        { r: 30, g: 100, b: 180 },  // Teal blue
+        { r: 90, g: 40, b: 140 },   // Violet
+      ];
+
+      const seedNebulae = () => {
+        nebulae.length = 0;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        for (let i = 0; i < nebulaCount; i++) {
+          nebulae.push({
+            x: Math.random() * w,
+            y: Math.random() * h * 0.7,
+            baseX: Math.random() * w,
+            baseY: Math.random() * h * 0.7,
+            radius: 200 + Math.random() * 300,
+            color: colors[i % colors.length],
+            speed: 0.0003 + Math.random() * 0.0004,
+            phase: Math.random() * Math.PI * 2,
+            driftX: 0.0001 + Math.random() * 0.0002,
+            driftY: 0.00005 + Math.random() * 0.0001,
+          });
+        }
+      };
+
+      const draw = () => {
+        time += 1;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        // Clear with black
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, h);
+
+        // Draw each nebula
+        nebulae.forEach((neb, i) => {
+          // Slow organic movement
+          neb.x = neb.baseX + Math.sin(time * neb.speed + neb.phase) * 80;
+          neb.y = neb.baseY + Math.cos(time * neb.speed * 0.7 + neb.phase) * 50;
+
+          // Slowly drift the base position
+          neb.baseX += Math.sin(time * neb.driftX) * 0.3;
+          neb.baseY += Math.cos(time * neb.driftY) * 0.2;
+
+          // Wrap around
+          if (neb.baseX < -neb.radius) neb.baseX = w + neb.radius;
+          if (neb.baseX > w + neb.radius) neb.baseX = -neb.radius;
+          if (neb.baseY < -neb.radius) neb.baseY = h * 0.5;
+          if (neb.baseY > h) neb.baseY = 0;
+
+          // Pulsing radius
+          const pulseRadius = neb.radius + Math.sin(time * 0.001 + i) * 30;
+
+          // Create radial gradient
+          const gradient = ctx.createRadialGradient(
+            neb.x, neb.y, 0,
+            neb.x, neb.y, pulseRadius
+          );
+
+          // Color intensity pulses
+          const intensity = 0.15 + Math.sin(time * 0.0008 + neb.phase) * 0.05;
+
+          gradient.addColorStop(0, `rgba(${neb.color.r}, ${neb.color.g}, ${neb.color.b}, ${intensity})`);
+          gradient.addColorStop(0.4, `rgba(${neb.color.r}, ${neb.color.g}, ${neb.color.b}, ${intensity * 0.5})`);
+          gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, w, h);
+        });
+
+        // Add subtle aurora waves at the top
+        const auroraGradient = ctx.createLinearGradient(0, 0, 0, h * 0.5);
+        const auroraIntensity = 0.08 + Math.sin(time * 0.0005) * 0.03;
+        const hueShift = Math.sin(time * 0.0003) * 20;
+
+        auroraGradient.addColorStop(0, `hsla(${240 + hueShift}, 70%, 50%, ${auroraIntensity})`);
+        auroraGradient.addColorStop(0.3, `hsla(${280 + hueShift}, 60%, 40%, ${auroraIntensity * 0.6})`);
+        auroraGradient.addColorStop(0.6, `hsla(${260 + hueShift}, 50%, 30%, ${auroraIntensity * 0.3})`);
+        auroraGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        ctx.fillStyle = auroraGradient;
+        ctx.fillRect(0, 0, w, h * 0.6);
+
+        requestAnimationFrame(draw);
+      };
+
+      resize();
+      seedNebulae();
+      requestAnimationFrame(draw);
+
+      window.addEventListener('resize', () => {
+        resize();
+        seedNebulae();
+      });
+    };
+
+    createSpaceBackground(document.getElementById('space-bg'));
 
     const createParticles = (canvas) => {
       const ctx = canvas.getContext('2d');
