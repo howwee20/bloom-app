@@ -430,14 +430,24 @@ export class AlpacaBrokerageAdapter implements BrokerageAdapterContract {
           }),
         });
 
-        await supabaseAdmin
+        const externalOrderId = order.external_order_id || order.id;
+        const { data: existingAlert } = await supabaseAdmin
           .from('internal_alerts')
-          .insert({
-            user_id: order.user_id,
-            kind: 'pending_fill_accounting',
-            message: `Missing fill data for order ${order.external_order_id || order.id}`,
-            metadata: { order_id: order.id, external_order_id: order.external_order_id },
-          });
+          .select('id')
+          .eq('kind', 'pending_fill_accounting')
+          .contains('metadata', { external_order_id: externalOrderId })
+          .maybeSingle();
+
+        if (!existingAlert) {
+          await supabaseAdmin
+            .from('internal_alerts')
+            .insert({
+              user_id: order.user_id,
+              kind: 'pending_fill_accounting',
+              message: `Missing fill data for order ${externalOrderId}`,
+              metadata: { order_id: order.id, external_order_id: externalOrderId },
+            });
+        }
 
         return;
       }

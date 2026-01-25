@@ -59,7 +59,8 @@ npx vercel dev
 
 - `GET /api/balance` → `{ spendable_cents, total_value_cents, day_pnl_cents, updated_at }`
 - `GET /api/flip` → `{ payments, holdings, other_assets, liabilities }`
-- `POST /api/command` → parse command preview
+- `POST /api/command` → preview (compat shim)
+- `POST /api/command/preview` → parse command preview
 - `POST /api/command/confirm` → execute command
 - `POST /api/webhooks/column/auth_request`
 - `POST /api/webhooks/column/transaction_posted`
@@ -72,8 +73,9 @@ npx vercel dev
 - `GET /api/account/dd`
 - `GET /api/card/status`
 - `GET /api/admin/incident-bundle?user_id=...`
-- `POST /api/cron/liquidate` (requires `x-cron-secret` or `?cron_secret=...`)
-- `POST /api/cron/reconcile` (requires `x-cron-secret` or `?cron_secret=...`)
+- `POST /api/cron/update-prices` (requires cron auth)
+- `POST /api/cron/liquidate` (requires cron auth)
+- `POST /api/cron/reconcile` (requires cron auth)
 
 ## Scripts
 
@@ -121,4 +123,6 @@ Adapters auto-switch based on env vars:
 
 - Native builds must set `EXPO_PUBLIC_API_BASE_URL` so the app can reach `/api` routes.
 - API routes accept `x-user-id` in headers for dev; production should pass a real auth token.
-- Vercel cron should include `CRON_SECRET` (use query param in Vercel cron config if headers are not supported).
+- Vercel cron sets `Authorization: Bearer $CRON_SECRET` automatically when `CRON_SECRET` is configured.
+- Manual testing can use `x-cron-secret` or `?cron_secret=...` as fallbacks.
+- Default schedules in `vercel.json`: update-prices `*/10 * * * *`, liquidate `*/2 * * * *`, reconcile `*/30 * * * *`.

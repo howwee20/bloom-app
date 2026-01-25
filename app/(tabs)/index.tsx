@@ -496,10 +496,10 @@ export default function HomeScreen() {
     if (session?.user?.id) {
       headers['x-user-id'] = session.user.id;
     }
-    console.log('[CMD] Fetching preview from:', `${apiBaseUrl}/api/command`);
+    console.log('[CMD] Fetching preview from:', `${apiBaseUrl}/api/command/preview`);
 
     try {
-      const previewRes = await fetch(`${apiBaseUrl}/api/command`, {
+      const previewRes = await fetch(`${apiBaseUrl}/api/command/preview`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ text: trimmed }),

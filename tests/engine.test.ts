@@ -14,6 +14,7 @@ import { LiquidationEngine } from '../lib/engine/liquidation';
 import { ReconciliationService } from '../lib/engine/reconcile';
 import { EventStore } from '../lib/engine/eventStore';
 import { ReceiptBuilder } from '../lib/engine/receipts';
+import commandPreviewHandler from '../api/command';
 
 const TEST_PASSWORD = 'testpass123';
 
@@ -62,6 +63,21 @@ async function clearUserData(userId: string) {
     const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId);
     if (error) throw error;
   }
+}
+
+function createMockRes() {
+  return {
+    statusCode: 200,
+    body: null as any,
+    status(code: number) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload: any) {
+      this.body = payload;
+      return this;
+    },
+  };
 }
 
 let userId = '';
@@ -329,9 +345,32 @@ test('command dd/card details are graceful when not linked', async () => {
   assert.equal(cardConfirm.status, 'not_linked');
 });
 
+test('api/command shim matches preview', async () => {
+  const command = new CommandService();
+  const preview = await command.preview(userId, 'balance');
+
+  const req = {
+    method: 'POST',
+    headers: { 'x-user-id': userId },
+    body: { text: 'balance' },
+  } as any;
+  const res = createMockRes();
+
+  await commandPreviewHandler(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body?.action, preview.action);
+  assert.equal(res.body?.confirm_required, preview.confirm_required);
+  assert.equal(res.body?.preview_title, preview.preview_title);
+  assert.ok(typeof res.body?.idempotency_key === 'string');
+});
+
 test('cron auth accepts header and query param', () => {
   const original = process.env.CRON_SECRET;
   process.env.CRON_SECRET = 'test-secret';
+
+  const bearerOk = requireCronSecret({ headers: { authorization: 'Bearer test-secret' } });
+  assert.equal(bearerOk.ok, true);
 
   const headerOk = requireCronSecret({ headers: { 'x-cron-secret': 'test-secret' } });
   assert.equal(headerOk.ok, true);
@@ -520,4 +559,60 @@ test('alpaca missing fill fields do not overstate', async () => {
       .single()
   );
   assert.equal(updatedOrder.status, 'pending_fill_accounting');
+});
+
+test('pending fill alert is idempotent', async () => {
+  const symbol = 'SPY';
+  const { data: existing } = await supabaseAdmin
+    .from('instruments')
+    .select('id, symbol')
+    .eq('symbol', symbol)
+    .maybeSingle();
+
+  const instrument = existing || (await unwrap(
+    supabaseAdmin
+      .from('instruments')
+      .insert({ symbol, type: 'ETF', quote_source: 'alpaca' })
+      .select('id, symbol')
+      .single()
+  ));
+
+  const externalOrderId = `alpaca-alert-${randomUUID()}`;
+  const order = await unwrap(
+    supabaseAdmin
+      .from('orders')
+      .insert({
+        user_id: userId,
+        instrument_id: instrument.id,
+        side: 'buy',
+        notional_cents: 10000,
+        status: 'placed',
+        external_order_id: externalOrderId,
+      })
+      .select('*')
+      .single()
+  );
+
+  const adapter = Object.create(AlpacaBrokerageAdapter.prototype) as any;
+  adapter.config = { key: 'x', secret: 'y', baseUrl: 'http://local', dataUrl: 'http://local' };
+  adapter.local = new PaperBrokerageAdapter();
+  adapter.eventStore = new EventStore();
+  adapter.receipts = new ReceiptBuilder();
+  adapter.request = async () => ({
+    ok: true,
+    status: 200,
+    data: { status: 'filled' },
+  });
+
+  await adapter.fillOrder(order);
+  await adapter.fillOrder(order);
+
+  const alerts = await unwrap(
+    supabaseAdmin
+      .from('internal_alerts')
+      .select('id')
+      .eq('kind', 'pending_fill_accounting')
+      .contains('metadata', { external_order_id: externalOrderId })
+  );
+  assert.equal(alerts.length, 1);
 });
