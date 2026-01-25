@@ -123,11 +123,27 @@ export class PaperBrokerageAdapter implements BrokerageAdapterContract {
     return data as OrderRecord;
   }
 
-  async fillOrder(order: OrderRecord) {
+  async fillOrder(
+    order: OrderRecord,
+    fillOverride?: { filled_cents?: number; filled_qty?: number; status?: string }
+  ) {
+    const filledCents = Math.abs(fillOverride?.filled_cents ?? order.notional_cents);
+    const filledQty = Math.abs(fillOverride?.filled_qty ?? 1);
+    const status = fillOverride?.status ?? 'filled';
+
     await supabaseAdmin
       .from('orders')
-      .update({ status: 'filled', filled_cents: Math.abs(order.notional_cents), updated_at: new Date().toISOString() })
+      .update({
+        status,
+        filled_cents: filledCents,
+        filled_qty: filledQty,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', order.id);
+
+    if (filledCents <= 0 || filledQty <= 0) {
+      return;
+    }
 
     const instrument = await supabaseAdmin
       .from('instruments')
@@ -146,8 +162,8 @@ export class PaperBrokerageAdapter implements BrokerageAdapterContract {
       .eq('instrument_id', order.instrument_id)
       .maybeSingle();
 
-    const qtyDelta = order.side === 'buy' ? 1 : -1;
-    const costDelta = order.side === 'buy' ? order.notional_cents : -order.notional_cents;
+    const qtyDelta = order.side === 'buy' ? filledQty : -filledQty;
+    const costDelta = order.side === 'buy' ? filledCents : -filledCents;
 
     if (position) {
       await supabaseAdmin
@@ -165,7 +181,7 @@ export class PaperBrokerageAdapter implements BrokerageAdapterContract {
           user_id: order.user_id,
           instrument_id: order.instrument_id,
           qty: qtyDelta,
-          cost_basis_cents: order.notional_cents,
+          cost_basis_cents: filledCents,
         });
     }
 
@@ -179,12 +195,12 @@ export class PaperBrokerageAdapter implements BrokerageAdapterContract {
         {
           ledger_account_id: accounts.cash.id,
           direction: order.side === 'buy' ? 'credit' : 'debit',
-          amount_cents: Math.abs(order.notional_cents),
+          amount_cents: filledCents,
         },
         {
           ledger_account_id: accounts.clearing.id,
           direction: order.side === 'buy' ? 'debit' : 'credit',
-          amount_cents: Math.abs(order.notional_cents),
+          amount_cents: filledCents,
         },
       ],
     });
@@ -192,7 +208,7 @@ export class PaperBrokerageAdapter implements BrokerageAdapterContract {
     await this.receipts.recordTradeFill(
       order.user_id,
       instrument.data.symbol,
-      Math.abs(order.notional_cents),
+      filledCents,
       order.side,
       order.external_order_id || order.id
     );
@@ -203,9 +219,9 @@ export class PaperBrokerageAdapter implements BrokerageAdapterContract {
       event_type: 'order_filled',
       external_id: order.external_order_id || order.id,
       user_id: order.user_id,
-      status: 'filled',
-      amount_cents: Math.abs(order.notional_cents),
-      metadata: { symbol: instrument.data.symbol, side: order.side },
+      status,
+      amount_cents: filledCents,
+      metadata: { symbol: instrument.data.symbol, side: order.side, filled_qty: filledQty },
     });
   }
 
@@ -369,7 +385,68 @@ export class AlpacaBrokerageAdapter implements BrokerageAdapterContract {
 
     const status = response.data.status;
     if (status === 'filled' || status === 'partially_filled') {
-      await this.local.fillOrder(order);
+      const filledQty = Number((response.data as any).filled_qty || 0);
+      const filledAvgPrice = Number((response.data as any).filled_avg_price || 0);
+      const requestedQty = Number((response.data as any).qty || 0);
+      const requestedNotional = Number((response.data as any).notional || 0);
+
+      let filledCents = 0;
+      if (filledQty > 0 && filledAvgPrice > 0) {
+        filledCents = Math.round(filledQty * filledAvgPrice * 100);
+      } else if (filledQty > 0 && requestedQty > 0 && requestedNotional > 0) {
+        const fillRatio = Math.min(1, filledQty / requestedQty);
+        filledCents = Math.round(requestedNotional * fillRatio * 100);
+      }
+
+      if (filledCents <= 0) {
+        await supabaseAdmin
+          .from('orders')
+          .update({ status: 'pending_fill_accounting', updated_at: new Date().toISOString() })
+          .eq('id', order.id);
+
+        await this.eventStore.recordNormalizedEvent({
+          source: 'brokerage',
+          domain: 'trade',
+          event_type: 'order_pending_fill',
+          external_id: order.external_order_id || order.id,
+          user_id: order.user_id,
+          status: 'pending_fill_accounting',
+          amount_cents: order.notional_cents,
+          metadata: { reason: 'missing_fill_fields' },
+        });
+
+        const { data: instrument } = await supabaseAdmin
+          .from('instruments')
+          .select('symbol')
+          .eq('id', order.instrument_id)
+          .maybeSingle();
+
+        await this.receipts.recordReceipt({
+          user_id: order.user_id,
+          ...receiptCatalog.tradeQueued({
+            symbol: instrument?.symbol || 'Trade',
+            amount_cents: 0,
+            external_id: order.external_order_id || order.id,
+          }),
+        });
+
+        await supabaseAdmin
+          .from('internal_alerts')
+          .insert({
+            user_id: order.user_id,
+            kind: 'pending_fill_accounting',
+            message: `Missing fill data for order ${order.external_order_id || order.id}`,
+            metadata: { order_id: order.id, external_order_id: order.external_order_id },
+          });
+
+        return;
+      }
+
+      await this.local.fillOrder(order, {
+        filled_cents: filledCents,
+        filled_qty: filledQty > 0 ? filledQty : 1,
+        status,
+      });
       return;
     }
 

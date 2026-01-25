@@ -4,9 +4,16 @@ import { randomUUID } from 'crypto';
 import { after, before, beforeEach, test } from 'node:test';
 import { supabaseAdmin } from '../lib/server/supabaseAdmin';
 import { ColumnAdapter } from '../lib/engine/integrations/column';
-import { BrokerageAdapter } from '../lib/engine/integrations/brokerage';
+import { AlpacaBrokerageAdapter, BrokerageAdapter, PaperBrokerageAdapter } from '../lib/engine/integrations/brokerage';
 import { SpendableEngine } from '../lib/engine/spendable';
 import { CardService } from '../lib/engine/card';
+import { CommandService } from '../lib/engine/command';
+import { requireCronSecret } from '../lib/server/cronAuth';
+import { MetricsService } from '../lib/engine/metrics';
+import { LiquidationEngine } from '../lib/engine/liquidation';
+import { ReconciliationService } from '../lib/engine/reconcile';
+import { EventStore } from '../lib/engine/eventStore';
+import { ReceiptBuilder } from '../lib/engine/receipts';
 
 const TEST_PASSWORD = 'testpass123';
 
@@ -36,6 +43,7 @@ async function clearUserData(userId: string) {
     'card_holds',
     'card_auths',
     'receipts',
+    'external_links',
     'orders',
     'positions',
     'ledger_journal_entries',
@@ -47,6 +55,7 @@ async function clearUserData(userId: string) {
     'ach_transfers',
     'reconciliation_reports',
     'internal_alerts',
+    'metrics_snapshots',
   ];
 
   for (const table of tables) {
@@ -283,4 +292,232 @@ test('out-of-order card events converge', async () => {
 
   assert.equal(authState.status, 'settled');
   assert.equal(Number(authState.captured_cents), 2500);
+});
+
+const hasAlpaca = !!(process.env.ALPACA_API_KEY || process.env.ALPACA_KEY);
+
+test('alpaca adapter connectivity', { skip: !hasAlpaca }, async () => {
+  const symbol = process.env.BLOOM_STOCK_TICKER || 'SPY';
+  const adapter = new AlpacaBrokerageAdapter();
+  const quote = await adapter.getQuote(symbol);
+  assert.ok(quote.price_cents >= 0);
+});
+
+test('command dd/card details are graceful when not linked', async () => {
+  const command = new CommandService();
+
+  const ddPreview = await command.preview(userId, 'dd details');
+  assert.equal(ddPreview.status, 'not_linked');
+  assert.equal(ddPreview.next_step, 'create_account');
+
+  const cardPreview = await command.preview(userId, 'card status');
+  assert.equal(cardPreview.status, 'not_linked');
+  assert.equal(cardPreview.next_step, 'issue_card');
+
+  const ddConfirm = await command.confirm(userId, {
+    action: 'dd_details',
+    idempotency_key: `dd-${randomUUID()}`,
+  } as any);
+  assert.equal(ddConfirm.ok, false);
+  assert.equal(ddConfirm.status, 'not_linked');
+
+  const cardConfirm = await command.confirm(userId, {
+    action: 'card_status',
+    idempotency_key: `card-${randomUUID()}`,
+  } as any);
+  assert.equal(cardConfirm.ok, false);
+  assert.equal(cardConfirm.status, 'not_linked');
+});
+
+test('cron auth accepts header and query param', () => {
+  const original = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = 'test-secret';
+
+  const headerOk = requireCronSecret({ headers: { 'x-cron-secret': 'test-secret' } });
+  assert.equal(headerOk.ok, true);
+
+  const queryOk = requireCronSecret({ query: { cron_secret: 'test-secret' } });
+  assert.equal(queryOk.ok, true);
+
+  const bad = requireCronSecret({ headers: { 'x-cron-secret': 'wrong' } });
+  assert.equal(bad.ok, false);
+
+  process.env.CRON_SECRET = original;
+});
+
+test('metrics are best-effort', async () => {
+  const originalFrom = (supabaseAdmin as any).from;
+  (supabaseAdmin as any).from = () => {
+    throw new Error('metrics down');
+  };
+
+  const metrics = new MetricsService();
+  await metrics.record({ name: 'test_metric', value: 1 });
+
+  (supabaseAdmin as any).from = originalFrom;
+});
+
+test('liquidation/reconcile are idempotent for ledger', async () => {
+  await supabaseAdmin.from('policy').upsert({
+    user_id: userId,
+    buffer_cents: 1000,
+    buffer_percent: null,
+    liquidation_order_json: [],
+    bridge_enabled_bool: false,
+  }, { onConflict: 'user_id' });
+
+  const liquidation = new LiquidationEngine();
+  await liquidation.enqueueIfNeeded(userId);
+  await liquidation.enqueueIfNeeded(userId);
+
+  const jobs = await unwrap(
+    supabaseAdmin.from('liquidation_jobs').select('id').eq('user_id', userId)
+  );
+  assert.equal(jobs.length, 1);
+
+  const entriesBefore = await unwrap(
+    supabaseAdmin.from('ledger_journal_entries').select('id').eq('user_id', userId)
+  );
+
+  const reconcile = new ReconciliationService();
+  await reconcile.reconcileUser(userId);
+  await reconcile.reconcileUser(userId);
+
+  const entriesAfter = await unwrap(
+    supabaseAdmin.from('ledger_journal_entries').select('id').eq('user_id', userId)
+  );
+
+  assert.equal(entriesAfter.length, entriesBefore.length);
+});
+
+test('alpaca partial fill uses actual filled amounts', async () => {
+  const symbol = 'SPY';
+  const { data: existing } = await supabaseAdmin
+    .from('instruments')
+    .select('id, symbol')
+    .eq('symbol', symbol)
+    .maybeSingle();
+
+  const instrument = existing || (await unwrap(
+    supabaseAdmin
+      .from('instruments')
+      .insert({ symbol, type: 'ETF', quote_source: 'alpaca' })
+      .select('id, symbol')
+      .single()
+  ));
+
+  const externalOrderId = `alpaca-${randomUUID()}`;
+  const order = await unwrap(
+    supabaseAdmin
+      .from('orders')
+      .insert({
+        user_id: userId,
+        instrument_id: instrument.id,
+        side: 'buy',
+        notional_cents: 10000,
+        status: 'placed',
+        external_order_id: externalOrderId,
+      })
+      .select('*')
+      .single()
+  );
+
+  const adapter = Object.create(AlpacaBrokerageAdapter.prototype) as any;
+  adapter.config = { key: 'x', secret: 'y', baseUrl: 'http://local', dataUrl: 'http://local' };
+  adapter.local = new PaperBrokerageAdapter();
+  adapter.eventStore = new EventStore();
+  adapter.receipts = new ReceiptBuilder();
+  adapter.request = async () => ({
+    ok: true,
+    status: 200,
+    data: {
+      status: 'filled',
+      filled_qty: '0.5',
+      filled_avg_price: '100',
+      qty: '1',
+      notional: '100',
+    },
+  });
+
+  await adapter.fillOrder(order);
+
+  const entries = await unwrap(
+    supabaseAdmin
+      .from('ledger_journal_entries')
+      .select('id')
+      .eq('external_id', externalOrderId)
+  );
+  assert.equal(entries.length, 1);
+
+  const postings = await unwrap(
+    supabaseAdmin
+      .from('ledger_postings')
+      .select('amount_cents')
+      .eq('journal_entry_id', entries[0].id)
+  );
+  const amounts = postings.map((row) => Number(row.amount_cents));
+  assert.ok(amounts.every((value) => value === 5000));
+});
+
+test('alpaca missing fill fields do not overstate', async () => {
+  const symbol = 'SPY';
+  const { data: existing } = await supabaseAdmin
+    .from('instruments')
+    .select('id, symbol')
+    .eq('symbol', symbol)
+    .maybeSingle();
+
+  const instrument = existing || (await unwrap(
+    supabaseAdmin
+      .from('instruments')
+      .insert({ symbol, type: 'ETF', quote_source: 'alpaca' })
+      .select('id, symbol')
+      .single()
+  ));
+
+  const externalOrderId = `alpaca-missing-${randomUUID()}`;
+  const order = await unwrap(
+    supabaseAdmin
+      .from('orders')
+      .insert({
+        user_id: userId,
+        instrument_id: instrument.id,
+        side: 'buy',
+        notional_cents: 10000,
+        status: 'placed',
+        external_order_id: externalOrderId,
+      })
+      .select('*')
+      .single()
+  );
+
+  const adapter = Object.create(AlpacaBrokerageAdapter.prototype) as any;
+  adapter.config = { key: 'x', secret: 'y', baseUrl: 'http://local', dataUrl: 'http://local' };
+  adapter.local = new PaperBrokerageAdapter();
+  adapter.eventStore = new EventStore();
+  adapter.receipts = new ReceiptBuilder();
+  adapter.request = async () => ({
+    ok: true,
+    status: 200,
+    data: { status: 'filled' },
+  });
+
+  await adapter.fillOrder(order);
+
+  const entries = await unwrap(
+    supabaseAdmin
+      .from('ledger_journal_entries')
+      .select('id')
+      .eq('external_id', externalOrderId)
+  );
+  assert.equal(entries.length, 0);
+
+  const updatedOrder = await unwrap(
+    supabaseAdmin
+      .from('orders')
+      .select('status')
+      .eq('id', order.id)
+      .single()
+  );
+  assert.equal(updatedOrder.status, 'pending_fill_accounting');
 });

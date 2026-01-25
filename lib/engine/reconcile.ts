@@ -4,12 +4,28 @@ import { LedgerService } from './ledger';
 import { ReceiptBuilder } from './receipts';
 import { receiptCatalog } from './receiptCatalog';
 import { MetricsService } from './metrics';
+import { BrokerageAdapter } from './integrations/brokerage';
 
 export class ReconciliationService {
   private ledger = new LedgerService();
   private bank = getBankAdapter();
   private receipts = new ReceiptBuilder();
   private metrics = new MetricsService();
+  private brokerage = new BrokerageAdapter();
+
+  private async retryPendingTrades(userId: string) {
+    const { data: pending, error } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'pending_fill_accounting');
+
+    if (error) throw error;
+
+    for (const order of pending || []) {
+      await this.brokerage.fillOrder(order);
+    }
+  }
 
   async reconcileUser(userId: string) {
     const partner = await this.bank.getBalanceTruth(userId);
@@ -66,6 +82,8 @@ export class ReconciliationService {
 
       await this.metrics.recordCount('reconcile_drift_cleared', 1, {}, userId);
     }
+
+    await this.retryPendingTrades(userId);
 
     return data;
   }

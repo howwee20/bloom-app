@@ -254,13 +254,37 @@ export class CommandService {
     const preview = this.parse(text);
 
     if (preview.action === 'dd_details') {
-      const details = await this.account.getDirectDepositDetails(userId);
-      preview.preview_body = `Routing: ${details.routing_number}\nAccount: ${details.account_number}`;
+      try {
+        const details = await this.account.getDirectDepositDetails(userId);
+        preview.preview_body = `Routing: ${details.routing_number}\nAccount: ${details.account_number}`;
+        preview.status = 'ok';
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Direct deposit not linked yet.';
+        preview.preview_body = message.includes('No Column bank account linked')
+          ? 'Direct deposit not linked yet.'
+          : message;
+        preview.status = 'not_linked';
+        preview.next_step = 'create_account';
+        preview.cta_text = 'Run column:import';
+        preview.cta_route = 'column_import';
+      }
     }
 
     if (preview.action === 'card_status') {
-      const status = await this.account.getCardStatus(userId);
-      preview.preview_body = `Status: ${status.status}\n•••• ${status.last4}`;
+      try {
+        const status = await this.account.getCardStatus(userId);
+        preview.preview_body = `Status: ${status.status}\n•••• ${status.last4}`;
+        preview.status = 'ok';
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Card not linked yet.';
+        preview.preview_body = message.includes('No Column card linked')
+          ? 'Card not linked yet.'
+          : message;
+        preview.status = 'not_linked';
+        preview.next_step = 'issue_card';
+        preview.cta_text = 'Run column:import';
+        preview.cta_route = 'column_import';
+      }
     }
 
     if (preview.action === 'btc_quote') {
@@ -295,11 +319,37 @@ export class CommandService {
     }
 
     if (payload.action === 'dd_details') {
-      return this.account.getDirectDepositDetails(userId);
+      try {
+        const details = await this.account.getDirectDepositDetails(userId);
+        return { ok: true, status: 'ok', ...details };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Direct deposit not linked yet.';
+        return {
+          ok: false,
+          status: 'not_linked',
+          next_step: 'create_account',
+          cta_text: 'Run column:import',
+          cta_route: 'column_import',
+          message,
+        };
+      }
     }
 
     if (payload.action === 'card_status') {
-      return this.account.getCardStatus(userId);
+      try {
+        const details = await this.account.getCardStatus(userId);
+        return { ok: true, status: 'ok', ...details };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Card not linked yet.';
+        return {
+          ok: false,
+          status: 'not_linked',
+          next_step: 'issue_card',
+          cta_text: 'Run column:import',
+          cta_route: 'column_import',
+          message,
+        };
+      }
     }
 
     if (payload.action === 'card_freeze' || payload.action === 'card_unfreeze') {

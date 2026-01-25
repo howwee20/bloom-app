@@ -16,6 +16,7 @@
     "alpaca:test": "npx tsx scripts/alpaca-test.ts",
     "run:liquidate": "npx tsx scripts/run-liquidate.ts",
     "reconcile": "npx tsx scripts/run-reconcile.ts",
+    "inspect:user": "npx tsx scripts/inspect-user.ts",
     "e2e:kernel": "npx tsx scripts/e2e-kernel.ts",
     "test": "npx tsx --test tests/**/*.test.ts"
   },

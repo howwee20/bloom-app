@@ -45,6 +45,10 @@ export type CommandPreview = {
   allocation_targets?: { stocks_pct: number; btc_pct: number };
   preview_title: string;
   preview_body: string;
+  status?: 'not_linked' | 'ok';
+  next_step?: 'create_account' | 'issue_card' | 'add_to_wallet';
+  cta_text?: string;
+  cta_route?: string;
   confirm_required: boolean;
   idempotency_key: string;
 };

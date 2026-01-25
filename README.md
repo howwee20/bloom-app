@@ -24,8 +24,10 @@ Recommended:
 - `DEV_USER_ID` (used by API routes in dev if no auth header is provided)
 - `DEV_USER_EMAIL`, `DEV_USER_PASSWORD` (used by seed script if `DEV_USER_ID` is not set)
 - `EXPO_PUBLIC_API_BASE_URL` (native/mobile only, e.g. `https://your-vercel-url`)
+- `BLOOM_WEBHOOK_BASE_URL` (used by column:import output)
 - `COLUMN_WEBHOOK_SECRET` (optional; enables webhook signature verification)
 - `ADMIN_API_KEY` or `DEV_ADMIN_KEY` (for admin endpoints)
+- `CRON_SECRET` (required for cron endpoints)
 - `BLOOM_BALANCE_MODE` (`debit` or `spend_power`)
 - `BRIDGE_ENABLED` (true/false)
 
@@ -67,15 +69,21 @@ npx vercel dev
 - `POST /api/webhooks/card/refund`
 - `POST /api/webhooks/card/reversal`
 - `POST /api/webhooks/card/dispute`
-- `POST /api/cron/liquidate`
-- `POST /api/cron/reconcile`
+- `GET /api/account/dd`
+- `GET /api/card/status`
+- `GET /api/admin/incident-bundle?user_id=...`
+- `POST /api/cron/liquidate` (requires `x-cron-secret` or `?cron_secret=...`)
+- `POST /api/cron/reconcile` (requires `x-cron-secret` or `?cron_secret=...`)
 
 ## Scripts
 
 - `npm run seed:ledger` – seeds a demo user + ledger data
 - `npm run simulate:column` – posts mock Column webhooks
+- `npm run column:import` – import Column dashboard resources (read-only mode)
+- `npm run alpaca:test` – verify Alpaca connectivity + quote
 - `npm run run:liquidate` – runs liquidation loop for `DEV_USER_ID`
 - `npm run reconcile` – runs reconciliation loop for `DEV_USER_ID`
+- `npm run inspect:user` – dump incident bundle for `DEV_USER_ID`
 - `npm run e2e:kernel` – end-to-end kernel smoke test (mock mode)
 - `npm test` – runs backend engine tests (requires env + migrated DB)
 
@@ -85,8 +93,8 @@ Adapters auto-switch based on env vars:
 
 - Bank/BaaS: `COLUMN_API_KEY` → real, otherwise mock
 - Card Processor: `CARD_PROCESSOR_API_KEY` → real, otherwise mock
-- Brokerage: `ALPACA_API_KEY` → real, otherwise paper
-- Crypto: `COINBASE_API_KEY` or `ZEROHASH_API_KEY` → real, otherwise paper
+- Brokerage: `ALPACA_API_KEY`/`ALPACA_KEY` → real, otherwise paper
+- Crypto: `CRYPTO_PROVIDER=mock|coinbase|zerohash`
 
 ## Day Column Keys Arrive (Checklist)
 
@@ -102,7 +110,15 @@ Adapters auto-switch based on env vars:
 5) Enable card processor keys and point their webhooks to `/api/webhooks/card/*`.
 6) Enable brokerage + crypto keys when ready.
 
+## Read-Only Column Dogfood (Dashboard Import)
+
+1) Create entity + bank account + card in Column dashboard.
+2) Set env vars: `COLUMN_ENTITY_ID`, `COLUMN_BANK_ACCOUNT_ID`, `COLUMN_CARD_ID`, `COLUMN_API_KEY`.
+3) Run `npm run column:import` to store the mapping + print DD details + webhook URLs.
+4) Use `/api/account/dd` or command bar `direct deposit` to show routing/account.
+
 ## Notes
 
 - Native builds must set `EXPO_PUBLIC_API_BASE_URL` so the app can reach `/api` routes.
 - API routes accept `x-user-id` in headers for dev; production should pass a real auth token.
+- Vercel cron should include `CRON_SECRET` (use query param in Vercel cron config if headers are not supported).

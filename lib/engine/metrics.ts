@@ -9,16 +9,22 @@ type MetricInput = {
 
 export class MetricsService {
   async record(input: MetricInput) {
-    const { error } = await supabaseAdmin
-      .from('metrics_snapshots')
-      .insert({
-        user_id: input.user_id ?? null,
-        metric_name: input.name,
-        metric_value: input.value,
-        metadata_json: input.metadata ?? {},
-      });
+    try {
+      const { error } = await supabaseAdmin
+        .from('metrics_snapshots')
+        .insert({
+          user_id: input.user_id ?? null,
+          metric_name: input.name,
+          metric_value: input.value,
+          metadata_json: input.metadata ?? {},
+        });
 
-    if (error) throw error;
+      if (error) {
+        console.warn('[Metrics] insert failed', error);
+      }
+    } catch (error) {
+      console.warn('[Metrics] insert failed', error);
+    }
   }
 
   async recordLatency(name: string, startedAtMs: number, metadata?: Record<string, unknown>, userId?: string | null) {
