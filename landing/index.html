@@ -630,180 +630,137 @@
       max-width: 520px;
     }
 
-    .phone-mockups {
+    .screen-mockups {
       display: flex;
-      gap: 24px;
+      gap: 32px;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
     }
 
-    .phone-frame {
-      width: 220px;
-      height: 440px;
-      border-radius: 32px;
-      background: linear-gradient(165deg, #e8e8ed 0%, #d4d4d8 15%, #f0f0f2 30%, #c8c8cc 50%, #e0e0e4 70%, #d0d0d4 85%, #e8e8ec 100%);
-      border: 1px solid rgba(255, 255, 255, 0.6);
+    .screen-card {
+      width: 320px;
+      background: #fff;
+      border-radius: 24px;
       box-shadow:
-        0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
-        0 -1px 0 0 rgba(0, 0, 0, 0.05) inset,
-        0 30px 60px rgba(0, 0, 0, 0.3),
-        0 10px 20px rgba(0, 0, 0, 0.2);
-      padding: 12px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .phone-screen {
-      width: 100%;
-      height: 100%;
-      border-radius: 22px;
-      background: linear-gradient(165deg, #f4f4f6 0%, #eaeaee 50%, #f0f0f4 100%);
+        0 25px 50px rgba(0, 0, 0, 0.25),
+        0 10px 20px rgba(0, 0, 0, 0.15);
+      padding: 28px;
       display: flex;
       flex-direction: column;
-      position: relative;
-      overflow: hidden;
+      gap: 20px;
     }
 
-    .phone-status {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 16px;
-      font-size: 11px;
+    .screen-header {
+      text-align: center;
       color: #1a1a1a;
+      font-size: 14px;
     }
 
-    .phone-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 16px;
+    .screen-header strong {
+      font-weight: 600;
     }
 
-    .phone-bloom-logo {
-      width: 28px;
-      height: 28px;
+    .screen-logo {
+      width: 32px;
+      height: 32px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 3px;
-      margin: 0 auto 24px;
+      margin: 0 auto 16px;
     }
 
-    .phone-bloom-logo span {
-      background: rgba(0, 0, 0, 0.35);
-      border-radius: 2px;
+    .screen-logo span {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 3px;
     }
 
-    .phone-spend-power {
-      text-align: center;
-      color: #1a1a1a;
-      font-size: 16px;
-      margin-bottom: auto;
-    }
-
-    .phone-spend-power strong {
-      font-weight: 600;
-    }
-
-    .phone-command-bar {
-      background: rgba(0, 0, 0, 0.05);
-      border: 1px solid rgba(0, 0, 0, 0.1);
+    .screen-command-input {
+      background: rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.08);
       border-radius: 12px;
-      padding: 14px 16px;
+      padding: 16px 18px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      color: rgba(0, 0, 0, 0.55);
-      font-size: 13px;
-      margin-top: auto;
+      color: #1a1a1a;
+      font-size: 14px;
     }
 
-    .phone-command-dot {
-      width: 8px;
-      height: 8px;
-      background: rgba(0, 0, 0, 0.4);
+    .screen-command-dot {
+      width: 10px;
+      height: 10px;
+      background: rgba(0, 0, 0, 0.3);
       border-radius: 50%;
     }
 
-    .phone-confirm-card {
-      background: rgba(0, 0, 0, 0.04);
-      border: 1px solid rgba(0, 0, 0, 0.08);
+    .screen-confirm-box {
+      background: rgba(0, 0, 0, 0.03);
+      border: 1px solid rgba(0, 0, 0, 0.06);
       border-radius: 16px;
-      padding: 20px;
+      padding: 24px;
       text-align: center;
       color: #1a1a1a;
-      margin: auto 0;
     }
 
-    .phone-ticker {
-      font-size: 12px;
+    .screen-ticker {
+      font-size: 13px;
       color: rgba(0, 0, 0, 0.45);
-      margin-bottom: 4px;
-    }
-
-    .phone-amount {
-      font-size: 36px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-
-    .phone-shares {
-      font-size: 12px;
-      color: rgba(0, 0, 0, 0.45);
-      margin-bottom: 16px;
-    }
-
-    .phone-detail-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      color: rgba(0, 0, 0, 0.6);
       margin-bottom: 6px;
     }
 
-    .phone-after {
-      font-size: 11px;
-      color: rgba(0, 0, 0, 0.45);
-      margin-top: 16px;
+    .screen-amount {
+      font-size: 42px;
+      font-weight: 600;
+      margin-bottom: 6px;
     }
 
-    .phone-confirm-btn {
+    .screen-shares {
+      font-size: 13px;
+      color: rgba(0, 0, 0, 0.45);
+      margin-bottom: 20px;
+    }
+
+    .screen-detail-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: rgba(0, 0, 0, 0.6);
+      margin-bottom: 8px;
+    }
+
+    .screen-after {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.45);
+      margin-top: 20px;
+    }
+
+    .screen-confirm-btn {
       background: #1a1a1a;
       color: #fff;
       border-radius: 12px;
-      padding: 14px;
-      font-size: 14px;
+      padding: 16px;
+      font-size: 15px;
       font-weight: 500;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      margin-top: 16px;
     }
 
-    .phone-cancel {
+    .screen-cancel {
       color: rgba(0, 0, 0, 0.4);
-      font-size: 13px;
-      margin-top: 12px;
+      font-size: 14px;
       text-align: center;
     }
 
-    .phone-home-indicator {
-      width: 100px;
-      height: 4px;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 2px;
-      margin: 8px auto;
-    }
-
     @media (max-width: 768px) {
-      .phone-mockups {
+      .screen-mockups {
         flex-direction: column;
-        gap: 20px;
+        align-items: center;
+        gap: 24px;
       }
-      .phone-frame {
-        width: 180px;
-        height: 360px;
+      .screen-card {
+        width: min(320px, 90vw);
       }
     }
 
@@ -1504,47 +1461,30 @@
           <span class="subhead-line">Buy, sell, send — no apps, no waiting.</span>
         </div>
       </div>
-      <div class="phone-mockups">
-        <div class="phone-frame">
-          <div class="phone-screen">
-            <div class="phone-status">
-              <span>9:41</span>
-              <span>●●● ⚡</span>
-            </div>
-            <div class="phone-content">
-              <div class="phone-bloom-logo">
-                <span></span><span></span><span></span><span></span>
-              </div>
-              <div class="phone-spend-power">Spend power: <strong>$47,291</strong></div>
-              <div class="phone-command-bar">
-                <span>Buy $500 of Apple Stock</span>
-                <span class="phone-command-dot"></span>
-              </div>
-            </div>
-            <div class="phone-home-indicator"></div>
+      <div class="screen-mockups">
+        <div class="screen-card">
+          <div class="screen-logo">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="screen-header">Spend power: <strong>$47,291</strong></div>
+          <div style="flex: 1;"></div>
+          <div class="screen-command-input">
+            <span>Buy $500 of Apple Stock</span>
+            <span class="screen-command-dot"></span>
           </div>
         </div>
-        <div class="phone-frame">
-          <div class="phone-screen">
-            <div class="phone-status">
-              <span>9:41</span>
-              <span>●●● ⚡</span>
-            </div>
-            <div class="phone-content">
-              <div class="phone-spend-power" style="font-size: 13px; margin-bottom: 16px;">Spend power: $47,291</div>
-              <div class="phone-confirm-card">
-                <div class="phone-ticker">AAPL</div>
-                <div class="phone-amount">$500</div>
-                <div class="phone-shares">~2.19 shares</div>
-                <div class="phone-detail-row"><span>Price</span><span>$228.31</span></div>
-                <div class="phone-detail-row"><span>Fee</span><span>$0.00</span></div>
-              </div>
-              <div class="phone-after">After: Spend power $46,791</div>
-              <div class="phone-confirm-btn">Confirm with Face ID ⟡</div>
-              <div class="phone-cancel">Cancel</div>
-            </div>
-            <div class="phone-home-indicator"></div>
+        <div class="screen-card">
+          <div class="screen-header" style="font-size: 13px;">Spend power: <strong>$47,291</strong></div>
+          <div class="screen-confirm-box">
+            <div class="screen-ticker">AAPL</div>
+            <div class="screen-amount">$500</div>
+            <div class="screen-shares">~2.19 shares</div>
+            <div class="screen-detail-row"><span>Price</span><span>$228.31</span></div>
+            <div class="screen-detail-row"><span>Fee</span><span>$0.00</span></div>
           </div>
+          <div class="screen-after">After: Spend power $46,791</div>
+          <div class="screen-confirm-btn">Confirm with Face ID ✦</div>
+          <div class="screen-cancel">Cancel</div>
         </div>
       </div>
     </div>
