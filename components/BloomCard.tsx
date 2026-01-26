@@ -5,6 +5,7 @@ import React, { useRef, useState, useEffect, ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Animated,
+  Platform,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -68,6 +69,18 @@ const GRADIENT_COLORS = [
   '#c8c8cc', // muted metallic
   '#e0e0e4', // titanium bottom
 ] as const;
+
+const LANDING_GRADIENT_COLORS = [
+  '#e8e8ed',
+  '#d4d4d8',
+  '#f0f0f2',
+  '#c8c8cc',
+  '#e0e0e4',
+  '#d0d0d4',
+  '#e8e8ec',
+] as const;
+
+const LANDING_GRADIENT_LOCATIONS = [0, 0.15, 0.3, 0.5, 0.7, 0.85, 1];
 
 const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.22)',
@@ -957,7 +970,7 @@ export function BloomCard({
   });
 
   const displayValue = totalValue > 0 ? formatValue(totalValue) : '$47,291';
-  const displayChange = totalValue > 0 ? formatChange(dailyChange) : '+ $127 today';
+  const displayChange = totalValue > 0 ? formatChange(dailyChange) : '+$127 today';
   const payments = flipData?.payments?.length
     ? flipData.payments.map((p) => ({
         merchant: p.title,
@@ -1004,6 +1017,50 @@ export function BloomCard({
     commandResult?.status === 'success' && styles.commandResultTitleSuccess,
     commandResult?.status === 'error' && styles.commandResultTitleError,
   ];
+
+  const renderLandingFront = () => (
+    <>
+      <LinearGradient
+        colors={[...LANDING_GRADIENT_COLORS]}
+        locations={LANDING_GRADIENT_LOCATIONS}
+        start={{ x: 0.12, y: 0.06 }}
+        end={{ x: 0.88, y: 0.94 }}
+        style={styles.frontGradient}
+      />
+      <View style={styles.frontHighlight} pointerEvents="none">
+        <LinearGradient
+          colors={[
+            'rgba(255,255,255,0.5)',
+            'rgba(255,255,255,0.12)',
+            'rgba(255,255,255,0)',
+            'rgba(0,0,0,0.02)',
+            'rgba(0,0,0,0.05)',
+          ]}
+          locations={[0, 0.25, 0.5, 0.75, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.frontHighlightGradient}
+        />
+      </View>
+      <LinearGradient
+        colors={[
+          'rgba(0,0,0,0.03)',
+          'rgba(0,0,0,0.015)',
+          'rgba(0,0,0,0.025)',
+        ]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.frontTexture}
+        pointerEvents="none"
+      />
+      <View style={styles.frontBorder} pointerEvents="none" />
+      <View style={styles.frontContent}>
+        <Text style={styles.frontLabel}>BLOOM</Text>
+        <Text style={styles.valueText}>{displayValue}</Text>
+        <Text style={styles.changeText}>{displayChange}</Text>
+      </View>
+    </>
+  );
 
   const renderCardFace = (isBack: boolean) => (
     <>
@@ -1558,7 +1615,7 @@ export function BloomCard({
                 { transform: [{ perspective: 1200 }, { rotateY: frontRotation }] },
               ]}
             >
-              {renderCardFace(false)}
+              {renderLandingFront()}
             </Animated.View>
 
             {/* Back face */}
@@ -1711,6 +1768,39 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '12deg' }],
     pointerEvents: 'none',
   },
+  frontGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  frontBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: INNER_RADIUS,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  frontHighlight: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  frontHighlightGradient: {
+    flex: 1,
+  },
+  frontTexture: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.14,
+    transform: [{ rotate: '10deg' }],
+  },
+  frontContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  frontLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 2.4,
+    textTransform: 'uppercase',
+    color: 'rgba(26, 26, 26, 0.5)',
+    marginBottom: 6,
+  },
   bottomFog: {
     position: 'absolute',
     left: 0,
@@ -1859,15 +1949,21 @@ const styles = StyleSheet.create({
   },
   valueText: {
     fontSize: 48,
-    fontFamily: 'PlusJakartaSans-SemiBold',
-    color: '#1a1a2e',
-    letterSpacing: -0.4,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    fontWeight: '600',
+    color: '#1a1a1a',
+    letterSpacing: -0.9,
+    textShadowColor: 'rgba(255, 255, 255, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   changeText: {
-    fontSize: 17,
-    fontFamily: 'PlusJakartaSans-Regular',
-    color: 'rgba(26, 26, 46, 0.7)',
-    letterSpacing: 0.1,
+    fontSize: 14,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    fontWeight: '600',
+    color: '#16a34a',
+    letterSpacing: 0.2,
+    marginTop: 4,
   },
   backContent: {
     flex: 1,
