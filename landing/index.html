@@ -134,11 +134,11 @@
     }
 
     .card-3d {
-      width: min(340px, 80vw);
-      height: min(580px, 70vh);
+      width: min(520px, 86vw);
+      aspect-ratio: 1.586 / 1;
       transform-style: preserve-3d;
       -webkit-transform-style: preserve-3d;
-      border-radius: 32px;
+      border-radius: 18px;
       transition: transform 0.6s var(--ease-out);
       will-change: transform;
     }
@@ -734,17 +734,24 @@
     let cardMetrics = null;
 
     const updateMetrics = () => {
-      // Large phone-like card
-      let cardHeight = Math.min(window.innerHeight * 0.68, 580);
-      let cardWidth = Math.min(cardHeight * 0.58, window.innerWidth * 0.8, 340);
+      // Front: card aspect. Back: phone aspect.
+      const cardWidth = Math.min(520, window.innerWidth * 0.86);
+      const cardHeight = cardWidth / 1.586;
+      let phoneHeight = Math.min(window.innerHeight * 0.72, 680);
+      let phoneWidth = phoneHeight * 0.56;
+      const maxPhoneWidth = window.innerWidth * 0.78;
+      if (phoneWidth > maxPhoneWidth) {
+        phoneWidth = maxPhoneWidth;
+        phoneHeight = phoneWidth / 0.56;
+      }
 
       cardMetrics = {
         cardWidth,
         cardHeight,
-        phoneWidth: cardWidth,
-        phoneHeight: cardHeight,
-        cardRadius: 32,
-        phoneRadius: 32
+        phoneWidth,
+        phoneHeight,
+        cardRadius: 18,
+        phoneRadius: 36
       };
     };
 
