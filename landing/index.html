@@ -372,25 +372,33 @@
       font-weight: 600;
     }
 
-    .inv-sparkline {
+    .charts-section {
+      display: flex;
+      gap: 10px;
       flex: 1;
-      height: 24px;
+      align-items: center;
     }
 
-    .inv-sparkline svg {
+    .chart-box {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.03);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .chart-box svg {
       width: 100%;
-      height: 100%;
+      height: 40px;
     }
 
-    .sparkline-path {
-      fill: none;
-      stroke-width: 1.5;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
-    .sparkline-area {
-      opacity: 0.15;
+    .chart-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(0, 0, 0, 0.5);
+      text-align: center;
     }
 
     .other-section {
@@ -679,34 +687,42 @@
                 <div class="investments-list">
                   <div class="investment-row">
                     <span class="inv-label">Cash</span>
-                    <div class="inv-sparkline">
-                      <svg viewBox="0 0 100 24" preserveAspectRatio="none">
-                        <path class="sparkline-area" d="M0,20 L10,18 L20,19 L30,17 L40,18 L50,16 L60,17 L70,15 L80,14 L90,13 L100,12 L100,24 L0,24 Z" fill="#16a34a"/>
-                        <path class="sparkline-path" d="M0,20 L10,18 L20,19 L30,17 L40,18 L50,16 L60,17 L70,15 L80,14 L90,13 L100,12" stroke="#16a34a"/>
-                      </svg>
-                    </div>
+                    <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 35%"></div></div>
                     <span class="inv-amount">$12,480</span>
                   </div>
                   <div class="investment-row">
                     <span class="inv-label">Stocks</span>
-                    <div class="inv-sparkline">
-                      <svg viewBox="0 0 100 24" preserveAspectRatio="none">
-                        <path class="sparkline-area" d="M0,16 L10,14 L20,17 L30,12 L40,15 L50,10 L60,13 L70,8 L80,11 L90,6 L100,4 L100,24 L0,24 Z" fill="#16a34a"/>
-                        <path class="sparkline-path" d="M0,16 L10,14 L20,17 L30,12 L40,15 L50,10 L60,13 L70,8 L80,11 L90,6 L100,4" stroke="#16a34a"/>
-                      </svg>
-                    </div>
+                    <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 55%"></div></div>
                     <span class="inv-amount">$21,940</span>
                   </div>
                   <div class="investment-row">
                     <span class="inv-label">BTC</span>
-                    <div class="inv-sparkline">
-                      <svg viewBox="0 0 100 24" preserveAspectRatio="none">
-                        <path class="sparkline-area" d="M0,12 L10,15 L20,10 L30,18 L40,14 L50,20 L60,16 L70,12 L80,8 L90,10 L100,6 L100,24 L0,24 Z" fill="#f59e0b"/>
-                        <path class="sparkline-path" d="M0,12 L10,15 L20,10 L30,18 L40,14 L50,20 L60,16 L70,12 L80,8 L90,10 L100,6" stroke="#f59e0b"/>
-                      </svg>
-                    </div>
+                    <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 22%"></div></div>
                     <span class="inv-amount">$7,820</span>
                   </div>
+                </div>
+              </div>
+              <div class="charts-section">
+                <div class="chart-box">
+                  <svg viewBox="0 0 60 40" preserveAspectRatio="none">
+                    <path d="M0,35 L8,32 L16,28 L24,30 L32,22 L40,18 L48,20 L60,12" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M0,35 L8,32 L16,28 L24,30 L32,22 L40,18 L48,20 L60,12 L60,40 L0,40 Z" fill="rgba(22,163,74,0.15)"/>
+                  </svg>
+                  <span class="chart-label">Stocks</span>
+                </div>
+                <div class="chart-box">
+                  <svg viewBox="0 0 60 40" preserveAspectRatio="none">
+                    <path d="M0,25 L8,28 L16,20 L24,32 L32,26 L40,30 L48,22 L60,18" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M0,25 L8,28 L16,20 L24,32 L32,26 L40,30 L48,22 L60,18 L60,40 L0,40 Z" fill="rgba(245,158,11,0.15)"/>
+                  </svg>
+                  <span class="chart-label">BTC</span>
+                </div>
+                <div class="chart-box">
+                  <svg viewBox="0 0 60 40" preserveAspectRatio="none">
+                    <path d="M0,30 L8,28 L16,26 L24,27 L32,24 L40,22 L48,20 L60,16" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M0,30 L8,28 L16,26 L24,27 L32,24 L40,22 L48,20 L60,16 L60,40 L0,40 Z" fill="rgba(99,102,241,0.15)"/>
+                  </svg>
+                  <span class="chart-label">ETH</span>
                 </div>
               </div>
               <div class="other-section">
