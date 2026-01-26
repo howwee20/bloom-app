@@ -62,11 +62,11 @@ const LIABILITIES = [
 ];
 
 const GRADIENT_COLORS = [
-  '#A8D8F0', // soft sky blue top
-  '#B8E0F8', // light blue
-  '#D0ECFC', // pale blue center
-  '#E8F6FF', // very light blue
-  '#FFFFFF', // white at bottom
+  '#e8e8ed', // titanium top
+  '#d4d4d8', // light metallic
+  '#f0f0f2', // bright center
+  '#c8c8cc', // muted metallic
+  '#e0e0e4', // titanium bottom
 ] as const;
 
 const FRAME_COLORS = [
