@@ -656,175 +656,77 @@
       background: transparent;
     }
 
-    .defense-visual {
-      position: relative;
-      width: min(520px, 90vw);
-      height: 260px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 32px;
-      background:
-        radial-gradient(circle at 50% 35%, rgba(120, 130, 255, 0.22), transparent 55%),
-        linear-gradient(150deg, rgba(10, 12, 20, 0.92), rgba(5, 6, 10, 0.96));
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      box-shadow:
-        0 30px 60px rgba(0, 0, 0, 0.4),
-        0 0 50px rgba(120, 130, 255, 0.08);
-      overflow: hidden;
-    }
-
-    .shield-glow {
-      position: absolute;
-      inset: 20% 24%;
-      border-radius: 40%;
-      background: radial-gradient(circle, rgba(120, 130, 255, 0.35), transparent 65%);
-      filter: blur(12px);
-      opacity: 0.7;
-      animation: shieldPulse 4s var(--ease-out) infinite;
-    }
-
-    .shield-icon {
-      width: 120px;
-      height: 140px;
-      position: relative;
-      z-index: 2;
-      filter: drop-shadow(0 18px 24px rgba(0, 0, 0, 0.35));
-      animation: shieldFloat 6s ease-in-out infinite;
-    }
-
-    .shield-account {
-      position: absolute;
-      top: 52%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+    .mini-card-container {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
-      text-align: center;
-      color: rgba(10, 12, 24, 0.82);
-      z-index: 4;
-      pointer-events: none;
-      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35);
+      gap: 24px;
     }
 
-    .shield-account-label {
+    .mini-card {
+      width: 280px;
+      height: 176px;
+      border-radius: 14px;
+      background:
+        linear-gradient(165deg,
+          #e8e8ed 0%,
+          #d4d4d8 15%,
+          #f0f0f2 30%,
+          #c8c8cc 50%,
+          #e0e0e4 70%,
+          #d0d0d4 85%,
+          #e8e8ec 100%
+        );
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow:
+        0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
+        0 -1px 0 0 rgba(0, 0, 0, 0.05) inset,
+        0 20px 40px rgba(0, 0, 0, 0.3),
+        0 8px 16px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mini-card-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .mini-card-label {
       font-size: 9px;
       font-weight: 600;
-      letter-spacing: 0.28em;
+      letter-spacing: 0.24em;
       text-transform: uppercase;
-      color: rgba(10, 12, 24, 0.6);
+      color: rgba(26, 26, 26, 0.55);
     }
 
-    .shield-account-number {
-      font-size: 18px;
+    .mini-card-number {
+      font-size: 32px;
       font-weight: 600;
-      letter-spacing: 0.08em;
-      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      color: #1a1a1a;
+    }
+
+    .mini-card-delta {
+      font-size: 11px;
+      color: #16a34a;
+      font-weight: 600;
     }
 
     .defense-labels {
-      position: absolute;
-      bottom: 22px;
       display: flex;
       gap: 18px;
       font-size: 11px;
       letter-spacing: 0.16em;
       color: var(--secondary);
-      z-index: 2;
     }
 
     .defense-label {
       opacity: 0;
       animation: defenseLabel 6s ease-in-out infinite;
-    }
-
-    .shield-impact {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 180px;
-      height: 180px;
-      border-radius: 999px;
-      border: 1px solid rgba(180, 200, 255, 0.6);
-      box-shadow: 0 0 30px rgba(120, 130, 255, 0.7);
-      opacity: 0;
-      z-index: 1;
-      animation: shieldImpact 4.2s ease-out infinite;
-    }
-
-    .shield-impact.impact-1 {
-      animation-delay: 0s;
-    }
-
-    .shield-impact.impact-2 {
-      animation-delay: 1.4s;
-    }
-
-    .shield-impact.impact-3 {
-      animation-delay: 2.8s;
-    }
-
-    .defense-hit {
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      border-radius: 999px;
-      background: radial-gradient(circle, rgba(255, 255, 255, 0.98), rgba(140, 160, 255, 0.35));
-      box-shadow:
-        0 0 18px rgba(120, 130, 255, 0.9),
-        0 0 32px rgba(255, 255, 255, 0.45);
-      opacity: 0;
-      z-index: 3;
-      animation: defenseHit 4.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-    }
-
-    .defense-hit::after {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 44px;
-      height: 6px;
-      border-radius: 999px;
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0.85), rgba(140, 160, 255, 0.3), transparent);
-      transform: translate(-50%, -50%) rotate(var(--hit-angle)) translateX(-12px);
-      filter: blur(0.2px);
-      opacity: 0.85;
-    }
-
-    .defense-hit.hit-1 {
-      --from-x: -220px;
-      --from-y: -80px;
-      --to-x: -10px;
-      --to-y: -6px;
-      --bounce-x: -80px;
-      --bounce-y: -60px;
-      --hit-angle: 20deg;
-      animation-delay: 0s;
-    }
-
-    .defense-hit.hit-2 {
-      --from-x: 220px;
-      --from-y: 60px;
-      --to-x: 18px;
-      --to-y: 10px;
-      --bounce-x: 90px;
-      --bounce-y: 70px;
-      --hit-angle: 200deg;
-      animation-delay: 1.4s;
-    }
-
-    .defense-hit.hit-3 {
-      --from-x: -190px;
-      --from-y: 150px;
-      --to-x: -6px;
-      --to-y: 32px;
-      --bounce-x: -70px;
-      --bounce-y: 90px;
-      --hit-angle: 315deg;
-      animation-delay: 2.8s;
     }
 
     .defense-label:nth-child(1) {
@@ -837,6 +739,10 @@
 
     .defense-label:nth-child(3) {
       animation-delay: 4s;
+      color: rgba(10, 12, 24, 0.82);
+      z-index: 4;
+      pointer-events: none;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35);
     }
 
     .cta-section {
@@ -971,10 +877,6 @@
 
       .video-frame {
         border-radius: 22px;
-      }
-
-      .defense-visual {
-        height: 220px;
       }
     }
 
@@ -1134,27 +1036,13 @@
         <div class="headline" id="defense-title">If anything&rsquo;s wrong, we fix it.</div>
         <div class="subhead">Fraud, disputes, errors — handled automatically. You never make a call.</div>
       </div>
-      <div class="defense-visual" role="img" aria-label="Defense shield">
-        <div class="shield-glow" aria-hidden="true"></div>
-        <span class="shield-impact impact-1" aria-hidden="true"></span>
-        <span class="shield-impact impact-2" aria-hidden="true"></span>
-        <span class="shield-impact impact-3" aria-hidden="true"></span>
-        <span class="defense-hit hit-1" aria-hidden="true"></span>
-        <span class="defense-hit hit-2" aria-hidden="true"></span>
-        <span class="defense-hit hit-3" aria-hidden="true"></span>
-        <svg class="shield-icon" viewBox="0 0 120 140" aria-hidden="true">
-          <path d="M60 6L106 22V64c0 32-19 58-46 70C33 122 14 96 14 64V22L60 6Z" fill="url(#shield-gradient)" stroke="rgba(255,255,255,0.35)" stroke-width="1.2"/>
-          <defs>
-            <linearGradient id="shield-gradient" x1="0" y1="0" x2="0.8" y2="1">
-              <stop offset="0" stop-color="#e6e8ff" stop-opacity="0.9"/>
-              <stop offset="0.55" stop-color="#9aa6ff" stop-opacity="0.85"/>
-              <stop offset="1" stop-color="#5c68c0" stop-opacity="0.9"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        <div class="shield-account" aria-hidden="true">
-          <span class="shield-account-label">Account</span>
-          <span class="shield-account-number">47291</span>
+      <div class="mini-card-container">
+        <div class="mini-card">
+          <div class="mini-card-content">
+            <div class="mini-card-label">Bloom</div>
+            <div class="mini-card-number">$47,291</div>
+            <div class="mini-card-delta">+$127 today</div>
+          </div>
         </div>
         <div class="defense-labels" aria-hidden="true">
           <span class="defense-label">fraud</span>
