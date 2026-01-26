@@ -134,13 +134,13 @@
     }
 
     .card-3d {
-      width: min(380px, 75vw);
-      aspect-ratio: 1.586 / 1;
+      width: min(320px, 72vw);
+      aspect-ratio: 0.58 / 1;
       transform-style: preserve-3d;
       -webkit-transform-style: preserve-3d;
-      border-radius: 18px;
-      transition: transform 0.6s var(--ease-out), width 0.6s var(--ease-out), height 0.6s var(--ease-out), border-radius 0.6s var(--ease-out);
-      will-change: transform, width, height, border-radius;
+      border-radius: 32px;
+      transition: transform 0.6s var(--ease-out);
+      will-change: transform;
     }
 
     .card-face {
@@ -734,25 +734,21 @@
     let cardMetrics = null;
 
     const updateMetrics = () => {
-      // Front: credit card proportions (1.586:1 ratio)
-      const cardWidth = Math.min(380, window.innerWidth * 0.75);
-      const cardHeight = cardWidth / 1.586;
-
-      // Back: phone proportions (taller, narrower)
-      let phoneHeight = Math.min(window.innerHeight * 0.68, 580);
-      let phoneWidth = phoneHeight * 0.52;
-      const maxPhoneWidth = window.innerWidth * 0.72;
-      if (phoneWidth > maxPhoneWidth) {
-        phoneWidth = maxPhoneWidth;
-        phoneHeight = phoneWidth / 0.52;
+      // Phone-like proportions (taller than wide, ~0.58 ratio)
+      let cardHeight = Math.min(window.innerHeight * 0.65, 520);
+      let cardWidth = cardHeight * 0.58;
+      const maxCardWidth = window.innerWidth * 0.72;
+      if (cardWidth > maxCardWidth) {
+        cardWidth = maxCardWidth;
+        cardHeight = cardWidth / 0.58;
       }
 
       cardMetrics = {
         cardWidth,
         cardHeight,
-        phoneWidth,
-        phoneHeight,
-        cardRadius: 18,
+        phoneWidth: cardWidth,
+        phoneHeight: cardHeight,
+        cardRadius: 32,
         phoneRadius: 32
       };
     };
