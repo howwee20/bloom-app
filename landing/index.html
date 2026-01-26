@@ -682,8 +682,8 @@
     }
 
     .screen-card--confirm {
-      width: clamp(340px, 42vw, 420px);
-      min-height: clamp(600px, 75vh, 780px);
+      width: clamp(360px, 38vw, 480px);
+      min-height: clamp(640px, 78vh, 680px);
     }
 
     .execute-section .screen-card--app {
@@ -1873,7 +1873,7 @@
         <div class="copy" id="copy">
         <div class="copy-states">
           <div class="copy-block" id="copy-front">
-            <div class="headline">All your money. One card.</div>
+            <div class="headline">All your money in one card.</div>
             <div class="subhead">Tap to pay anywhere.</div>
           </div>
           <div class="copy-block" id="copy-back">
@@ -2013,7 +2013,7 @@
       const cardWidth = Math.min(450, window.innerWidth * 0.85);
       const cardHeight = cardWidth / 1.586;
       // Back: phone shape (0.72 ratio, taller than wide)
-      let phoneHeight = Math.min(window.innerHeight * 0.7, 520);
+      let phoneHeight = Math.min(window.innerHeight * 0.78, 680);
       let phoneWidth = phoneHeight * 0.72;
       const maxPhoneWidth = window.innerWidth * 0.85;
       if (phoneWidth > maxPhoneWidth) {
