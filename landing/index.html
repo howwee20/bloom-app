@@ -287,7 +287,7 @@
       font-weight: 600;
       letter-spacing: 0.24em;
       text-transform: uppercase;
-      color: #F97316;
+      color: #FFD7B5;
     }
 
     .spend-number {
@@ -693,6 +693,37 @@
       animation: shieldFloat 6s ease-in-out infinite;
     }
 
+    .shield-account {
+      position: absolute;
+      top: 52%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      text-align: center;
+      color: rgba(10, 12, 24, 0.82);
+      z-index: 4;
+      pointer-events: none;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35);
+    }
+
+    .shield-account-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(10, 12, 24, 0.6);
+    }
+
+    .shield-account-number {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      font-variant-numeric: tabular-nums;
+    }
+
     .defense-labels {
       position: absolute;
       bottom: 22px;
@@ -709,46 +740,91 @@
       animation: defenseLabel 6s ease-in-out infinite;
     }
 
-    .defense-hit {
+    .shield-impact {
       position: absolute;
-      width: 12px;
-      height: 12px;
+      top: 50%;
+      left: 50%;
+      width: 180px;
+      height: 180px;
       border-radius: 999px;
-      background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(120, 130, 255, 0.15));
-      box-shadow: 0 0 14px rgba(120, 130, 255, 0.6);
+      border: 1px solid rgba(180, 200, 255, 0.6);
+      box-shadow: 0 0 30px rgba(120, 130, 255, 0.7);
       opacity: 0;
       z-index: 1;
-      animation: defenseHit 5.5s ease-in-out infinite;
+      animation: shieldImpact 4.2s ease-out infinite;
+    }
+
+    .shield-impact.impact-1 {
+      animation-delay: 0s;
+    }
+
+    .shield-impact.impact-2 {
+      animation-delay: 1.4s;
+    }
+
+    .shield-impact.impact-3 {
+      animation-delay: 2.8s;
+    }
+
+    .defense-hit {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.98), rgba(140, 160, 255, 0.35));
+      box-shadow:
+        0 0 18px rgba(120, 130, 255, 0.9),
+        0 0 32px rgba(255, 255, 255, 0.45);
+      opacity: 0;
+      z-index: 3;
+      animation: defenseHit 4.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    }
+
+    .defense-hit::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 44px;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.85), rgba(140, 160, 255, 0.3), transparent);
+      transform: translate(-50%, -50%) rotate(var(--hit-angle)) translateX(-12px);
+      filter: blur(0.2px);
+      opacity: 0.85;
     }
 
     .defense-hit.hit-1 {
-      --from-x: -180px;
-      --from-y: -60px;
-      --to-x: -20px;
-      --to-y: -10px;
-      --bounce-x: -40px;
-      --bounce-y: -30px;
+      --from-x: -220px;
+      --from-y: -80px;
+      --to-x: -10px;
+      --to-y: -6px;
+      --bounce-x: -80px;
+      --bounce-y: -60px;
+      --hit-angle: 20deg;
       animation-delay: 0s;
     }
 
     .defense-hit.hit-2 {
-      --from-x: 190px;
-      --from-y: 40px;
-      --to-x: 30px;
+      --from-x: 220px;
+      --from-y: 60px;
+      --to-x: 18px;
       --to-y: 10px;
-      --bounce-x: 50px;
-      --bounce-y: 35px;
-      animation-delay: 1.8s;
+      --bounce-x: 90px;
+      --bounce-y: 70px;
+      --hit-angle: 200deg;
+      animation-delay: 1.4s;
     }
 
     .defense-hit.hit-3 {
-      --from-x: -140px;
-      --from-y: 120px;
-      --to-x: -10px;
-      --to-y: 30px;
-      --bounce-x: -35px;
-      --bounce-y: 45px;
-      animation-delay: 3.4s;
+      --from-x: -190px;
+      --from-y: 150px;
+      --to-x: -6px;
+      --to-y: 32px;
+      --bounce-x: -70px;
+      --bounce-y: 90px;
+      --hit-angle: 315deg;
+      animation-delay: 2.8s;
     }
 
     .defense-label:nth-child(1) {
@@ -815,20 +891,41 @@
       100% { transform: translateY(0) scale(1); }
     }
 
-    @keyframes defenseHit {
+    @keyframes shieldImpact {
       0% {
-        transform: translate(var(--from-x), var(--from-y)) scale(0.4);
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.65);
+      }
+      26% {
         opacity: 0;
       }
-      15% {
-        opacity: 0.7;
-      }
-      35% {
-        transform: translate(var(--to-x), var(--to-y)) scale(1);
+      34% {
         opacity: 0.9;
+        transform: translate(-50%, -50%) scale(0.9);
       }
-      50% {
-        transform: translate(calc(var(--to-x) + var(--bounce-x)), calc(var(--to-y) + var(--bounce-y))) scale(0.5);
+      46% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.15);
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes defenseHit {
+      0% {
+        transform: translate(var(--from-x), var(--from-y)) scale(0.3);
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      28% {
+        transform: translate(var(--to-x), var(--to-y)) scale(1.25);
+        opacity: 1;
+      }
+      40% {
+        transform: translate(calc(var(--to-x) + var(--bounce-x)), calc(var(--to-y) + var(--bounce-y))) scale(0.35);
         opacity: 0;
       }
       100% {
@@ -1042,6 +1139,9 @@
       </div>
       <div class="defense-visual" role="img" aria-label="Defense shield">
         <div class="shield-glow" aria-hidden="true"></div>
+        <span class="shield-impact impact-1" aria-hidden="true"></span>
+        <span class="shield-impact impact-2" aria-hidden="true"></span>
+        <span class="shield-impact impact-3" aria-hidden="true"></span>
         <span class="defense-hit hit-1" aria-hidden="true"></span>
         <span class="defense-hit hit-2" aria-hidden="true"></span>
         <span class="defense-hit hit-3" aria-hidden="true"></span>
@@ -1055,6 +1155,10 @@
             </linearGradient>
           </defs>
         </svg>
+        <div class="shield-account" aria-hidden="true">
+          <span class="shield-account-label">Account</span>
+          <span class="shield-account-number">47291</span>
+        </div>
         <div class="defense-labels" aria-hidden="true">
           <span class="defense-label">fraud</span>
           <span class="defense-label">disputes</span>
