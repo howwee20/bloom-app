@@ -675,11 +675,10 @@
       pointer-events: none;
     }
 
-    .screen-card--input {
-      width: clamp(280px, 30vw, 360px);
-      min-height: clamp(230px, 30vw, 300px);
-      justify-content: center;
-      gap: 16px;
+    .screen-card--app {
+      width: clamp(340px, 38vw, 460px);
+      min-height: clamp(520px, 70vw, 680px);
+      padding: 0;
     }
 
     .screen-card--confirm {
@@ -726,15 +725,18 @@
 
     .screen-keyboard {
       width: 100%;
-      background: rgba(0, 0, 0, 0.04);
+      background: rgba(0, 0, 0, 0.05);
       border: 1px solid rgba(0, 0, 0, 0.06);
-      border-radius: 18px;
-      padding: 12px 12px 10px;
+      border-radius: 20px;
+      padding: 14px 12px 12px;
       display: flex;
       flex-direction: column;
       gap: 8px;
       position: relative;
       z-index: 1;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.7),
+        0 6px 12px rgba(0, 0, 0, 0.08);
     }
 
     .screen-key-row {
@@ -744,12 +746,12 @@
 
     .screen-key-row span {
       flex: 1;
-      height: 14px;
-      background: rgba(255, 255, 255, 0.9);
-      border-radius: 6px;
+      height: 16px;
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 8px;
       box-shadow:
         0 1px 0 rgba(255, 255, 255, 0.9) inset,
-        0 2px 4px rgba(0, 0, 0, 0.08);
+        0 2px 6px rgba(0, 0, 0, 0.1);
     }
 
     .screen-key-row .key-wide {
@@ -758,6 +760,66 @@
 
     .screen-key-row .key-space {
       flex: 3;
+    }
+
+    .screen-back {
+      padding: 26px 26px 22px;
+      gap: 16px;
+      height: auto;
+    }
+
+    .screen-back .section-label {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+    }
+
+    .screen-back .payment-row,
+    .screen-back .other-row {
+      font-size: 12px;
+    }
+
+    .screen-back .payment-time {
+      font-size: 10px;
+    }
+
+    .screen-back .investment-row {
+      font-size: 11px;
+      gap: 8px;
+    }
+
+    .screen-back .inv-label {
+      width: 44px;
+      font-weight: 600;
+    }
+
+    .screen-back .inv-bar-track {
+      height: 4px;
+    }
+
+    .screen-back .charts-section {
+      flex: 0;
+      gap: 12px;
+    }
+
+    .screen-back .chart-box {
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .screen-back .other-section {
+      margin-top: 6px;
+    }
+
+    .screen-back .command-bar {
+      margin-top: 6px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 11px;
+      color: rgba(0, 0, 0, 0.55);
+    }
+
+    .screen-back .screen-keyboard {
+      margin-top: 10px;
     }
 
     .screen-confirm-box {
@@ -1545,24 +1607,102 @@
 
   <section class="content-section execute-section" aria-labelledby="execute-title">
     <div class="section-inner">
+      <div class="copy section-copy">
+        <div class="headline" id="execute-title">Just type what you want.</div>
+        <div class="subhead">Buy, sell, send — done in seconds.</div>
+      </div>
       <div class="screen-mockups">
-        <div class="screen-card screen-card--input">
-          <div class="screen-header">Spend power: <strong>$47,291</strong></div>
-          <div class="screen-command-input">
-            <span>Buy $500 of Apple</span>
-            <span class="screen-command-dot"></span>
-          </div>
-          <div class="screen-keyboard" aria-hidden="true">
-            <div class="screen-key-row">
-              <span></span><span></span><span></span><span></span><span></span>
-              <span></span><span></span><span></span><span></span><span></span>
+        <div class="screen-card screen-card--app">
+          <div class="back-content screen-back">
+            <div class="payments-section">
+              <div class="section-label">Payments</div>
+              <div class="payments-list">
+                <div class="payment-row">
+                  <span><span class="payment-name">Spotify</span><span class="payment-time">9:24a</span></span>
+                  <span class="payment-amount">-$12</span>
+                </div>
+                <div class="payment-row">
+                  <span><span class="payment-name">Blue Bottle</span><span class="payment-time">8:11a</span></span>
+                  <span class="payment-amount">-$7</span>
+                </div>
+                <div class="payment-row">
+                  <span><span class="payment-name">Apple</span><span class="payment-time">Yesterday</span></span>
+                  <span class="payment-amount">-$3</span>
+                </div>
+              </div>
             </div>
-            <div class="screen-key-row">
-              <span class="key-wide"></span><span></span><span></span><span></span><span></span>
-              <span></span><span></span><span></span><span class="key-wide"></span>
+            <div class="investments-section">
+              <div class="section-label">Investments</div>
+              <div class="investments-list">
+                <div class="investment-row">
+                  <span class="inv-label">Cash</span>
+                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 35%"></div></div>
+                  <span class="inv-amount">$12,480</span>
+                </div>
+                <div class="investment-row">
+                  <span class="inv-label">Stocks</span>
+                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 55%"></div></div>
+                  <span class="inv-amount">$21,940</span>
+                </div>
+                <div class="investment-row">
+                  <span class="inv-label">BTC</span>
+                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 22%"></div></div>
+                  <span class="inv-amount">$7,820</span>
+                </div>
+              </div>
             </div>
-            <div class="screen-key-row">
-              <span class="key-wide"></span><span></span><span class="key-space"></span><span></span><span class="key-wide"></span>
+            <div class="charts-section">
+              <div class="chart-box">
+                <svg viewBox="0 0 60 40" preserveAspectRatio="none">
+                  <path d="M0,35 L8,32 L16,28 L24,30 L32,22 L40,18 L48,20 L60,12" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M0,35 L8,32 L16,28 L24,30 L32,22 L40,18 L48,20 L60,12 L60,40 L0,40 Z" fill="rgba(22,163,74,0.15)"/>
+                </svg>
+                <span class="chart-label">Stocks</span>
+              </div>
+              <div class="chart-box">
+                <svg viewBox="0 0 60 40" preserveAspectRatio="none">
+                  <path d="M0,25 L8,28 L16,20 L24,32 L32,26 L40,30 L48,22 L60,18" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M0,25 L8,28 L16,20 L24,32 L32,26 L40,30 L48,22 L60,18 L60,40 L0,40 Z" fill="rgba(245,158,11,0.15)"/>
+                </svg>
+                <span class="chart-label">BTC</span>
+              </div>
+              <div class="chart-box">
+                <svg viewBox="0 0 60 40" preserveAspectRatio="none">
+                  <path d="M0,30 L8,28 L16,26 L24,27 L32,24 L40,22 L48,20 L60,16" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M0,30 L8,28 L16,26 L24,27 L32,24 L40,22 L48,20 L60,16 L60,40 L0,40 Z" fill="rgba(99,102,241,0.15)"/>
+                </svg>
+                <span class="chart-label">ETH</span>
+              </div>
+            </div>
+            <div class="other-section">
+              <div class="section-label">Other</div>
+              <div class="other-list">
+                <div class="other-row">
+                  <span class="other-label">Spend power</span>
+                  <span class="other-amount">$47,291</span>
+                </div>
+                <div class="other-row">
+                  <span class="other-label">Total value</span>
+                  <span class="other-amount">$68,102</span>
+                </div>
+              </div>
+            </div>
+            <div class="command-bar">
+              <span>⌘</span>
+              <span>Balance, transfer, buy, sell...</span>
+            </div>
+            <div class="screen-keyboard" aria-hidden="true">
+              <div class="screen-key-row">
+                <span></span><span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <div class="screen-key-row">
+                <span class="key-wide"></span><span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span class="key-wide"></span>
+              </div>
+              <div class="screen-key-row">
+                <span class="key-wide"></span><span></span><span class="key-space"></span><span></span><span class="key-wide"></span>
+              </div>
             </div>
           </div>
         </div>
@@ -1585,10 +1725,6 @@
           <div class="screen-confirm-btn">Confirm with Face ID</div>
           <div class="screen-cancel">Cancel</div>
         </div>
-      </div>
-      <div class="copy section-copy">
-        <div class="headline" id="execute-title">Just type what you want.</div>
-        <div class="subhead">Buy, sell, send — done in seconds.</div>
       </div>
     </div>
   </section>
