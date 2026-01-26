@@ -690,6 +690,7 @@
       position: relative;
       z-index: 2;
       filter: drop-shadow(0 18px 24px rgba(0, 0, 0, 0.35));
+      animation: shieldFloat 6s ease-in-out infinite;
     }
 
     .defense-labels {
@@ -700,11 +701,54 @@
       font-size: 11px;
       letter-spacing: 0.16em;
       color: var(--secondary);
+      z-index: 2;
     }
 
     .defense-label {
       opacity: 0;
       animation: defenseLabel 6s ease-in-out infinite;
+    }
+
+    .defense-hit {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(120, 130, 255, 0.15));
+      box-shadow: 0 0 14px rgba(120, 130, 255, 0.6);
+      opacity: 0;
+      z-index: 1;
+      animation: defenseHit 5.5s ease-in-out infinite;
+    }
+
+    .defense-hit.hit-1 {
+      --from-x: -180px;
+      --from-y: -60px;
+      --to-x: -20px;
+      --to-y: -10px;
+      --bounce-x: -40px;
+      --bounce-y: -30px;
+      animation-delay: 0s;
+    }
+
+    .defense-hit.hit-2 {
+      --from-x: 190px;
+      --from-y: 40px;
+      --to-x: 30px;
+      --to-y: 10px;
+      --bounce-x: 50px;
+      --bounce-y: 35px;
+      animation-delay: 1.8s;
+    }
+
+    .defense-hit.hit-3 {
+      --from-x: -140px;
+      --from-y: 120px;
+      --to-x: -10px;
+      --to-y: 30px;
+      --bounce-x: -35px;
+      --bounce-y: 45px;
+      animation-delay: 3.4s;
     }
 
     .defense-label:nth-child(1) {
@@ -763,6 +807,33 @@
       20% { opacity: 0.75; transform: translateY(0); }
       50% { opacity: 0.2; transform: translateY(0); }
       100% { opacity: 0; transform: translateY(-4px); }
+    }
+
+    @keyframes shieldFloat {
+      0% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-4px) scale(1.01); }
+      100% { transform: translateY(0) scale(1); }
+    }
+
+    @keyframes defenseHit {
+      0% {
+        transform: translate(var(--from-x), var(--from-y)) scale(0.4);
+        opacity: 0;
+      }
+      15% {
+        opacity: 0.7;
+      }
+      35% {
+        transform: translate(var(--to-x), var(--to-y)) scale(1);
+        opacity: 0.9;
+      }
+      50% {
+        transform: translate(calc(var(--to-x) + var(--bounce-x)), calc(var(--to-y) + var(--bounce-y))) scale(0.5);
+        opacity: 0;
+      }
+      100% {
+        opacity: 0;
+      }
     }
 
     @media (max-width: 768px) {
@@ -971,6 +1042,9 @@
       </div>
       <div class="defense-visual" role="img" aria-label="Defense shield">
         <div class="shield-glow" aria-hidden="true"></div>
+        <span class="defense-hit hit-1" aria-hidden="true"></span>
+        <span class="defense-hit hit-2" aria-hidden="true"></span>
+        <span class="defense-hit hit-3" aria-hidden="true"></span>
         <svg class="shield-icon" viewBox="0 0 120 140" aria-hidden="true">
           <path d="M60 6L106 22V64c0 32-19 58-46 70C33 122 14 96 14 64V22L60 6Z" fill="url(#shield-gradient)" stroke="rgba(255,255,255,0.35)" stroke-width="1.2"/>
           <defs>
