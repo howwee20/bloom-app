@@ -632,74 +632,143 @@
 
     .screen-mockups {
       display: flex;
-      gap: 32px;
+      gap: clamp(24px, 5vw, 56px);
       justify-content: center;
-      align-items: flex-start;
+      align-items: center;
+      flex-wrap: wrap;
     }
 
     .screen-card {
-      width: 320px;
-      background: #fff;
-      border-radius: 24px;
+      width: clamp(300px, 34vw, 380px);
+      background:
+        linear-gradient(165deg,
+          #f4f4f6 0%,
+          #e4e4e8 35%,
+          #f8f8fa 70%,
+          #ededf0 100%
+        );
+      border-radius: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
       box-shadow:
-        0 25px 50px rgba(0, 0, 0, 0.25),
-        0 10px 20px rgba(0, 0, 0, 0.15);
-      padding: 28px;
+        0 1px 0 rgba(255, 255, 255, 0.8) inset,
+        0 -1px 0 rgba(0, 0, 0, 0.06) inset,
+        0 35px 60px rgba(0, 0, 0, 0.3),
+        0 12px 22px rgba(0, 0, 0, 0.2);
+      padding: 34px 30px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .screen-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg,
+          rgba(255, 255, 255, 0.5) 0%,
+          rgba(255, 255, 255, 0.12) 25%,
+          transparent 50%
+        );
+      pointer-events: none;
+    }
+
+    .screen-card--input {
+      width: clamp(280px, 30vw, 360px);
+      min-height: clamp(230px, 30vw, 300px);
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .screen-card--confirm {
+      width: clamp(320px, 36vw, 430px);
+      min-height: clamp(440px, 56vw, 540px);
     }
 
     .screen-header {
       text-align: center;
       color: #1a1a1a;
-      font-size: 14px;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      position: relative;
+      z-index: 1;
     }
 
     .screen-header strong {
       font-weight: 600;
     }
 
-    .screen-logo {
-      width: 32px;
-      height: 32px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 3px;
-      margin: 0 auto 16px;
-    }
-
-    .screen-logo span {
-      background: rgba(0, 0, 0, 0.25);
-      border-radius: 3px;
-    }
-
     .screen-command-input {
-      background: rgba(0, 0, 0, 0.04);
+      width: 100%;
+      background: rgba(0, 0, 0, 0.05);
       border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: 12px;
-      padding: 16px 18px;
+      border-radius: 16px;
+      padding: 14px 18px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       color: #1a1a1a;
       font-size: 14px;
+      position: relative;
+      z-index: 1;
     }
 
     .screen-command-dot {
-      width: 10px;
-      height: 10px;
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 50%;
+      width: 2px;
+      height: 16px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 2px;
+      animation: caretBlink 1.2s ease-in-out infinite;
+    }
+
+    .screen-keyboard {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 18px;
+      padding: 12px 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .screen-key-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .screen-key-row span {
+      flex: 1;
+      height: 14px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 6px;
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.9) inset,
+        0 2px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .screen-key-row .key-wide {
+      flex: 1.6;
+    }
+
+    .screen-key-row .key-space {
+      flex: 3;
     }
 
     .screen-confirm-box {
-      background: rgba(0, 0, 0, 0.03);
+      background: rgba(255, 255, 255, 0.7);
       border: 1px solid rgba(0, 0, 0, 0.06);
-      border-radius: 16px;
-      padding: 24px;
+      border-radius: 22px;
+      padding: 20px 20px 18px;
       text-align: center;
       color: #1a1a1a;
+      position: relative;
+      z-index: 1;
     }
 
     .screen-ticker {
@@ -709,7 +778,7 @@
     }
 
     .screen-amount {
-      font-size: 42px;
+      font-size: 40px;
       font-weight: 600;
       margin-bottom: 6px;
     }
@@ -728,6 +797,22 @@
       margin-bottom: 8px;
     }
 
+    .screen-graph {
+      width: 100%;
+      height: 64px;
+      margin: 8px 0 14px;
+      background: rgba(0, 0, 0, 0.03);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .screen-graph svg {
+      width: 100%;
+      height: 100%;
+    }
+
     .screen-after {
       font-size: 12px;
       color: rgba(0, 0, 0, 0.45);
@@ -737,20 +822,27 @@
     .screen-confirm-btn {
       background: #1a1a1a;
       color: #fff;
-      border-radius: 12px;
-      padding: 16px;
-      font-size: 15px;
-      font-weight: 500;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-size: 14px;
+      font-weight: 600;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
+      position: relative;
+      z-index: 1;
     }
 
     .screen-cancel {
       color: rgba(0, 0, 0, 0.4);
       font-size: 14px;
       text-align: center;
+    }
+
+    @keyframes caretBlink {
+      0%, 100% { opacity: 0.2; }
+      50% { opacity: 1; }
     }
 
     @media (max-width: 768px) {
@@ -1454,33 +1546,47 @@
   <section class="content-section execute-section" aria-labelledby="execute-title">
     <div class="section-inner">
       <div class="copy section-copy">
-        <div class="pill">COMMAND BAR</div>
         <div class="headline" id="execute-title">Just type what you want.</div>
         <div class="subhead">Buy, sell, send — done in seconds.</div>
       </div>
       <div class="screen-mockups">
-        <div class="screen-card">
-          <div class="screen-logo">
-            <span></span><span></span><span></span><span></span>
-          </div>
+        <div class="screen-card screen-card--input">
           <div class="screen-header">Spend power: <strong>$47,291</strong></div>
-          <div style="flex: 1;"></div>
           <div class="screen-command-input">
-            <span>Buy $500 of Apple Stock</span>
+            <span>Buy $500 of Apple</span>
             <span class="screen-command-dot"></span>
           </div>
+          <div class="screen-keyboard" aria-hidden="true">
+            <div class="screen-key-row">
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="screen-key-row">
+              <span class="key-wide"></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span class="key-wide"></span>
+            </div>
+            <div class="screen-key-row">
+              <span class="key-wide"></span><span></span><span class="key-space"></span><span></span><span class="key-wide"></span>
+            </div>
+          </div>
         </div>
-        <div class="screen-card">
-          <div class="screen-header" style="font-size: 13px;">Spend power: <strong>$47,291</strong></div>
+        <div class="screen-card screen-card--confirm">
+          <div class="screen-header">Spend power: <strong>$47,291</strong></div>
           <div class="screen-confirm-box">
             <div class="screen-ticker">AAPL</div>
             <div class="screen-amount">$500</div>
             <div class="screen-shares">~2.19 shares</div>
+            <div class="screen-graph" aria-hidden="true">
+              <svg viewBox="0 0 120 48" preserveAspectRatio="none">
+                <path d="M0,36 L12,30 L24,32 L36,22 L48,24 L60,16 L72,20 L84,14 L96,18 L108,10 L120,12" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
+                <path d="M0,36 L12,30 L24,32 L36,22 L48,24 L60,16 L72,20 L84,14 L96,18 L108,10 L120,12 L120,48 L0,48 Z" fill="rgba(22,163,74,0.12)"/>
+              </svg>
+            </div>
             <div class="screen-detail-row"><span>Price</span><span>$228.31</span></div>
             <div class="screen-detail-row"><span>Fee</span><span>$0.00</span></div>
           </div>
           <div class="screen-after">After: Spend power $46,791</div>
-          <div class="screen-confirm-btn">Confirm with Face ID ✦</div>
+          <div class="screen-confirm-btn">Confirm with Face ID</div>
           <div class="screen-cancel">Cancel</div>
         </div>
       </div>
