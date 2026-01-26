@@ -372,6 +372,31 @@
       font-weight: 600;
     }
 
+    .inv-sparkline {
+      flex: 1;
+      height: 24px;
+    }
+
+    .inv-sparkline svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .sparkline-path {
+      fill: none;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .sparkline-area {
+      opacity: 0.15;
+    }
+
+    .other-section {
+      margin-top: auto;
+    }
+
     .inv-bar-track {
       flex: 1;
       height: 5px;
@@ -654,17 +679,32 @@
                 <div class="investments-list">
                   <div class="investment-row">
                     <span class="inv-label">Cash</span>
-                    <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 35%"></div></div>
+                    <div class="inv-sparkline">
+                      <svg viewBox="0 0 100 24" preserveAspectRatio="none">
+                        <path class="sparkline-area" d="M0,20 L10,18 L20,19 L30,17 L40,18 L50,16 L60,17 L70,15 L80,14 L90,13 L100,12 L100,24 L0,24 Z" fill="#16a34a"/>
+                        <path class="sparkline-path" d="M0,20 L10,18 L20,19 L30,17 L40,18 L50,16 L60,17 L70,15 L80,14 L90,13 L100,12" stroke="#16a34a"/>
+                      </svg>
+                    </div>
                     <span class="inv-amount">$12,480</span>
                   </div>
                   <div class="investment-row">
                     <span class="inv-label">Stocks</span>
-                    <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 55%"></div></div>
+                    <div class="inv-sparkline">
+                      <svg viewBox="0 0 100 24" preserveAspectRatio="none">
+                        <path class="sparkline-area" d="M0,16 L10,14 L20,17 L30,12 L40,15 L50,10 L60,13 L70,8 L80,11 L90,6 L100,4 L100,24 L0,24 Z" fill="#16a34a"/>
+                        <path class="sparkline-path" d="M0,16 L10,14 L20,17 L30,12 L40,15 L50,10 L60,13 L70,8 L80,11 L90,6 L100,4" stroke="#16a34a"/>
+                      </svg>
+                    </div>
                     <span class="inv-amount">$21,940</span>
                   </div>
                   <div class="investment-row">
                     <span class="inv-label">BTC</span>
-                    <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 22%"></div></div>
+                    <div class="inv-sparkline">
+                      <svg viewBox="0 0 100 24" preserveAspectRatio="none">
+                        <path class="sparkline-area" d="M0,12 L10,15 L20,10 L30,18 L40,14 L50,20 L60,16 L70,12 L80,8 L90,10 L100,6 L100,24 L0,24 Z" fill="#f59e0b"/>
+                        <path class="sparkline-path" d="M0,12 L10,15 L20,10 L30,18 L40,14 L50,20 L60,16 L70,12 L80,8 L90,10 L100,6" stroke="#f59e0b"/>
+                      </svg>
+                    </div>
                     <span class="inv-amount">$7,820</span>
                   </div>
                 </div>
