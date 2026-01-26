@@ -834,6 +834,7 @@
           <div class="card-face card-front" id="card-front">
             <div class="paper-texture" aria-hidden="true"></div>
             <div class="front-content">
+              <div class="spend-label">Spend Power</div>
               <div class="spend-number">$47,291</div>
               <div class="spend-delta">+$127 today</div>
             </div>
@@ -925,12 +926,15 @@
         <div class="copy" id="copy">
         <div class="copy-states">
           <div class="copy-block" id="copy-front">
-            <div class="headline">All your money. One card.</div>
-            <div class="subhead">Cash, stocks, crypto. All spendable.</div>
+            <div class="headline">What you can spend. Right now.</div>
+            <div class="subhead subhead-lines">
+              <span class="subhead-line">Not what you own. What you can actually use.</span>
+              <span class="subhead-line subhead-line-secondary">Cash, stocks, crypto — all spendable.</span>
+            </div>
           </div>
           <div class="copy-block" id="copy-back">
-            <div class="headline">See everything. Do everything.</div>
-            <div class="subhead">Buy, sell, send — all from one place.</div>
+            <div class="headline">Tap to see why.</div>
+            <div class="subhead">Every dollar. Every change. Explained instantly.</div>
           </div>
         </div>
         </div>
@@ -940,17 +944,48 @@
     <section class="scroll-section" aria-hidden="true"></section>
   </main>
 
-  <section class="content-section apple-pay-section" aria-labelledby="apple-pay-title">
+  <section class="content-section execute-section" aria-labelledby="execute-title">
     <div class="section-inner">
       <div class="copy section-copy">
-        <div class="pill">APPLE PAY</div>
-        <div class="headline" id="apple-pay-title">Approve with Face ID.</div>
-        <div class="subhead">Big or unusual charges ask you first.</div>
+        <div class="pill">COMMAND BAR</div>
+        <div class="headline" id="execute-title">Buy $500 of Apple. Done.</div>
+        <div class="subhead subhead-lines">
+          <span class="subhead-line">Type what you want. Face ID to confirm.</span>
+          <span class="subhead-line">Buy, sell, send — no apps, no waiting.</span>
+        </div>
       </div>
       <div class="video-frame">
-        <video id="apple-video" muted loop playsinline preload="metadata" aria-label="Apple Pay approval demo" poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230b0d18'/%3E%3Cstop offset='0.55' stop-color='%23151a2b'/%3E%3Cstop offset='1' stop-color='%2306070e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1600' height='900' fill='url(%23g)'/%3E%3C/svg%3E">
-          <source src="/videos/apple-demo.mp4" type="video/mp4">
+        <video id="command-video" muted loop playsinline preload="metadata" aria-label="Command bar buy demo" poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230b0d18'/%3E%3Cstop offset='0.55' stop-color='%23151a2b'/%3E%3Cstop offset='1' stop-color='%2306070e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1600' height='900' fill='url(%23g)'/%3E%3C/svg%3E">
+          <source src="/videos/commandbar-buy-aapl.mp4" type="video/mp4">
         </video>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section defense-section" aria-labelledby="defense-title">
+    <div class="section-inner">
+      <div class="copy section-copy">
+        <div class="pill">DEFENSE</div>
+        <div class="headline" id="defense-title">If anything&rsquo;s wrong, we fix it.</div>
+        <div class="subhead">Fraud, disputes, errors — handled automatically. You never make a call.</div>
+      </div>
+      <div class="defense-visual" role="img" aria-label="Defense shield">
+        <div class="shield-glow" aria-hidden="true"></div>
+        <svg class="shield-icon" viewBox="0 0 120 140" aria-hidden="true">
+          <path d="M60 6L106 22V64c0 32-19 58-46 70C33 122 14 96 14 64V22L60 6Z" fill="url(#shield-gradient)" stroke="rgba(255,255,255,0.35)" stroke-width="1.2"/>
+          <defs>
+            <linearGradient id="shield-gradient" x1="0" y1="0" x2="0.8" y2="1">
+              <stop offset="0" stop-color="#e6e8ff" stop-opacity="0.9"/>
+              <stop offset="0.55" stop-color="#9aa6ff" stop-opacity="0.85"/>
+              <stop offset="1" stop-color="#5c68c0" stop-opacity="0.9"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="defense-labels" aria-hidden="true">
+          <span class="defense-label">fraud</span>
+          <span class="defense-label">disputes</span>
+          <span class="defense-label">errors</span>
+        </div>
       </div>
     </div>
   </section>
@@ -959,7 +994,7 @@
     <div class="section-inner">
       <div class="copy section-copy" id="cta-copy">
         <div class="headline" id="cta-title">Get early access</div>
-        <div class="subhead">No spam. We&apos;ll reach out when it&apos;s your turn.</div>
+        <div class="subhead">Limited early access. No spam. We&rsquo;ll reach out when it&rsquo;s your turn.</div>
         <form class="waitlist" id="waitlist-form-bottom">
           <input type="email" name="email" placeholder="Email" required autocomplete="email" autocapitalize="off">
           <input type="tel" name="phone" placeholder="Phone (optional)" autocomplete="tel">
@@ -1400,24 +1435,24 @@
       form.addEventListener('submit', handleWaitlistSubmit);
     });
 
-    const appleVideo = document.getElementById('apple-video');
-    if (appleVideo && 'IntersectionObserver' in window) {
-      appleVideo.muted = true;
+    const commandVideo = document.getElementById('command-video');
+    if (commandVideo && 'IntersectionObserver' in window) {
+      commandVideo.muted = true;
       const observer = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) {
-            appleVideo.pause();
+            commandVideo.pause();
             return;
           }
 
-          const playPromise = appleVideo.play();
+          const playPromise = commandVideo.play();
           if (playPromise && typeof playPromise.catch === 'function') {
             playPromise.catch(() => {});
           }
         });
       }, { threshold: 0.4 });
 
-      observer.observe(appleVideo);
+      observer.observe(commandVideo);
     }
 
     requestAnimationFrame(animate);
