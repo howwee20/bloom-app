@@ -146,19 +146,9 @@
     .card-face {
       position: absolute;
       inset: 0;
-      border-radius: 18px;
+      border-radius: inherit;
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
-      background:
-        linear-gradient(165deg,
-          #e8e8ed 0%,
-          #d4d4d8 15%,
-          #f0f0f2 30%,
-          #c8c8cc 50%,
-          #e0e0e4 70%,
-          #d0d0d4 85%,
-          #e8e8ec 100%
-        );
       border: 1px solid rgba(255, 255, 255, 0.6);
       box-shadow:
         0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
@@ -442,7 +432,18 @@
       text-align: center;
     }
 
+    .copy-states {
+      position: relative;
+      min-height: 120px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .copy-block {
+      position: absolute;
+      inset: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -451,7 +452,8 @@
     }
 
     #copy-back {
-      display: none;
+      opacity: 0;
+      transform: translateY(8px);
     }
 
     .headline {
@@ -676,6 +678,7 @@
         </div>
 
         <div class="copy" id="copy">
+        <div class="copy-states">
           <div class="copy-block" id="copy-front">
             <div class="headline">All your money. One card.</div>
             <div class="subhead">Cash, stocks, crypto. All spendable.</div>
@@ -684,6 +687,7 @@
             <div class="headline">See everything. Do everything.</div>
             <div class="subhead">Buy, sell, send — all from one place.</div>
           </div>
+        </div>
 
           <form class="waitlist" id="waitlist-form">
             <input type="email" name="email" placeholder="Email" required autocomplete="email" autocapitalize="off">
