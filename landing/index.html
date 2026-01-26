@@ -134,12 +134,14 @@
     }
 
     .card-3d {
-      width: min(340px, 80vw);
-      aspect-ratio: 0.72 / 1;
+      width: 340px;
+      height: 472px;
+      max-width: 80vw;
+      max-height: 65vh;
       transform-style: preserve-3d;
       -webkit-transform-style: preserve-3d;
       border-radius: 24px;
-      transition: transform 0.6s var(--ease-out), width 0.5s var(--ease-out), aspect-ratio 0.5s var(--ease-out);
+      transition: transform 0.6s var(--ease-out);
       will-change: transform;
     }
 
@@ -769,14 +771,7 @@
       const tiltX = 4 + pointerY * -tiltStrength;
       const tiltY = pointerX * tiltStrength;
 
-      if (cardMetrics) {
-        const width = lerp(cardMetrics.cardWidth, cardMetrics.phoneWidth, currentProgress);
-        const height = lerp(cardMetrics.cardHeight, cardMetrics.phoneHeight, currentProgress);
-        const radius = lerp(cardMetrics.cardRadius, cardMetrics.phoneRadius, currentProgress);
-        card.style.width = `${width.toFixed(2)}px`;
-        card.style.height = `${height.toFixed(2)}px`;
-        card.style.borderRadius = `${radius.toFixed(2)}px`;
-      }
+      // Card dimensions now fixed in CSS - no JS morphing
 
       card.style.transform = `rotateX(${tiltX.toFixed(2)}deg) rotateY(${(rotateY + tiltY).toFixed(2)}deg)`;
 
