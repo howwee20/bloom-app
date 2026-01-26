@@ -4,19 +4,5 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/update-prices",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/liquidate",
-      "schedule": "*/2 * * * *"
-    },
-    {
-      "path": "/api/cron/reconcile",
-      "schedule": "*/30 * * * *"
-    }
   ]
 }
