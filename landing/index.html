@@ -763,7 +763,28 @@
     .mini-card {
       width: 280px;
       height: 176px;
+      position: relative;
+      transform-style: preserve-3d;
+      animation: cardSpin 8s ease-in-out infinite;
+    }
+
+    .mini-card-face {
+      position: absolute;
+      inset: 0;
       border-radius: 14px;
+      backface-visibility: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow:
+        0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
+        0 -1px 0 0 rgba(0, 0, 0, 0.05) inset,
+        0 20px 40px rgba(0, 0, 0, 0.3),
+        0 8px 16px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mini-card-front {
       background:
         linear-gradient(165deg,
           #e8e8ed 0%,
@@ -774,15 +795,39 @@
           #d0d0d4 85%,
           #e8e8ec 100%
         );
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      box-shadow:
-        0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
-        0 -1px 0 0 rgba(0, 0, 0, 0.05) inset,
-        0 20px 40px rgba(0, 0, 0, 0.3),
-        0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .mini-card-back {
+      background:
+        linear-gradient(165deg,
+          #f4f4f6 0%,
+          #e4e4e8 35%,
+          #f8f8fa 70%,
+          #ededf0 100%
+        );
+      transform: rotateY(180deg);
+      padding: 16px;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .mini-back-row {
       display: flex;
-      align-items: center;
-      justify-content: center;
+      justify-content: space-between;
+      width: 100%;
+      font-size: 11px;
+      color: #1a1a1a;
+    }
+
+    .mini-back-label {
+      color: rgba(26, 26, 26, 0.5);
+    }
+
+    @keyframes cardSpin {
+      0%, 85% { transform: rotateY(0deg); }
+      92.5% { transform: rotateY(180deg); }
+      100% { transform: rotateY(360deg); }
     }
 
     .mini-card-content {
@@ -1139,10 +1184,26 @@
         <span class="defense-hit hit-3" aria-hidden="true"></span>
         <div class="card-glow" aria-hidden="true"></div>
         <div class="mini-card">
-          <div class="mini-card-content">
-            <div class="mini-card-label">Bloom</div>
-            <div class="mini-card-number">$47,291</div>
-            <div class="mini-card-delta">+$127 today</div>
+          <div class="mini-card-face mini-card-front">
+            <div class="mini-card-content">
+              <div class="mini-card-label">Bloom</div>
+              <div class="mini-card-number">$8,412</div>
+              <div class="mini-card-delta">+$34 today</div>
+            </div>
+          </div>
+          <div class="mini-card-face mini-card-back">
+            <div class="mini-back-row">
+              <span class="mini-back-label">Cash</span>
+              <span>$2,180</span>
+            </div>
+            <div class="mini-back-row">
+              <span class="mini-back-label">Stocks</span>
+              <span>$4,892</span>
+            </div>
+            <div class="mini-back-row">
+              <span class="mini-back-label">Crypto</span>
+              <span>$1,340</span>
+            </div>
           </div>
         </div>
         <div class="defense-labels" aria-hidden="true">
