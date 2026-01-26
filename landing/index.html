@@ -641,12 +641,13 @@
       width: 220px;
       height: 440px;
       border-radius: 32px;
-      background: #0a0a0a;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: linear-gradient(165deg, #e8e8ed 0%, #d4d4d8 15%, #f0f0f2 30%, #c8c8cc 50%, #e0e0e4 70%, #d0d0d4 85%, #e8e8ec 100%);
+      border: 1px solid rgba(255, 255, 255, 0.6);
       box-shadow:
-        0 30px 60px rgba(0, 0, 0, 0.4),
-        0 10px 20px rgba(0, 0, 0, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
+        0 -1px 0 0 rgba(0, 0, 0, 0.05) inset,
+        0 30px 60px rgba(0, 0, 0, 0.3),
+        0 10px 20px rgba(0, 0, 0, 0.2);
       padding: 12px;
       position: relative;
       overflow: hidden;
@@ -656,7 +657,7 @@
       width: 100%;
       height: 100%;
       border-radius: 22px;
-      background: #000;
+      background: linear-gradient(165deg, #f4f4f6 0%, #eaeaee 50%, #f0f0f4 100%);
       display: flex;
       flex-direction: column;
       position: relative;
@@ -669,7 +670,7 @@
       align-items: center;
       padding: 8px 16px;
       font-size: 11px;
-      color: #fff;
+      color: #1a1a1a;
     }
 
     .phone-content {
@@ -689,13 +690,13 @@
     }
 
     .phone-bloom-logo span {
-      background: #fff;
+      background: rgba(0, 0, 0, 0.35);
       border-radius: 2px;
     }
 
     .phone-spend-power {
       text-align: center;
-      color: #fff;
+      color: #1a1a1a;
       font-size: 16px;
       margin-bottom: auto;
     }
@@ -705,13 +706,14 @@
     }
 
     .phone-command-bar {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(0, 0, 0, 0.1);
       border-radius: 12px;
       padding: 14px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      color: #fff;
+      color: rgba(0, 0, 0, 0.55);
       font-size: 13px;
       margin-top: auto;
     }
@@ -719,22 +721,23 @@
     .phone-command-dot {
       width: 8px;
       height: 8px;
-      background: #fff;
+      background: rgba(0, 0, 0, 0.4);
       border-radius: 50%;
     }
 
     .phone-confirm-card {
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.08);
       border-radius: 16px;
       padding: 20px;
       text-align: center;
-      color: #fff;
+      color: #1a1a1a;
       margin: auto 0;
     }
 
     .phone-ticker {
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(0, 0, 0, 0.45);
       margin-bottom: 4px;
     }
 
@@ -746,7 +749,7 @@
 
     .phone-shares {
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(0, 0, 0, 0.45);
       margin-bottom: 16px;
     }
 
@@ -754,19 +757,19 @@
       display: flex;
       justify-content: space-between;
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.7);
+      color: rgba(0, 0, 0, 0.6);
       margin-bottom: 6px;
     }
 
     .phone-after {
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(0, 0, 0, 0.45);
       margin-top: 16px;
     }
 
     .phone-confirm-btn {
-      background: #fff;
-      color: #000;
+      background: #1a1a1a;
+      color: #fff;
       border-radius: 12px;
       padding: 14px;
       font-size: 14px;
@@ -779,7 +782,7 @@
     }
 
     .phone-cancel {
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(0, 0, 0, 0.4);
       font-size: 13px;
       margin-top: 12px;
       text-align: center;
@@ -788,7 +791,7 @@
     .phone-home-indicator {
       width: 100px;
       height: 4px;
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(0, 0, 0, 0.2);
       border-radius: 2px;
       margin: 8px auto;
     }
@@ -896,7 +899,7 @@
       opacity: 0;
       pointer-events: none;
       z-index: 5;
-      transform: translate(-50%, -50%) scale(0.7);
+      transform: translate(-50%, -60%) scale(0.7);
       animation: defenseImpact 3.6s ease-out infinite;
     }
 
@@ -1005,18 +1008,18 @@
     @keyframes defenseImpact {
       0% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.5);
+        transform: translate(-50%, -60%) scale(0.5);
       }
       20% {
         opacity: 0;
       }
       32% {
         opacity: 1;
-        transform: translate(-50%, -50%) scale(0.8);
+        transform: translate(-50%, -60%) scale(0.8);
       }
       48% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(1.35);
+        transform: translate(-50%, -60%) scale(1.35);
       }
       100% {
         opacity: 0;
@@ -1026,22 +1029,22 @@
     @keyframes defenseHit {
       0% {
         opacity: 0;
-        transform: translate(-50%, -50%) translate(var(--from-x), var(--from-y)) rotate(var(--hit-angle)) scale(0.5);
+        transform: translate(-50%, -60%) translate(var(--from-x), var(--from-y)) rotate(var(--hit-angle)) scale(0.5);
       }
       10% {
         opacity: 1;
       }
       34% {
         opacity: 1;
-        transform: translate(-50%, -50%) translate(var(--to-x), var(--to-y)) rotate(var(--hit-angle)) scale(1.1);
+        transform: translate(-50%, -60%) translate(var(--to-x), var(--to-y)) rotate(var(--hit-angle)) scale(1.1);
       }
       46% {
         opacity: 0;
-        transform: translate(-50%, -50%) translate(calc(var(--to-x) + var(--kick-x)), calc(var(--to-y) + var(--kick-y))) rotate(var(--hit-angle)) scale(0.2);
+        transform: translate(-50%, -60%) translate(calc(var(--to-x) + var(--kick-x)), calc(var(--to-y) + var(--kick-y))) rotate(var(--hit-angle)) scale(0.2);
       }
       100% {
         opacity: 0;
-        transform: translate(-50%, -50%) translate(calc(var(--to-x) + var(--kick-x)), calc(var(--to-y) + var(--kick-y))) rotate(var(--hit-angle)) scale(0.2);
+        transform: translate(-50%, -60%) translate(calc(var(--to-x) + var(--kick-x)), calc(var(--to-y) + var(--kick-y))) rotate(var(--hit-angle)) scale(0.2);
       }
     }
 
@@ -1277,9 +1280,9 @@
     }
 
     @keyframes shieldPulse {
-      0% { transform: scale(0.96); opacity: 0.55; }
-      50% { transform: scale(1); opacity: 0.85; }
-      100% { transform: scale(0.96); opacity: 0.55; }
+      0% { opacity: 0.65; }
+      50% { opacity: 1; }
+      100% { opacity: 0.65; }
     }
 
     @keyframes defenseLabel {
@@ -1290,9 +1293,9 @@
     }
 
     @keyframes shieldFloat {
-      0% { transform: translateY(0) scale(1); }
-      50% { transform: translateY(-4px) scale(1.01); }
-      100% { transform: translateY(0) scale(1); }
+      0% { transform: translate(-50%, -60%) scale(1); }
+      50% { transform: translate(-50%, -64%) scale(1.01); }
+      100% { transform: translate(-50%, -60%) scale(1); }
     }
 
     @keyframes shieldImpact {
@@ -1542,64 +1545,6 @@
             </div>
             <div class="phone-home-indicator"></div>
           </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="content-section defense-section" aria-labelledby="defense-title">
-    <div class="section-inner">
-      <div class="copy section-copy">
-        <div class="pill">DEFENSE</div>
-        <div class="headline" id="defense-title">If anything&rsquo;s wrong, we fix it.</div>
-        <div class="subhead">Fraud, disputes, errors — handled automatically. You never make a call.</div>
-      </div>
-      <div class="mini-card-container">
-        <span class="defense-impact impact-1" aria-hidden="true"></span>
-        <span class="defense-impact impact-2" aria-hidden="true"></span>
-        <span class="defense-impact impact-3" aria-hidden="true"></span>
-        <span class="defense-hit hit-1" aria-hidden="true"></span>
-        <span class="defense-hit hit-2" aria-hidden="true"></span>
-        <span class="defense-hit hit-3" aria-hidden="true"></span>
-        <div class="card-glow" aria-hidden="true"></div>
-        <div class="defense-shield" aria-hidden="true">
-          <div class="shield-content">
-            <div class="shield-label">Account</div>
-            <div class="shield-number">**** 7291</div>
-          </div>
-        </div>
-        <div class="mini-card">
-          <div class="mini-card-face mini-card-front">
-            <div class="mini-card-content">
-              <div class="mini-card-label">Bloom</div>
-              <div class="mini-card-number">$8,412</div>
-              <div class="mini-card-delta">+$34 today</div>
-            </div>
-          </div>
-          <div class="mini-card-face mini-card-back">
-            <div class="mini-back-content">
-              <div class="mini-section">
-                <div class="mini-section-label">Payments</div>
-                <div class="mini-payment-row"><span>Spotify <span class="mini-time">9:24a</span></span><span>-$12</span></div>
-                <div class="mini-payment-row"><span>Apple <span class="mini-time">8:11a</span></span><span>-$3</span></div>
-              </div>
-              <div class="mini-section">
-                <div class="mini-section-label">Investments</div>
-                <div class="mini-inv-row"><span>Cash</span><div class="mini-bar"><div class="mini-bar-fill" style="width:35%"></div></div><span>$2,180</span></div>
-                <div class="mini-inv-row"><span>Stocks</span><div class="mini-bar"><div class="mini-bar-fill" style="width:55%"></div></div><span>$4,892</span></div>
-              </div>
-              <div class="mini-charts">
-                <div class="mini-chart"><svg viewBox="0 0 40 20"><path d="M0,16 L8,14 L16,10 L24,12 L32,6 L40,4" fill="none" stroke="#16a34a" stroke-width="1.5"/></svg></div>
-                <div class="mini-chart"><svg viewBox="0 0 40 20"><path d="M0,10 L8,14 L16,8 L24,16 L32,10 L40,6" fill="none" stroke="#f59e0b" stroke-width="1.5"/></svg></div>
-                <div class="mini-chart"><svg viewBox="0 0 40 20"><path d="M0,14 L8,12 L16,10 L24,11 L32,8 L40,6" fill="none" stroke="#6366f1" stroke-width="1.5"/></svg></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="defense-labels" aria-hidden="true">
-          <span class="defense-label">fraud</span>
-          <span class="defense-label">disputes</span>
-          <span class="defense-label">errors</span>
         </div>
       </div>
     </div>
