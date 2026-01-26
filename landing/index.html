@@ -657,10 +657,107 @@
     }
 
     .mini-card-container {
+      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 24px;
+    }
+
+    .card-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+      width: 200px;
+      height: 140px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.25), transparent 65%);
+      filter: blur(20px);
+      opacity: 0.6;
+      animation: cardPulse 4s var(--ease-out) infinite;
+    }
+
+    .defense-hit {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(255, 100, 100, 0.95), rgba(255, 50, 50, 0.5));
+      box-shadow:
+        0 0 12px rgba(255, 80, 80, 0.8),
+        0 0 24px rgba(255, 50, 50, 0.4);
+      opacity: 0;
+      z-index: 3;
+      animation: defenseHit 4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    }
+
+    .defense-hit::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 30px;
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255, 100, 100, 0.8), rgba(255, 50, 50, 0.3), transparent);
+      transform: translate(-50%, -50%) rotate(var(--hit-angle)) translateX(-8px);
+      opacity: 0.8;
+    }
+
+    .defense-hit.hit-1 {
+      --from-x: -180px;
+      --from-y: -60px;
+      --to-x: -120px;
+      --to-y: -40px;
+      --hit-angle: 20deg;
+      animation-delay: 0s;
+    }
+
+    .defense-hit.hit-2 {
+      --from-x: 180px;
+      --from-y: 40px;
+      --to-x: 120px;
+      --to-y: 20px;
+      --hit-angle: 200deg;
+      animation-delay: 1.3s;
+    }
+
+    .defense-hit.hit-3 {
+      --from-x: -160px;
+      --from-y: 80px;
+      --to-x: -100px;
+      --to-y: 50px;
+      --hit-angle: 315deg;
+      animation-delay: 2.6s;
+    }
+
+    @keyframes cardPulse {
+      0%, 100% { opacity: 0.5; transform: translate(-50%, -60%) scale(0.95); }
+      50% { opacity: 0.8; transform: translate(-50%, -60%) scale(1.05); }
+    }
+
+    @keyframes defenseHit {
+      0% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--from-x)), calc(-50% + var(--from-y)));
+      }
+      15% {
+        opacity: 1;
+        transform: translate(calc(-50% + var(--from-x)), calc(-50% + var(--from-y)));
+      }
+      40% {
+        opacity: 1;
+        transform: translate(calc(-50% + var(--to-x)), calc(-50% + var(--to-y)));
+      }
+      45% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--to-x) * 1.5), calc(-50% + var(--to-y) * 1.5));
+      }
+      100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--to-x) * 1.5), calc(-50% + var(--to-y) * 1.5));
+      }
     }
 
     .mini-card {
@@ -1037,6 +1134,10 @@
         <div class="subhead">Fraud, disputes, errors — handled automatically. You never make a call.</div>
       </div>
       <div class="mini-card-container">
+        <span class="defense-hit hit-1" aria-hidden="true"></span>
+        <span class="defense-hit hit-2" aria-hidden="true"></span>
+        <span class="defense-hit hit-3" aria-hidden="true"></span>
+        <div class="card-glow" aria-hidden="true"></div>
         <div class="mini-card">
           <div class="mini-card-content">
             <div class="mini-card-label">Bloom</div>
