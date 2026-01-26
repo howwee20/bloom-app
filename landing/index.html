@@ -806,22 +806,93 @@
           #ededf0 100%
         );
       transform: rotateY(180deg);
-      padding: 16px;
-      flex-direction: column;
-      gap: 8px;
-      align-items: flex-start;
+      padding: 12px 14px;
     }
 
-    .mini-back-row {
+    .mini-back-content {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mini-section {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .mini-section-label {
+      font-size: 7px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: rgba(0, 0, 0, 0.4);
+      margin-bottom: 2px;
+    }
+
+    .mini-payment-row {
       display: flex;
       justify-content: space-between;
-      width: 100%;
-      font-size: 11px;
+      font-size: 9px;
       color: #1a1a1a;
     }
 
-    .mini-back-label {
-      color: rgba(26, 26, 26, 0.5);
+    .mini-time {
+      font-size: 7px;
+      color: rgba(0, 0, 0, 0.4);
+      margin-left: 4px;
+    }
+
+    .mini-inv-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 8px;
+      color: rgba(0, 0, 0, 0.6);
+    }
+
+    .mini-inv-row > span:first-child {
+      width: 36px;
+      font-weight: 500;
+    }
+
+    .mini-inv-row > span:last-child {
+      width: 36px;
+      text-align: right;
+      color: #1a1a1a;
+    }
+
+    .mini-bar {
+      flex: 1;
+      height: 3px;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 2px;
+    }
+
+    .mini-bar-fill {
+      height: 100%;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 2px;
+    }
+
+    .mini-charts {
+      display: flex;
+      gap: 6px;
+      margin-top: auto;
+    }
+
+    .mini-chart {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.03);
+      border-radius: 4px;
+      padding: 6px;
+    }
+
+    .mini-chart svg {
+      width: 100%;
+      height: 20px;
     }
 
     @keyframes cardSpin {
@@ -1192,17 +1263,22 @@
             </div>
           </div>
           <div class="mini-card-face mini-card-back">
-            <div class="mini-back-row">
-              <span class="mini-back-label">Cash</span>
-              <span>$2,180</span>
-            </div>
-            <div class="mini-back-row">
-              <span class="mini-back-label">Stocks</span>
-              <span>$4,892</span>
-            </div>
-            <div class="mini-back-row">
-              <span class="mini-back-label">Crypto</span>
-              <span>$1,340</span>
+            <div class="mini-back-content">
+              <div class="mini-section">
+                <div class="mini-section-label">Payments</div>
+                <div class="mini-payment-row"><span>Spotify <span class="mini-time">9:24a</span></span><span>-$12</span></div>
+                <div class="mini-payment-row"><span>Apple <span class="mini-time">8:11a</span></span><span>-$3</span></div>
+              </div>
+              <div class="mini-section">
+                <div class="mini-section-label">Investments</div>
+                <div class="mini-inv-row"><span>Cash</span><div class="mini-bar"><div class="mini-bar-fill" style="width:35%"></div></div><span>$2,180</span></div>
+                <div class="mini-inv-row"><span>Stocks</span><div class="mini-bar"><div class="mini-bar-fill" style="width:55%"></div></div><span>$4,892</span></div>
+              </div>
+              <div class="mini-charts">
+                <div class="mini-chart"><svg viewBox="0 0 40 20"><path d="M0,16 L8,14 L16,10 L24,12 L32,6 L40,4" fill="none" stroke="#16a34a" stroke-width="1.5"/></svg></div>
+                <div class="mini-chart"><svg viewBox="0 0 40 20"><path d="M0,10 L8,14 L16,8 L24,16 L32,10 L40,6" fill="none" stroke="#f59e0b" stroke-width="1.5"/></svg></div>
+                <div class="mini-chart"><svg viewBox="0 0 40 20"><path d="M0,14 L8,12 L16,10 L24,11 L32,8 L40,6" fill="none" stroke="#6366f1" stroke-width="1.5"/></svg></div>
+              </div>
             </div>
           </div>
         </div>
