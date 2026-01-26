@@ -23,6 +23,7 @@ import {
 import { fonts, theme } from '../../constants/Colors';
 import { CommandBar } from '../../components/CommandBar';
 import { BloomCard } from '../../components/BloomCard';
+import { SpaceBackground } from '../../components/SpaceBackground';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type CustodyFilter = 'bloom' | 'home' | 'watchlist';
@@ -254,8 +255,9 @@ export default function HomeScreen() {
   const baseBottom = Math.max(insets.bottom + 8, 14);
   const commandBarHeight = 44;
   const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
-  const cardHeight = Math.max(viewportHeight - topPadding - insets.bottom, 520);
-  const cardWidth = Math.min(Math.round(viewportWidth * 1), cardMaxWidth);
+  const availableHeight = viewportHeight - topPadding - insets.bottom;
+  const cardHeight = Math.round(availableHeight * 0.88);
+  const cardWidth = Math.min(Math.round(viewportWidth * 0.9), cardMaxWidth);
   const apiBaseUrl = (process.env.EXPO_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
 
   const fetchBloomSummary = useCallback(async (options?: { silent?: boolean }) => {
@@ -1344,13 +1346,14 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <SpaceBackground />
       {/* Bloom Card - tap to flip breakdown; stays on home screen when typing */}
       <View
         style={[
           styles.cardStage,
           {
             paddingTop: topPadding,
-            paddingHorizontal: 0,
+            paddingHorizontal: 16,
           },
         ]}
       >
@@ -1863,17 +1866,23 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F6F3EE',
+    backgroundColor: '#05060f',
   },
   cardStage: {
     flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'stretch',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cardContainer: {
     position: 'relative',
     borderRadius: 46,
-    overflow: 'hidden',
+    alignSelf: 'center',
+    overflow: 'visible',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 22 },
+    shadowOpacity: 0.45,
+    shadowRadius: 28,
+    elevation: 18,
   },
   keyboardAvoid: {
     flex: 1,
