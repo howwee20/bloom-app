@@ -1722,11 +1722,19 @@
       }
 
       .copy-states {
-        min-height: 160px;
+        min-height: 0;
+        height: auto;
       }
 
       .copy-block {
+        position: relative;
+        inset: auto;
         white-space: normal;
+      }
+
+      #copy-back {
+        position: absolute;
+        inset: 0;
       }
 
       .headline {
@@ -1886,115 +1894,10 @@
   <section class="content-section execute-section" aria-labelledby="execute-title">
     <div class="section-inner">
       <div class="copy section-copy">
-        <div class="headline" id="execute-title">Just type what you want.</div>
-        <div class="subhead">Buy, sell, send — done in seconds.</div>
+        <div class="headline" id="execute-title">Type it. Done.</div>
+        <div class="subhead">Buy, sell, send — in seconds.</div>
       </div>
       <div class="screen-mockups">
-        <div class="screen-card screen-card--app">
-          <div class="back-content screen-back">
-            <div class="payments-section">
-              <div class="section-label">Payments</div>
-              <div class="payments-list">
-                <div class="payment-row">
-                  <span><span class="payment-name">Spotify</span><span class="payment-time">9:24a</span></span>
-                  <span class="payment-amount">-$12</span>
-                </div>
-                <div class="payment-row">
-                  <span><span class="payment-name">Blue Bottle</span><span class="payment-time">8:11a</span></span>
-                  <span class="payment-amount">-$7</span>
-                </div>
-                <div class="payment-row">
-                  <span><span class="payment-name">Apple</span><span class="payment-time">Yesterday</span></span>
-                  <span class="payment-amount">-$3</span>
-                </div>
-              </div>
-            </div>
-            <div class="investments-section">
-              <div class="section-label">Investments</div>
-              <div class="investments-list">
-                <div class="investment-row">
-                  <span class="inv-label">Cash</span>
-                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 35%"></div></div>
-                  <span class="inv-amount">$12,480</span>
-                </div>
-                <div class="investment-row">
-                  <span class="inv-label">Stocks</span>
-                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 55%"></div></div>
-                  <span class="inv-amount">$21,940</span>
-                </div>
-                <div class="investment-row">
-                  <span class="inv-label">BTC</span>
-                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 22%"></div></div>
-                  <span class="inv-amount">$7,820</span>
-                </div>
-              </div>
-            </div>
-            <div class="charts-section">
-              <div class="chart-box">
-                <svg viewBox="0 0 60 40" preserveAspectRatio="none">
-                  <path d="M0,35 L8,32 L16,28 L24,30 L32,22 L40,18 L48,20 L60,12" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
-                  <path d="M0,35 L8,32 L16,28 L24,30 L32,22 L40,18 L48,20 L60,12 L60,40 L0,40 Z" fill="rgba(22,163,74,0.15)"/>
-                </svg>
-                <span class="chart-label">Stocks</span>
-              </div>
-              <div class="chart-box">
-                <svg viewBox="0 0 60 40" preserveAspectRatio="none">
-                  <path d="M0,25 L8,28 L16,20 L24,32 L32,26 L40,30 L48,22 L60,18" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
-                  <path d="M0,25 L8,28 L16,20 L24,32 L32,26 L40,30 L48,22 L60,18 L60,40 L0,40 Z" fill="rgba(245,158,11,0.15)"/>
-                </svg>
-                <span class="chart-label">BTC</span>
-              </div>
-              <div class="chart-box">
-                <svg viewBox="0 0 60 40" preserveAspectRatio="none">
-                  <path d="M0,30 L8,28 L16,26 L24,27 L32,24 L40,22 L48,20 L60,16" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
-                  <path d="M0,30 L8,28 L16,26 L24,27 L32,24 L40,22 L48,20 L60,16 L60,40 L0,40 Z" fill="rgba(99,102,241,0.15)"/>
-                </svg>
-                <span class="chart-label">ETH</span>
-              </div>
-            </div>
-            <div class="other-section">
-              <div class="section-label">Other</div>
-              <div class="other-list">
-                <div class="other-row">
-                  <span class="other-label">Spend power</span>
-                  <span class="other-amount">$47,291</span>
-                </div>
-                <div class="other-row">
-                  <span class="other-label">Total value</span>
-                  <span class="other-amount">$68,102</span>
-                </div>
-              </div>
-            </div>
-            <div class="command-stack">
-              <div class="command-bar">
-                <span class="command-text">buy $500 of apple stock</span>
-                <span class="command-caret" aria-hidden="true"></span>
-              </div>
-              <div class="screen-keyboard" aria-hidden="true">
-                <div class="screen-key-row">
-                  <span class="key">q</span><span class="key">w</span><span class="key">e</span><span class="key">r</span><span class="key">t</span>
-                  <span class="key">y</span><span class="key">u</span><span class="key">i</span><span class="key">o</span><span class="key">p</span>
-                </div>
-                <div class="screen-key-row">
-                  <span class="key">a</span><span class="key">s</span><span class="key">d</span><span class="key">f</span><span class="key">g</span>
-                  <span class="key">h</span><span class="key">j</span><span class="key">k</span><span class="key">l</span>
-                </div>
-                <div class="screen-key-row">
-                  <span class="key key-special key-shift">shift</span>
-                  <span class="key">z</span><span class="key">x</span><span class="key">c</span><span class="key">v</span><span class="key">b</span>
-                  <span class="key">n</span><span class="key">m</span>
-                  <span class="key key-special key-backspace">delete</span>
-                </div>
-                <div class="screen-key-row">
-                  <span class="key key-special key-123">123</span>
-                  <span class="key key-special key-globe">globe</span>
-                  <span class="key key-space">space</span>
-                  <span class="key key-special key-return">return</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
         <div class="screen-card screen-card--confirm">
           <div class="screen-header">Spend power: <strong>$47,291</strong></div>
           <div class="screen-confirm-box">
