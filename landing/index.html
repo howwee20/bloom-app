@@ -134,8 +134,8 @@
     }
 
     .card-3d {
-      width: min(320px, 72vw);
-      aspect-ratio: 0.58 / 1;
+      width: min(340px, 80vw);
+      height: min(580px, 70vh);
       transform-style: preserve-3d;
       -webkit-transform-style: preserve-3d;
       border-radius: 32px;
@@ -734,14 +734,9 @@
     let cardMetrics = null;
 
     const updateMetrics = () => {
-      // Phone-like proportions (taller than wide, ~0.58 ratio)
-      let cardHeight = Math.min(window.innerHeight * 0.65, 520);
-      let cardWidth = cardHeight * 0.58;
-      const maxCardWidth = window.innerWidth * 0.72;
-      if (cardWidth > maxCardWidth) {
-        cardWidth = maxCardWidth;
-        cardHeight = cardWidth / 0.58;
-      }
+      // Large phone-like card
+      let cardHeight = Math.min(window.innerHeight * 0.68, 580);
+      let cardWidth = Math.min(cardHeight * 0.58, window.innerWidth * 0.8, 340);
 
       cardMetrics = {
         cardWidth,
