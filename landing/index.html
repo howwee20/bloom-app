@@ -688,7 +688,6 @@
 
     .execute-section .screen-card--app {
       width: clamp(300px, 30vw, 360px);
-      min-height: clamp(560px, 78vw, 720px);
       border-radius: 34px;
     }
 
@@ -859,7 +858,7 @@
     }
 
     .execute-section .screen-back {
-      padding: 22px 22px 20px;
+      padding: 20px 20px 18px;
       gap: 12px;
       height: auto;
     }
@@ -868,20 +867,66 @@
       text-align: center;
       font-size: 10px;
       letter-spacing: 0.26em;
+      margin-bottom: 6px;
     }
 
-    .execute-section .screen-back .charts-section {
+    .execute-section .payments-section,
+    .execute-section .investments-section,
+    .execute-section .other-section {
+      width: 100%;
+    }
+
+    .execute-section .payments-list,
+    .execute-section .investments-list,
+    .execute-section .other-list {
+      gap: 8px;
+    }
+
+    .execute-section .payment-row {
+      font-size: 12px;
+    }
+
+    .execute-section .payment-amount {
+      font-size: 11px;
+    }
+
+    .execute-section .investment-row {
+      font-size: 11px;
+      gap: 8px;
+    }
+
+    .execute-section .inv-label {
+      width: 46px;
+    }
+
+    .execute-section .inv-bar-track {
+      height: 4px;
+    }
+
+    .execute-section .charts-section {
       flex: 0;
       gap: 10px;
     }
 
-    .execute-section .screen-back .chart-box {
+    .execute-section .chart-box {
       border-radius: 10px;
       padding: 10px;
     }
 
+    .execute-section .other-section {
+      margin-top: 0;
+    }
+
+    .execute-section .command-stack {
+      margin-top: auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
     .execute-section .screen-back .command-bar {
-      margin-top: 8px;
+      margin-top: 0;
       padding: 12px 16px;
       border-radius: 16px;
       border: 1px solid rgba(0, 0, 0, 0.08);
@@ -908,8 +953,42 @@
       animation: caretBlink 1.2s ease-in-out infinite;
     }
 
-    .execute-section .screen-back .screen-keyboard {
-      margin-top: 8px;
+    .execute-section .screen-keyboard {
+      width: calc(100% + 8px);
+      margin: 0 -4px;
+      padding: 14px 12px 16px;
+      border-radius: 20px;
+      gap: 8px;
+    }
+
+    .execute-section .screen-key-row {
+      gap: 7px;
+    }
+
+    .execute-section .screen-key-row .key {
+      height: 28px;
+      font-size: 10px;
+      border-radius: 7px;
+    }
+
+    .execute-section .screen-key-row .key-shift,
+    .execute-section .screen-key-row .key-backspace {
+      flex: 1.6;
+      font-size: 8px;
+    }
+
+    .execute-section .screen-key-row .key-123,
+    .execute-section .screen-key-row .key-globe {
+      flex: 1.15;
+    }
+
+    .execute-section .screen-key-row .key-space {
+      flex: 3.6;
+      height: 30px;
+    }
+
+    .execute-section .screen-key-row .key-return {
+      flex: 1.45;
     }
 
     .screen-confirm-box {
@@ -1175,87 +1254,74 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 130px;
-      height: 3px;
-      border-radius: 999px;
-      background: linear-gradient(
-        90deg,
-        rgba(255, 40, 60, 0) 0%,
-        rgba(255, 70, 110, 1) 55%,
-        rgba(255, 200, 220, 0.35) 100%
-      );
+      width: 12px;
+      height: 12px;
+      border-radius: 6px;
+      background: radial-gradient(circle, rgba(255, 240, 245, 0.98) 0%, rgba(255, 110, 150, 0.9) 55%, rgba(255, 60, 100, 0.7) 100%);
       box-shadow:
-        0 0 18px rgba(255, 80, 120, 0.95),
-        0 0 36px rgba(255, 50, 90, 0.65);
+        0 0 14px rgba(255, 90, 130, 0.95),
+        0 0 28px rgba(255, 60, 100, 0.55);
       opacity: 0;
       z-index: 6;
-      transform-origin: 100% 50%;
-      animation: defenseHit 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+      transform-origin: center;
+      animation: defenseHit 4.4s cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
       mix-blend-mode: screen;
-      filter: drop-shadow(0 0 16px rgba(255, 80, 120, 0.85));
+      filter: drop-shadow(0 0 12px rgba(255, 80, 120, 0.7));
     }
 
     .defense-hit::before {
       content: "";
       position: absolute;
-      right: -6px;
+      right: 100%;
       top: 50%;
-      width: 12px;
-      height: 12px;
+      width: 52px;
+      height: 2px;
       border-radius: 999px;
-      background: radial-gradient(circle, rgba(255, 255, 255, 0.98) 0%, rgba(255, 130, 160, 0.95) 45%, rgba(255, 70, 110, 0.7) 70%, transparent 100%);
+      background: linear-gradient(90deg, rgba(255, 80, 120, 0), rgba(255, 120, 160, 0.65), rgba(255, 220, 235, 0.75));
       transform: translateY(-50%);
-      box-shadow: 0 0 20px rgba(255, 130, 160, 0.95);
+      opacity: 0.8;
     }
 
     .defense-hit::after {
       content: "";
       position: absolute;
-      right: 18px;
-      top: 50%;
-      width: 84px;
-      height: 12px;
-      transform: translateY(-50%);
-      background: repeating-linear-gradient(
-        90deg,
-        rgba(255, 110, 150, 0.7) 0 4px,
-        rgba(255, 110, 150, 0) 4px 9px
-      );
-      opacity: 0.65;
-      filter: blur(0.4px);
+      inset: -6px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 140, 170, 0.35);
+      opacity: 0.35;
     }
 
     .defense-hit.hit-1 {
-      --from-x: -280px;
-      --from-y: -130px;
-      --to-x: -140px;
-      --to-y: -50px;
-      --kick-x: -110px;
-      --kick-y: -70px;
-      --hit-angle: 18deg;
+      --start-x: -220px;
+      --start-y: -120px;
+      --end-x: -90px;
+      --end-y: -40px;
+      --deflect-x: -32px;
+      --deflect-y: -24px;
+      --hit-rotate: 18deg;
       animation-delay: 0s;
     }
 
     .defense-hit.hit-2 {
-      --from-x: 280px;
-      --from-y: 100px;
-      --to-x: 140px;
-      --to-y: 30px;
-      --kick-x: 120px;
-      --kick-y: 85px;
-      --hit-angle: 200deg;
-      animation-delay: 1.2s;
+      --start-x: 240px;
+      --start-y: 80px;
+      --end-x: 95px;
+      --end-y: 24px;
+      --deflect-x: 36px;
+      --deflect-y: 22px;
+      --hit-rotate: 200deg;
+      animation-delay: 1.4s;
     }
 
     .defense-hit.hit-3 {
-      --from-x: -260px;
-      --from-y: 180px;
-      --to-x: -130px;
-      --to-y: 90px;
-      --kick-x: -95px;
-      --kick-y: 120px;
-      --hit-angle: 315deg;
-      animation-delay: 2.4s;
+      --start-x: -210px;
+      --start-y: 150px;
+      --end-x: -85px;
+      --end-y: 70px;
+      --deflect-x: -26px;
+      --deflect-y: 36px;
+      --hit-rotate: 320deg;
+      animation-delay: 2.8s;
     }
 
     @keyframes cardPulse {
@@ -1287,22 +1353,22 @@
     @keyframes defenseHit {
       0% {
         opacity: 0;
-        transform: translate(-50%, -60%) translate(var(--from-x), var(--from-y)) rotate(var(--hit-angle)) scale(0.5);
+        transform: translate(-50%, -60%) translate(var(--start-x), var(--start-y)) rotate(var(--hit-rotate)) scale(0.6);
       }
-      10% {
+      18% {
         opacity: 1;
       }
-      34% {
+      52% {
         opacity: 1;
-        transform: translate(-50%, -60%) translate(var(--to-x), var(--to-y)) rotate(var(--hit-angle)) scale(1.1);
+        transform: translate(-50%, -60%) translate(var(--end-x), var(--end-y)) rotate(var(--hit-rotate)) scale(1);
       }
-      46% {
-        opacity: 0;
-        transform: translate(-50%, -60%) translate(calc(var(--to-x) + var(--kick-x)), calc(var(--to-y) + var(--kick-y))) rotate(var(--hit-angle)) scale(0.2);
+      64% {
+        opacity: 0.65;
+        transform: translate(-50%, -60%) translate(calc(var(--end-x) + var(--deflect-x)), calc(var(--end-y) + var(--deflect-y))) rotate(var(--hit-rotate)) scale(0.25);
       }
       100% {
         opacity: 0;
-        transform: translate(-50%, -60%) translate(calc(var(--to-x) + var(--kick-x)), calc(var(--to-y) + var(--kick-y))) rotate(var(--hit-angle)) scale(0.2);
+        transform: translate(-50%, -60%) translate(calc(var(--end-x) + var(--deflect-x)), calc(var(--end-y) + var(--deflect-y))) rotate(var(--hit-rotate)) scale(0.2);
       }
     }
 
@@ -1646,6 +1712,33 @@
       }
     }
 
+    @media (max-width: 600px) {
+      .sticky-layer {
+        padding: var(--space-64) var(--space-16);
+      }
+
+      .stage {
+        gap: var(--space-24);
+      }
+
+      .copy-states {
+        min-height: 160px;
+      }
+
+      .copy-block {
+        white-space: normal;
+      }
+
+      .headline {
+        font-size: clamp(26px, 8vw, 34px);
+      }
+
+      .subhead {
+        font-size: 14px;
+        max-width: min(320px, 92vw);
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .card-3d,
       .copy-state {
@@ -1801,9 +1894,40 @@
           <div class="back-content screen-back">
             <div class="payments-section">
               <div class="section-label">Payments</div>
+              <div class="payments-list">
+                <div class="payment-row">
+                  <span><span class="payment-name">Spotify</span><span class="payment-time">9:24a</span></span>
+                  <span class="payment-amount">-$12</span>
+                </div>
+                <div class="payment-row">
+                  <span><span class="payment-name">Blue Bottle</span><span class="payment-time">8:11a</span></span>
+                  <span class="payment-amount">-$7</span>
+                </div>
+                <div class="payment-row">
+                  <span><span class="payment-name">Apple</span><span class="payment-time">Yesterday</span></span>
+                  <span class="payment-amount">-$3</span>
+                </div>
+              </div>
             </div>
             <div class="investments-section">
               <div class="section-label">Investments</div>
+              <div class="investments-list">
+                <div class="investment-row">
+                  <span class="inv-label">Cash</span>
+                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 35%"></div></div>
+                  <span class="inv-amount">$12,480</span>
+                </div>
+                <div class="investment-row">
+                  <span class="inv-label">Stocks</span>
+                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 55%"></div></div>
+                  <span class="inv-amount">$21,940</span>
+                </div>
+                <div class="investment-row">
+                  <span class="inv-label">BTC</span>
+                  <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 22%"></div></div>
+                  <span class="inv-amount">$7,820</span>
+                </div>
+              </div>
             </div>
             <div class="charts-section">
               <div class="chart-box">
@@ -1828,30 +1952,45 @@
                 <span class="chart-label">ETH</span>
               </div>
             </div>
-            <div class="command-bar">
-              <span class="command-text">buy $500 of apple stock</span>
-              <span class="command-caret" aria-hidden="true"></span>
+            <div class="other-section">
+              <div class="section-label">Other</div>
+              <div class="other-list">
+                <div class="other-row">
+                  <span class="other-label">Spend power</span>
+                  <span class="other-amount">$47,291</span>
+                </div>
+                <div class="other-row">
+                  <span class="other-label">Total value</span>
+                  <span class="other-amount">$68,102</span>
+                </div>
+              </div>
             </div>
-            <div class="screen-keyboard" aria-hidden="true">
-              <div class="screen-key-row">
-                <span class="key">q</span><span class="key">w</span><span class="key">e</span><span class="key">r</span><span class="key">t</span>
-                <span class="key">y</span><span class="key">u</span><span class="key">i</span><span class="key">o</span><span class="key">p</span>
+            <div class="command-stack">
+              <div class="command-bar">
+                <span class="command-text">buy $500 of apple stock</span>
+                <span class="command-caret" aria-hidden="true"></span>
               </div>
-              <div class="screen-key-row">
-                <span class="key">a</span><span class="key">s</span><span class="key">d</span><span class="key">f</span><span class="key">g</span>
-                <span class="key">h</span><span class="key">j</span><span class="key">k</span><span class="key">l</span>
-              </div>
-              <div class="screen-key-row">
-                <span class="key key-special key-shift">shift</span>
-                <span class="key">z</span><span class="key">x</span><span class="key">c</span><span class="key">v</span><span class="key">b</span>
-                <span class="key">n</span><span class="key">m</span>
-                <span class="key key-special key-backspace">delete</span>
-              </div>
-              <div class="screen-key-row">
-                <span class="key key-special key-123">123</span>
-                <span class="key key-special key-globe">globe</span>
-                <span class="key key-space">space</span>
-                <span class="key key-special key-return">return</span>
+              <div class="screen-keyboard" aria-hidden="true">
+                <div class="screen-key-row">
+                  <span class="key">q</span><span class="key">w</span><span class="key">e</span><span class="key">r</span><span class="key">t</span>
+                  <span class="key">y</span><span class="key">u</span><span class="key">i</span><span class="key">o</span><span class="key">p</span>
+                </div>
+                <div class="screen-key-row">
+                  <span class="key">a</span><span class="key">s</span><span class="key">d</span><span class="key">f</span><span class="key">g</span>
+                  <span class="key">h</span><span class="key">j</span><span class="key">k</span><span class="key">l</span>
+                </div>
+                <div class="screen-key-row">
+                  <span class="key key-special key-shift">shift</span>
+                  <span class="key">z</span><span class="key">x</span><span class="key">c</span><span class="key">v</span><span class="key">b</span>
+                  <span class="key">n</span><span class="key">m</span>
+                  <span class="key key-special key-backspace">delete</span>
+                </div>
+                <div class="screen-key-row">
+                  <span class="key key-special key-123">123</span>
+                  <span class="key key-special key-globe">globe</span>
+                  <span class="key key-space">space</span>
+                  <span class="key key-special key-return">return</span>
+                </div>
               </div>
             </div>
           </div>
