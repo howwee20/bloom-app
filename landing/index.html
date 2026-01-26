@@ -136,12 +136,11 @@
     .card-3d {
       width: 450px;
       height: 284px;
-      max-width: 85vw;
       transform-style: preserve-3d;
       -webkit-transform-style: preserve-3d;
       border-radius: 18px;
-      transition: transform 0.6s var(--ease-out);
-      will-change: transform;
+      transition: transform 0.6s var(--ease-out), width 0.5s var(--ease-out), height 0.5s var(--ease-out), border-radius 0.5s var(--ease-out);
+      will-change: transform, width, height;
     }
 
     .card-face {
@@ -735,17 +734,24 @@
     let cardMetrics = null;
 
     const updateMetrics = () => {
-      // Taller phone-like card shape (0.72 width/height ratio)
-      const cardWidth = Math.min(340, window.innerWidth * 0.8);
-      const cardHeight = cardWidth / 0.72;
-
+      // Front: credit card shape (1.586 ratio, wider than tall)
+      const cardWidth = Math.min(450, window.innerWidth * 0.85);
+      const cardHeight = cardWidth / 1.586;
+      // Back: phone shape (0.72 ratio, taller than wide)
+      let phoneHeight = Math.min(window.innerHeight * 0.7, 520);
+      let phoneWidth = phoneHeight * 0.72;
+      const maxPhoneWidth = window.innerWidth * 0.85;
+      if (phoneWidth > maxPhoneWidth) {
+        phoneWidth = maxPhoneWidth;
+        phoneHeight = phoneWidth / 0.72;
+      }
       cardMetrics = {
         cardWidth,
         cardHeight,
-        phoneWidth: cardWidth,
-        phoneHeight: cardHeight,
-        cardRadius: 24,
-        phoneRadius: 24
+        phoneWidth,
+        phoneHeight,
+        cardRadius: 18,
+        phoneRadius: 32
       };
     };
 
@@ -770,7 +776,14 @@
       const tiltX = 4 + pointerY * -tiltStrength;
       const tiltY = pointerX * tiltStrength;
 
-      // Card dimensions now fixed in CSS - no JS morphing
+      if (cardMetrics) {
+        const width = lerp(cardMetrics.cardWidth, cardMetrics.phoneWidth, currentProgress);
+        const height = lerp(cardMetrics.cardHeight, cardMetrics.phoneHeight, currentProgress);
+        const radius = lerp(cardMetrics.cardRadius, cardMetrics.phoneRadius, currentProgress);
+        card.style.width = `${width.toFixed(2)}px`;
+        card.style.height = `${height.toFixed(2)}px`;
+        card.style.borderRadius = `${radius.toFixed(2)}px`;
+      }
 
       card.style.transform = `rotateX(${tiltX.toFixed(2)}deg) rotateY(${(rotateY + tiltY).toFixed(2)}deg)`;
 
