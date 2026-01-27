@@ -110,6 +110,32 @@
       text-align: center;
     }
 
+    .scroll-cue {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 4;
+      opacity: 0.8;
+      transition: opacity 0.4s var(--ease-out);
+    }
+
+    .scroll-cue-icon {
+      display: block;
+      animation: cueBounce 1.8s ease-in-out infinite;
+    }
+
     .scroll-section {
       height: 100vh;
     }
@@ -170,12 +196,6 @@
       overflow: hidden;
     }
 
-    .card-3d.is-back .card-front {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-
     .card-face::before {
       content: "";
       position: absolute;
@@ -222,6 +242,11 @@
       100% { left: 150%; }
     }
 
+    @keyframes cueBounce {
+      0%, 100% { transform: translateY(2px); }
+      50% { transform: translateY(-6px); }
+    }
+
     .card-front {
       position: relative;
       padding: 0;
@@ -261,11 +286,11 @@
     }
 
     .card-back {
-      transform: rotateY(180deg);
       padding: 0;
       display: flex;
       align-items: stretch;
       justify-content: stretch;
+      opacity: 0;
       background:
         linear-gradient(165deg,
           #f4f4f6 0%,
@@ -318,6 +343,46 @@
       font-weight: 600;
       position: relative;
       z-index: 3;
+    }
+
+    .detail-hint {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: lowercase;
+      color: rgba(26, 26, 26, 0.7);
+      opacity: 0.2;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .detail-hint-icon {
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .spend-bridge {
+      position: absolute;
+      top: 0;
+      left: 0;
+      font-size: clamp(42px, 10vw, 56px);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      color: #1a1a1a;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+      transform-origin: top left;
+      pointer-events: none;
+      z-index: 4;
+      opacity: 0;
+      will-change: transform, opacity;
     }
 
     /* Back card - Bloom app layout */
@@ -1759,7 +1824,8 @@
       .defense-impact,
       .defense-hit,
       .defense-field::before,
-      .defense-field::after {
+      .defense-field::after,
+      .scroll-cue-icon {
         animation: none;
       }
     }
@@ -1782,7 +1848,7 @@
             <div class="paper-texture" aria-hidden="true"></div>
             <div class="front-content">
               <div class="spend-label">bloom</div>
-              <div class="spend-number">$47,291</div>
+              <div class="spend-number" id="spend-front">$47,291</div>
               <div class="spend-delta">+$127 today</div>
             </div>
           </div>
@@ -1853,7 +1919,7 @@
                 <div class="other-list">
                   <div class="other-row">
                     <span class="other-label">Spend power</span>
-                    <span class="other-amount">$47,291</span>
+                    <span class="other-amount" id="spend-back">$47,291</span>
                   </div>
                   <div class="other-row">
                     <span class="other-label">Total value</span>
@@ -1867,13 +1933,13 @@
               </div>
             </div>
           </div>
+          <div class="spend-bridge" id="spend-bridge" aria-hidden="true">$47,291</div>
           </div>
         </div>
 
         <div class="copy" id="copy">
         <div class="copy-states">
           <div class="copy-block" id="copy-front">
-            <div class="subhead">Cash, stocks, crypto. All spendable.</div>
           </div>
           <div class="copy-block" id="copy-back">
             <div class="headline">Spend. Invest. Send.</div>
@@ -1881,6 +1947,9 @@
           </div>
         </div>
         </div>
+      </div>
+      <div class="scroll-cue" aria-hidden="true">
+        <span class="scroll-cue-icon">⌃</span>
       </div>
     </div>
     <section class="scroll-section" aria-hidden="true"></section>
@@ -1993,9 +2062,15 @@
 
   <script>
     const card = document.getElementById('bloom-card');
+    const cardFront = document.getElementById('card-front');
+    const cardBack = document.getElementById('card-back');
     const copyFront = document.getElementById('copy-front');
     const copyBack = document.getElementById('copy-back');
     const copy = document.getElementById('copy');
+    const spendFront = document.getElementById('spend-front');
+    const spendBack = document.getElementById('spend-back');
+    const spendBridge = document.getElementById('spend-bridge');
+    const scrollCue = document.querySelector('.scroll-cue');
 
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
     const lerp = (start, end, t) => start + (end - start) * t;
@@ -2005,6 +2080,10 @@
     let pointerX = 0;
     let pointerY = 0;
     let cardMetrics = null;
+
+    if (spendBridge && spendFront) {
+      spendBridge.textContent = spendFront.textContent || '';
+    }
 
     const updateMetrics = () => {
       // Front: credit card shape (1.586 ratio, wider than tall)
@@ -2036,17 +2115,36 @@
       pointerY = (y - 0.5) * 2;
     };
 
-    const animate = () => {
-      currentProgress = lerp(currentProgress, targetProgress, 0.08);
+    const updateSpendBridge = (progress) => {
+      if (!spendBridge || !spendFront || !spendBack || !card) return;
+      const cardRect = card.getBoundingClientRect();
+      const frontRect = spendFront.getBoundingClientRect();
+      const backRect = spendBack.getBoundingClientRect();
+      if (!frontRect.width || !backRect.width) return;
 
+      const t = clamp((progress - 0.05) / 0.9, 0, 1);
+      const fromX = frontRect.left - cardRect.left;
+      const fromY = frontRect.top - cardRect.top;
+      const toX = backRect.left - cardRect.left;
+      const toY = backRect.top - cardRect.top;
+      const scale = lerp(1, backRect.width / frontRect.width, t);
+
+      spendBridge.style.transform = `translate3d(${fromX + (toX - fromX) * t}px, ${fromY + (toY - fromY) * t}px, 0) scale(${scale.toFixed(3)})`;
+      spendBridge.style.opacity = '1';
+      spendFront.style.opacity = '0';
+      spendBack.style.opacity = '0';
+    };
+
+    const animate = () => {
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const scrollRange = window.innerHeight || 1;
-      targetProgress = clamp(scrollTop / scrollRange, 0, 1);
-      currentProgress = lerp(currentProgress, targetProgress, 0.12);
+      const rawProgress = clamp(scrollTop / scrollRange, 0, 1);
+      const snapThreshold = 0.08;
+      targetProgress = rawProgress < snapThreshold ? 0 : rawProgress > 1 - snapThreshold ? 1 : rawProgress;
+      currentProgress = lerp(currentProgress, targetProgress, 0.14);
 
-      const rotateY = currentProgress * 180;
-      const tiltStrength = lerp(6, 2, currentProgress);
-      const tiltX = 4 + pointerY * -tiltStrength;
+      const tiltStrength = lerp(5, 2, currentProgress);
+      const tiltX = 2 + pointerY * -tiltStrength;
       const tiltY = pointerX * tiltStrength;
 
       if (cardMetrics) {
@@ -2058,17 +2156,30 @@
         card.style.borderRadius = `${radius.toFixed(2)}px`;
       }
 
-      card.style.transform = `rotateX(${tiltX.toFixed(2)}deg) rotateY(${(rotateY + tiltY).toFixed(2)}deg)`;
+      card.style.transform = `rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg)`;
 
-      const showBack = currentProgress > 0.5;
-      card.classList.toggle('is-back', showBack);
-
-      const backOpacity = clamp((currentProgress - 0.35) / 0.3, 0, 1);
+      const backOpacity = clamp((currentProgress - 0.82) / 0.12, 0, 1);
       const frontOpacity = 1 - backOpacity;
-      copyFront.style.opacity = frontOpacity.toFixed(2);
-      copyFront.style.transform = `translateY(${(1 - frontOpacity) * 8}px)`;
-      copyBack.style.opacity = backOpacity.toFixed(2);
-      copyBack.style.transform = `translateY(${(1 - backOpacity) * -8}px)`;
+      if (cardFront) {
+        cardFront.style.opacity = frontOpacity.toFixed(2);
+      }
+      if (cardBack) {
+        cardBack.style.opacity = backOpacity.toFixed(2);
+      }
+
+      const copyProgress = clamp((currentProgress - 0.55) / 0.3, 0, 1);
+      const copyFrontOpacity = 1 - copyProgress;
+      copyFront.style.opacity = copyFrontOpacity.toFixed(2);
+      copyFront.style.transform = `translateY(${(1 - copyFrontOpacity) * 8}px)`;
+      copyBack.style.opacity = copyProgress.toFixed(2);
+      copyBack.style.transform = `translateY(${(1 - copyProgress) * -8}px)`;
+
+      if (scrollCue) {
+        const cueOpacity = clamp((0.4 - currentProgress) / 0.4, 0, 1);
+        scrollCue.style.opacity = cueOpacity.toFixed(2);
+      }
+
+      updateSpendBridge(currentProgress);
 
       requestAnimationFrame(animate);
     };
