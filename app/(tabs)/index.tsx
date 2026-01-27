@@ -20,6 +20,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { fonts, theme } from '../../constants/Colors';
 import { CommandBar } from '../../components/CommandBar';
 import { BloomCard } from '../../components/BloomCard';
@@ -56,6 +57,10 @@ const MARKETPLACE_LABELS: Record<string, string> = {
 const MARKETPLACE_FEES: Record<string, { feeRate: number; shipping: number }> = {
   stockx: { feeRate: 0.12, shipping: 14 },
 };
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+const lerp = (start: number, end: number, t: number) => start + (end - start) * t;
 
 // Command bar offer interface
 interface BloomOffer {
@@ -246,18 +251,67 @@ export default function HomeScreen() {
   const [spendableCents, setSpendableCents] = useState<number | null>(null);
   const [dayPnlCents, setDayPnlCents] = useState<number | null>(null);
   const [flipData, setFlipData] = useState<FlipPayload | null>(null);
+  const [flipProgress, setFlipProgress] = useState(0);
+  const [tilt, setTilt] = useState({ x: 4, y: 0 });
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
-  const cardMaxWidth = 9999; // allow full bleed on phone
+  const isLandingWeb = Platform.OS === 'web';
+  const stagePaddingX = viewportWidth < 420 ? 16 : 24;
+  const stagePaddingY = viewportWidth < 420 ? 64 : 80;
   const topOffset = 0;
   const topPadding = insets.top + topOffset;
   const baseBottom = Math.max(insets.bottom + 8, 14);
-  const commandBarHeight = 44;
-  const commandBarBottom = keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
+  const commandBarHeight = isLandingWeb ? 36 : 44;
+  const commandBarBottom = isLandingWeb ? 12 : keyboardHeight > 0 ? keyboardHeight + 10 : baseBottom;
   const availableHeight = viewportHeight - topPadding - insets.bottom;
-  const cardHeight = Math.round(availableHeight * 0.88);
-  const cardWidth = Math.min(Math.round(viewportWidth * 0.9), cardMaxWidth);
+  const frontWidth = Math.min(isLandingWeb ? 450 : 420, viewportWidth * (isLandingWeb ? 0.85 : 0.9));
+  const frontHeight = frontWidth / 1.586;
+  let backHeight = Math.min(availableHeight, 720);
+  let backWidth = backHeight * 0.72;
+  if (isLandingWeb) {
+    const isCompact = viewportWidth < 600 || viewportHeight < 720;
+    const phoneAspect = viewportWidth < 700 ? 0.46 : 0.58;
+    const maxPhoneHeight = Math.min(
+      viewportHeight * (isCompact ? 0.8 : 0.94),
+      isCompact ? 720 : 820
+    );
+    const maxPhoneWidth = viewportWidth * (isCompact ? 0.92 : 0.96);
+    backHeight = Math.min(maxPhoneHeight, maxPhoneWidth / phoneAspect);
+    backWidth = backHeight * phoneAspect;
+  } else {
+    const maxBackWidth = viewportWidth * 0.92;
+    if (backWidth > maxBackWidth) {
+      backWidth = maxBackWidth;
+      backHeight = backWidth / 0.72;
+    }
+  }
+  const cardWidth = frontWidth + (backWidth - frontWidth) * flipProgress;
+  const cardHeight = frontHeight + (backHeight - frontHeight) * flipProgress;
+  const cardRadius = isLandingWeb ? 18 + (32 - 18) * flipProgress : undefined;
+  const cardStageHeight = viewportHeight;
+  const flipScrollRange = Math.max(viewportHeight, 360);
+  const scrollContentHeight = cardStageHeight + flipScrollRange;
+  const copyProgress = isLandingWeb
+    ? clamp((flipProgress - 0.55) / 0.3, 0, 1)
+    : clamp((flipProgress - 0.35) / 0.35, 0, 1);
+  const copyFrontOpacity = isLandingWeb
+    ? 1 - copyProgress
+    : clamp(1 - (flipProgress - 0.2) / 0.35, 0, 1);
+  const copyBackOpacity = isLandingWeb ? copyProgress : clamp((flipProgress - 0.35) / 0.35, 0, 1);
+  const copyOffset = isLandingWeb ? 8 : 12;
+  const copyFrontOffset = (1 - copyFrontOpacity) * copyOffset;
+  const copyBackOffset = (1 - copyBackOpacity) * -copyOffset;
+  const copyHeadlineSize = clamp(viewportWidth * 0.085, 24, 36);
+  const copySubheadSize = clamp(viewportWidth * 0.045, 14, 17);
+  const copyStatesHeight = viewportWidth < 420 ? 150 : 120;
+  const cardFlipProgress = isLandingWeb
+    ? clamp((flipProgress - 0.82) / 0.12, 0, 1)
+    : flipProgress;
+  const targetProgressRef = useRef(0);
+  const currentProgressRef = useRef(0);
+  const pointerRef = useRef({ x: 0, y: 0 });
+  const rafRef = useRef<number | null>(null);
   const apiBaseUrl = (process.env.EXPO_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
 
   const fetchBloomSummary = useCallback(async (options?: { silent?: boolean }) => {
@@ -310,6 +364,64 @@ export default function HomeScreen() {
   const handleImageError = (assetId: string) => {
     setFailedImages(prev => new Set(prev).add(assetId));
   };
+
+  const handleFlipScroll = useCallback((event: any) => {
+    const offsetY = event.nativeEvent.contentOffset?.y ?? 0;
+    const progress = clamp(offsetY / flipScrollRange, 0, 1);
+    if (isLandingWeb) {
+      const snapThreshold = 0.08;
+      targetProgressRef.current = progress < snapThreshold
+        ? 0
+        : progress > 1 - snapThreshold
+          ? 1
+          : progress;
+      return;
+    }
+    setFlipProgress((prev) => (Math.abs(prev - progress) > 0.002 ? progress : prev));
+  }, [flipScrollRange, isLandingWeb]);
+
+  useEffect(() => {
+    if (!isLandingWeb) return;
+    const handlePointerMove = (event: PointerEvent) => {
+      const x = event.clientX / window.innerWidth;
+      const y = event.clientY / window.innerHeight;
+      pointerRef.current = {
+        x: (x - 0.5) * 2,
+        y: (y - 0.5) * 2,
+      };
+    };
+    window.addEventListener('pointermove', handlePointerMove);
+    return () => window.removeEventListener('pointermove', handlePointerMove);
+  }, [isLandingWeb]);
+
+  useEffect(() => {
+    if (!isLandingWeb) return;
+    const animate = () => {
+      const nextProgress = lerp(
+        currentProgressRef.current,
+        targetProgressRef.current,
+        0.14
+      );
+      currentProgressRef.current = nextProgress;
+
+      const tiltStrength = lerp(5, 2, nextProgress);
+      const tiltX = 2 + pointerRef.current.y * -tiltStrength;
+      const tiltY = pointerRef.current.x * tiltStrength;
+
+      setFlipProgress((prev) => (Math.abs(prev - nextProgress) > 0.0005 ? nextProgress : prev));
+      setTilt((prev) => (
+        Math.abs(prev.x - tiltX) > 0.12 || Math.abs(prev.y - tiltY) > 0.12
+          ? { x: tiltX, y: tiltY }
+          : prev
+      ));
+
+      rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [isLandingWeb]);
 
   // Command bar handlers
   const handleCommandQueryChange = (query: string) => {
@@ -1346,59 +1458,137 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <SpaceBackground />
-      {/* Bloom Card - tap to flip breakdown; stays on home screen when typing */}
-      <View
-        style={[
-          styles.cardStage,
+      {isLandingWeb ? (
+        <SpaceBackground />
+      ) : (
+        <LinearGradient
+          colors={['#050505', '#0B0C12', '#060606']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
+      {!isLandingWeb && <View style={styles.backdropGlow} pointerEvents="none" />}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={handleFlipScroll}
+        bounces={false}
+        alwaysBounceVertical={false}
+        overScrollMode="never"
+        stickyHeaderIndices={[0]}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
           {
-            paddingTop: topPadding,
-            paddingHorizontal: 16,
+            minHeight: scrollContentHeight,
+            paddingBottom: 24,
           },
         ]}
       >
+        {/* Bloom Card - scroll to flip into the back */}
         <View
           style={[
-            styles.cardContainer,
+            styles.cardStage,
             {
-              height: cardHeight,
-              width: cardWidth,
-              paddingBottom: commandBarHeight + commandBarBottom + 16,
+              height: cardStageHeight,
+              paddingTop: stagePaddingY + insets.top,
+              paddingBottom: stagePaddingY + insets.bottom,
+              paddingHorizontal: stagePaddingX,
             },
           ]}
         >
-          <BloomCard
-            totalValue={displayedTotalValue}
-            dailyChange={displayedTotalPnl || 0}
-            style={{
-              height: cardHeight,
-              width: cardWidth,
-            }}
-            flipData={flipData || undefined}
-            commandResult={commandResultDisplay}
-            footerOffset={commandBarBottom}
-            footerHeight={commandBarHeight}
-            footer={
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
-              >
-                <CommandBar
-                  query={commandQuery}
-                  onChangeQuery={handleCommandQueryChange}
-                  onFocus={handleCommandFocus}
-                  onBlur={handleCommandBlur}
-                  onClear={handleCommandClear}
-                  onSubmit={handleCommandSubmit}
-                  isActive={commandActive}
-                  isLoading={commandLoading}
-                  onHelp={handleCommandHelp}
-                />
-              </KeyboardAvoidingView>
-            }
-          />
+          <View style={styles.stageContent}>
+            <View
+              style={[
+                styles.cardContainer,
+                !isLandingWeb && styles.cardContainerApp,
+                isLandingWeb && styles.cardContainerLanding,
+                {
+                  height: cardHeight,
+                  width: cardWidth,
+                  borderRadius: cardRadius ?? 46,
+                  ...(isLandingWeb
+                    ? {
+                        transform: [
+                          { perspective: 1200 },
+                          { rotateX: `${tilt.x}deg` },
+                          { rotateY: `${tilt.y}deg` },
+                        ],
+                      }
+                    : {}),
+                },
+              ]}
+            >
+              <BloomCard
+                totalValue={displayedTotalValue}
+                dailyChange={displayedTotalPnl || 0}
+                style={{
+                  height: cardHeight,
+                  width: cardWidth,
+                }}
+                flipProgress={cardFlipProgress}
+                flipData={flipData || undefined}
+                commandResult={commandResultDisplay}
+                footerOffset={commandBarBottom}
+                footerHeight={commandBarHeight}
+                variant={isLandingWeb ? 'landing' : 'app'}
+                cornerRadius={cardRadius}
+                footer={
+                  <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
+                  >
+                    <CommandBar
+                      query={commandQuery}
+                      onChangeQuery={handleCommandQueryChange}
+                      onFocus={handleCommandFocus}
+                      onBlur={handleCommandBlur}
+                      onClear={handleCommandClear}
+                      onSubmit={handleCommandSubmit}
+                      isActive={commandActive}
+                      isLoading={commandLoading}
+                      onHelp={handleCommandHelp}
+                      variant={isLandingWeb ? 'landing' : 'app'}
+                    />
+                  </KeyboardAvoidingView>
+                }
+              />
+            </View>
+            <View
+              pointerEvents="none"
+            style={[
+              styles.copy,
+              { maxWidth: Math.min(420, viewportWidth - stagePaddingX * 2) },
+            ]}
+          >
+              <View style={[styles.copyStates, { minHeight: copyStatesHeight }]}>
+                <View
+                  style={[
+                    styles.copyBlock,
+                    {
+                      opacity: copyFrontOpacity,
+                      transform: [{ translateY: copyFrontOffset }],
+                    },
+                  ]}
+                >
+                </View>
+                <View
+                  style={[
+                    styles.copyBlock,
+                    {
+                      opacity: copyBackOpacity,
+                      transform: [{ translateY: copyBackOffset }],
+                    },
+                  ]}
+                >
+                </View>
+              </View>
+            </View>
+          </View>
         </View>
-      </View>
+        <View style={{ height: flipScrollRange }} />
+      </ScrollView>
 
       {/* Command bar lives on the back of the card */}
       {/* Buy Intent Modal and Route Home Modal removed - now navigating to /buy */}
@@ -1866,23 +2056,127 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#05060f',
+    backgroundColor: '#000000',
+  },
+  backdropGlow: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  logoContainer: {
+    position: 'absolute',
+    left: 24,
+    zIndex: 6,
+  },
+  logoText: {
+    fontFamily: fonts.heading,
+    fontSize: 18,
+    color: '#FFFFFF',
+    letterSpacing: 0.6,
+  },
+  scrollContent: {
+    paddingBottom: 24,
+  },
+  scrollView: {
+    zIndex: 1,
+    position: 'relative',
   },
   cardStage: {
-    flex: 1,
+    width: '100%',
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  stageContent: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   cardContainer: {
     position: 'relative',
-    borderRadius: 46,
-    alignSelf: 'center',
     overflow: 'visible',
+  },
+  cardContainerApp: {
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 22 },
-    shadowOpacity: 0.45,
-    shadowRadius: 28,
-    elevation: 18,
+    shadowOpacity: 0.4,
+    shadowRadius: 40,
+    elevation: 12,
+  },
+  cardContainerLanding: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 10,
+    transformStyle: 'preserve-3d' as any,
+  },
+  copy: {
+    marginTop: 24,
+    alignItems: 'center',
+    width: '100%',
+  },
+  copyStates: {
+    width: '100%',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  copyBlock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  copyHeadline: {
+    fontFamily: fonts.heading,
+    fontSize: 26,
+    color: '#FFFFFF',
+    letterSpacing: 0.6,
+    textAlign: 'center',
+  },
+  copyHeadlineLanding: {
+    fontFamily: Platform.select({
+      web: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif',
+      ios: 'System',
+      android: 'sans-serif',
+      default: 'System',
+    }),
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  copySubhead: {
+    marginTop: 8,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.78)',
+    textAlign: 'center',
+  },
+  copySubheadLanding: {
+    fontFamily: Platform.select({
+      web: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif',
+      ios: 'System',
+      android: 'sans-serif',
+      default: 'System',
+    }),
+    fontWeight: '400',
+    color: 'rgba(255, 255, 255, 0.72)',
+  },
+  copySubheadSecondary: {
+    marginTop: 6,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.58)',
+    textAlign: 'center',
+  },
+  copySubheadSecondaryLanding: {
+    fontFamily: Platform.select({
+      web: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif',
+      ios: 'System',
+      android: 'sans-serif',
+      default: 'System',
+    }),
+    color: 'rgba(255, 255, 255, 0.6)',
   },
   keyboardAvoid: {
     flex: 1,

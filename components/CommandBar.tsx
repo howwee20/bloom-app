@@ -5,6 +5,7 @@ import React, { useRef } from 'react';
 import {
   ActivityIndicator,
   View,
+  Text,
   TextInput,
   Pressable,
   StyleSheet,
@@ -56,6 +57,7 @@ interface CommandBarProps {
   isActive: boolean;
   isLoading?: boolean;
   onHelp?: () => void;
+  variant?: 'app' | 'landing';
 }
 
 export function CommandBar({
@@ -68,6 +70,7 @@ export function CommandBar({
   isActive,
   isLoading = false,
   onHelp,
+  variant = 'app',
 }: CommandBarProps) {
   const inputRef = useRef<TextInput>(null);
 
@@ -86,42 +89,53 @@ export function CommandBar({
     onHelp?.();
   };
 
-  const showClear = !isLoading && (query.length > 0 || isActive);
-  const showHelp = !isLoading && !!onHelp;
-  const showSubmit = !isLoading && query.trim().length > 0;
+  const isLanding = variant === 'landing';
+  const showClear = !isLanding && !isLoading && (query.length > 0 || isActive);
+  const showHelp = !isLanding && !isLoading && !!onHelp;
+  const showSubmit = !isLanding && !isLoading && query.trim().length > 0;
 
   const containerStyle = [
     styles.container,
     isActive && styles.containerActive,
-    Platform.OS === 'web' && styles.containerWebBlur,
+    isLanding && styles.containerLanding,
+    Platform.OS === 'web' && !isLanding && styles.containerWebBlur,
   ];
 
   return (
     <LinearGradient
-      colors={[
-        'rgba(255,235,246,0.78)',
-        'rgba(236,226,255,0.52)',
-      ]}
+      colors={
+        isLanding
+          ? ['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.06)']
+          : ['rgba(255,235,246,0.78)', 'rgba(236,226,255,0.52)']
+      }
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
       style={containerStyle}
     >
-      <Ionicons
-        name="search"
-        size={16}
-        color="rgba(255, 255, 255, 0.7)"
-        style={styles.searchIcon}
-      />
+      {isLanding ? (
+        <Text style={styles.landingGlyph}>⌘</Text>
+      ) : (
+        <Ionicons
+          name="search"
+          size={16}
+          color="rgba(255, 255, 255, 0.7)"
+          style={styles.searchIcon}
+        />
+      )}
       <TextInput
         ref={inputRef}
-        style={styles.input}
+        style={[styles.input, isLanding && styles.inputLanding]}
         value={query}
         onChangeText={onChangeQuery}
         onFocus={onFocus}
         onBlur={onBlur}
         onSubmitEditing={handleSubmit}
-        placeholder="Direct deposit, transfer, invest, buy, sell..."
-        placeholderTextColor="rgba(255, 255, 255, 0.55)"
+        placeholder={
+          isLanding
+            ? 'Balance, transfer, buy, sell...'
+            : 'Direct deposit, transfer, invest, buy, sell...'
+        }
+        placeholderTextColor={isLanding ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.55)'}
         returnKeyType="search"
         autoCapitalize="none"
         autoCorrect={false}
@@ -130,7 +144,7 @@ export function CommandBar({
       {isLoading && (
         <ActivityIndicator
           size="small"
-          color="rgba(255, 255, 255, 0.7)"
+          color={isLanding ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.7)'}
           style={styles.loading}
         />
       )}
@@ -172,6 +186,17 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 1,
   },
+  containerLanding: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
   containerActive: {
     marginBottom: 3,
   },
@@ -182,12 +207,28 @@ const styles = StyleSheet.create({
   searchIcon: {
     marginRight: 6,
   },
+  landingGlyph: {
+    marginRight: 8,
+    fontSize: 10,
+    color: 'rgba(0, 0, 0, 0.55)',
+    fontWeight: '600',
+  },
   input: {
     flex: 1,
     fontSize: 13,
     fontFamily: 'PlusJakartaSans-Regular',
     color: 'rgba(255, 255, 255, 0.95)',
     padding: 0,
+  },
+  inputLanding: {
+    fontFamily: Platform.select({
+      web: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif',
+      ios: 'System',
+      android: 'sans-serif',
+      default: 'System',
+    }),
+    fontSize: 10,
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   clearButton: {
     marginLeft: 5,

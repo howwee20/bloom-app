@@ -1779,11 +1779,11 @@
 
     @media (max-width: 600px) {
       .sticky-layer {
-        padding: var(--space-64) var(--space-16);
+        padding: var(--space-48) var(--space-16);
       }
 
       .stage {
-        gap: var(--space-24);
+        gap: var(--space-16);
       }
 
       .copy-states {
@@ -1810,6 +1810,15 @@
         font-size: 14px;
         max-width: min(320px, 92vw);
       }
+
+      .back-content {
+        padding: 20px;
+        gap: 16px;
+      }
+
+      .section-label {
+        margin-bottom: 8px;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1834,10 +1843,6 @@
 <body>
   <canvas id="space-bg"></canvas>
   <canvas id="bg-particles"></canvas>
-
-  <header>
-    <div class="logo">bloom</div>
-  </header>
 
   <main>
     <div class="sticky-layer">
@@ -1942,8 +1947,6 @@
           <div class="copy-block" id="copy-front">
           </div>
           <div class="copy-block" id="copy-back">
-            <div class="headline">Spend. Invest. Send.</div>
-            <div class="subhead">No transfers. No waiting.</div>
           </div>
         </div>
         </div>
@@ -2089,14 +2092,13 @@
       // Front: credit card shape (1.586 ratio, wider than tall)
       const cardWidth = Math.min(450, window.innerWidth * 0.85);
       const cardHeight = cardWidth / 1.586;
-      // Back: phone shape (0.72 ratio, taller than wide)
-      let phoneHeight = Math.min(window.innerHeight * 0.78, 680);
-      let phoneWidth = phoneHeight * 0.72;
-      const maxPhoneWidth = window.innerWidth * 0.85;
-      if (phoneWidth > maxPhoneWidth) {
-        phoneWidth = maxPhoneWidth;
-        phoneHeight = phoneWidth / 0.72;
-      }
+      // Back: phone screen shape (narrower ratio to read full height)
+      const isCompact = window.innerWidth < 600 || window.innerHeight < 720;
+      const phoneAspect = window.innerWidth < 700 ? 0.46 : 0.58;
+      const maxPhoneHeight = Math.min(window.innerHeight * (isCompact ? 0.8 : 0.94), isCompact ? 720 : 820);
+      const maxPhoneWidth = window.innerWidth * (isCompact ? 0.92 : 0.96);
+      const phoneHeight = Math.min(maxPhoneHeight, maxPhoneWidth / phoneAspect);
+      const phoneWidth = phoneHeight * phoneAspect;
       cardMetrics = {
         cardWidth,
         cardHeight,

@@ -14,6 +14,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { fonts } from '../constants/Colors';
 
 interface BloomCardProps {
   totalValue: number;
@@ -23,6 +24,9 @@ interface BloomCardProps {
   footer?: ReactNode;
   footerOffset?: number;
   footerHeight?: number;
+  flipProgress?: number;
+  variant?: 'app' | 'landing';
+  cornerRadius?: number;
   commandResult?: {
     title: string;
     body: string;
@@ -50,6 +54,12 @@ const HOLDINGS = [
 ];
 
 const HOLDING_TREND = [0.35, 0.6, 0.42, 0.78, 0.56, 0.7, 0.48];
+
+const LANDING_SPARKLINES = [
+  { label: 'Stocks', color: '#16a34a', points: [0.85, 0.78, 0.7, 0.76, 0.62, 0.66, 0.54, 0.6] },
+  { label: 'BTC', color: '#f59e0b', points: [0.62, 0.7, 0.58, 0.76, 0.66, 0.72, 0.6, 0.56] },
+  { label: 'ETH', color: '#6366f1', points: [0.7, 0.66, 0.62, 0.64, 0.58, 0.55, 0.52, 0.48] },
+] as const;
 
 const OTHER_ASSETS = [
   { label: '401(k)', value: '$64,200' },
@@ -80,7 +90,7 @@ const LANDING_GRADIENT_COLORS = [
   '#e8e8ec',
 ] as const;
 
-const LANDING_GRADIENT_LOCATIONS = [0, 0.15, 0.3, 0.5, 0.7, 0.85, 1];
+const LANDING_GRADIENT_LOCATIONS = [0, 0.15, 0.3, 0.5, 0.7, 0.85, 1] as const;
 
 const FRAME_COLORS = [
   'rgba(255, 255, 255, 0.22)',
@@ -104,7 +114,13 @@ const FLARES = [
   { key: 'flare-4', top: '68%', left: '28%', size: 220, alpha: 0.26 },
   { key: 'flare-5', top: '40%', left: '84%', size: 300, alpha: 0.36 },
   { key: 'flare-6', top: '74%', left: '66%', size: 320, alpha: 0.32 },
-];
+] as const satisfies ReadonlyArray<{
+  key: string;
+  top: `${number}%`;
+  left: `${number}%`;
+  size: number;
+  alpha: number;
+}>;
 
 type Particle = {
   x: number;
@@ -684,6 +700,9 @@ export function BloomCard({
   footer,
   footerOffset = 16,
   footerHeight = 52,
+  flipProgress,
+  variant = 'app',
+  cornerRadius,
   commandResult,
   flipData,
 }: BloomCardProps) {
@@ -698,6 +717,11 @@ export function BloomCard({
   const flashAnim = useRef(new Animated.Value(0)).current;
   const smokeAnimA = useRef(new Animated.Value(0)).current;
   const smokeAnimB = useRef(new Animated.Value(0)).current;
+  const hasExternalFlip = typeof flipProgress === 'number';
+  const normalizedFlipProgress = hasExternalFlip ? clamp(flipProgress ?? 0, 0, 1) : 0;
+  const resolvedFlipped = hasExternalFlip ? normalizedFlipProgress >= 0.5 : flipped;
+  const isLanding = variant === 'landing';
+  const landingRadius = cornerRadius ?? 18;
 
   useEffect(() => {
     let mounted = true;
@@ -713,6 +737,11 @@ export function BloomCard({
       subscription?.remove?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasExternalFlip) return;
+    flipAnim.setValue(normalizedFlipProgress * 180);
+  }, [flipAnim, hasExternalFlip, normalizedFlipProgress]);
 
   // Subtle sheen animation for the glass surface
   useEffect(() => {
@@ -929,6 +958,10 @@ export function BloomCard({
   };
 
   const toggleFlip = () => {
+    if (hasExternalFlip) {
+      onPress?.();
+      return;
+    }
     const next = !flipped;
     setFlipped(next);
     Animated.spring(flipAnim, {
@@ -1018,7 +1051,23 @@ export function BloomCard({
     commandResult?.status === 'error' && styles.commandResultTitleError,
   ];
 
-  const renderLandingFront = () => (
+  const landingPayments = payments
+    .slice(0, 3)
+    .map((item) => ({
+      ...item,
+      time: item.time.replace(/^Today\s+/i, '').replace(/^Yesterday\s+/i, 'Yesterday'),
+    }));
+  const landingHoldings = holdings.slice(0, 3);
+  const totalHoldingsCents = flipData?.holdings?.length
+    ? flipData.holdings.reduce((sum, h) => sum + Math.max(h.amount_cents, 0), 0)
+    : null;
+  const totalValueDisplay = totalHoldingsCents ? formatCents(totalHoldingsCents) : '$68,102';
+  const landingOther = [
+    { label: 'Spend power', value: displayValue },
+    { label: 'Total value', value: totalValueDisplay },
+  ];
+
+  const renderLandingFront = (radius?: number) => (
     <>
       <LinearGradient
         colors={[...LANDING_GRADIENT_COLORS]}
@@ -1053,13 +1102,101 @@ export function BloomCard({
         style={styles.frontTexture}
         pointerEvents="none"
       />
-      <View style={styles.frontBorder} pointerEvents="none" />
-      <View style={styles.frontContent}>
-        <Text style={styles.frontLabel}>BLOOM</Text>
+      <View style={[styles.frontBorder, radius ? { borderRadius: radius } : null]} pointerEvents="none" />
+      <View style={[styles.frontContent, isLanding && styles.frontContentLanding]}>
+        <Text style={[styles.frontLabel, isLanding && styles.frontLabelLanding]}>
+          {isLanding ? 'bloom' : 'Spend Power'}
+        </Text>
         <Text style={styles.valueText}>{displayValue}</Text>
         <Text style={styles.changeText}>{displayChange}</Text>
       </View>
     </>
+  );
+
+  const renderLandingBack = () => (
+    <LinearGradient
+      colors={['#f4f4f6', '#e4e4e8', '#f8f8fa', '#ededf0']}
+      locations={[0, 0.35, 0.7, 1]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.landingBack}
+    >
+      <View style={[styles.landingBackBorder, { borderRadius: landingRadius }]} pointerEvents="none" />
+      <View style={styles.landingBackContent}>
+        <View style={styles.landingSection}>
+          <Text style={styles.landingSectionLabel}>Payments</Text>
+          <View style={styles.landingList}>
+            {landingPayments.map((item) => (
+              <View key={`${item.merchant}-${item.time}`} style={styles.landingPaymentRow}>
+                <View style={styles.landingPaymentMeta}>
+                  <Text style={styles.landingPaymentName}>{item.merchant}</Text>
+                  <Text style={styles.landingPaymentTime}>{item.time}</Text>
+                </View>
+                <Text style={styles.landingPaymentAmount}>{item.amount}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.landingSection}>
+          <Text style={styles.landingSectionLabel}>Investments</Text>
+          <View style={styles.landingList}>
+            {landingHoldings.map((item) => (
+              <View key={item.label} style={styles.landingInvestmentRow}>
+                <Text style={styles.landingInvLabel}>{item.label}</Text>
+                <View style={styles.landingInvBarTrack}>
+                  <View style={[styles.landingInvBarFill, { width: `${item.pct * 100}%` }]} />
+                </View>
+                <Text style={styles.landingInvAmount}>{item.value}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.landingChartsRow}>
+          {LANDING_SPARKLINES.map((spark, index) => (
+            <View
+              key={spark.label}
+              style={[styles.landingChartBox, index < LANDING_SPARKLINES.length - 1 && styles.landingChartBoxSpacer]}
+            >
+              <View style={styles.landingChartBars}>
+                {spark.points.map((point, idx) => (
+                  <View
+                    key={`${spark.label}-${idx}`}
+                    style={[
+                      styles.landingChartBar,
+                      {
+                        height: Math.max(6, point * 36),
+                        backgroundColor: spark.color,
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text style={styles.landingChartLabel}>{spark.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.landingSection}>
+          <Text style={styles.landingSectionLabel}>Other</Text>
+          <View style={styles.landingList}>
+            {landingOther.map((item) => (
+              <View key={item.label} style={styles.landingOtherRow}>
+                <Text style={styles.landingOtherLabel}>{item.label}</Text>
+                <Text style={styles.landingOtherAmount}>{item.value}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {footer && (
+          <Pressable onPress={(e) => e.stopPropagation()} style={styles.landingCommandBar}>
+            {footer}
+          </Pressable>
+        )}
+      </View>
+    </LinearGradient>
   );
 
   const renderCardFace = (isBack: boolean) => (
@@ -1405,7 +1542,7 @@ export function BloomCard({
 
       {/* Shooting stars only - no particles */}
       <ParticleField
-        enabled={!reduceMotionEnabled && ((!isBack && !flipped) || (isBack && flipped))}
+        enabled={!reduceMotionEnabled && ((!isBack && !resolvedFlipped) || (isBack && resolvedFlipped))}
         reduceMotionEnabled={reduceMotionEnabled}
         showParticles={!isBack}
         showStars
@@ -1594,6 +1731,46 @@ export function BloomCard({
       )}
     </>
   );
+
+  if (isLanding) {
+    const landingFrontOpacity = hasExternalFlip ? 1 - normalizedFlipProgress : 1;
+    const landingBackOpacity = hasExternalFlip ? normalizedFlipProgress : 1;
+    const landingFrontRotation = hasExternalFlip ? '0deg' : frontRotation;
+    const landingBackRotation = hasExternalFlip ? '0deg' : backRotation;
+    return (
+      <Pressable style={[styles.container, style]} onPress={toggleFlip}>
+        <View style={[styles.landingShadow, { borderRadius: landingRadius }]}>
+          <View style={[styles.landingCard, { borderRadius: landingRadius }]}>
+            <Animated.View
+              style={[
+                styles.landingFace,
+                { borderRadius: landingRadius },
+                {
+                  transform: [{ perspective: 1200 }, { rotateY: landingFrontRotation }],
+                  opacity: landingFrontOpacity,
+                },
+              ]}
+            >
+              {renderLandingFront(landingRadius)}
+            </Animated.View>
+            <Animated.View
+              style={[
+                styles.landingFace,
+                styles.landingFaceBack,
+                { borderRadius: landingRadius },
+                {
+                  transform: [{ perspective: 1200 }, { rotateY: landingBackRotation }],
+                  opacity: landingBackOpacity,
+                },
+              ]}
+            >
+              {renderLandingBack()}
+            </Animated.View>
+          </View>
+        </View>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable style={[styles.container, style]} onPress={toggleFlip}>
@@ -1800,6 +1977,172 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: 'rgba(26, 26, 26, 0.5)',
     marginBottom: 6,
+  },
+  frontContentLanding: {
+    paddingVertical: 2,
+  },
+  frontLabelLanding: {
+    fontFamily: fonts.heading,
+    textTransform: 'lowercase',
+    letterSpacing: 0.4,
+    fontWeight: '400',
+    color: 'rgba(26, 26, 26, 0.7)',
+  },
+  landingShadow: {
+    flex: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.25,
+    shadowRadius: 34,
+    elevation: 14,
+  },
+  landingCard: {
+    flex: 1,
+    overflow: 'hidden',
+    backgroundColor: '#f4f4f6',
+  },
+  landingFace: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+    backfaceVisibility: 'hidden',
+  },
+  landingFaceBack: {},
+  landingBack: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 22,
+    position: 'relative',
+  },
+  landingBackBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  landingBackContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  landingSection: {
+    marginBottom: 16,
+  },
+  landingSectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: 'rgba(0, 0, 0, 0.45)',
+    marginBottom: 10,
+  },
+  landingList: {
+    marginBottom: 0,
+  },
+  landingPaymentRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  landingPaymentMeta: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  landingPaymentName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  landingPaymentTime: {
+    fontSize: 10,
+    color: 'rgba(0, 0, 0, 0.4)',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  landingPaymentAmount: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.6)',
+    fontWeight: '500',
+  },
+  landingInvestmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  landingInvLabel: {
+    width: 50,
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.55)',
+  },
+  landingInvBarTrack: {
+    flex: 1,
+    height: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 999,
+    overflow: 'hidden',
+    marginHorizontal: 8,
+  },
+  landingInvBarFill: {
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderRadius: 999,
+  },
+  landingInvAmount: {
+    minWidth: 54,
+    textAlign: 'right',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  landingChartsRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  landingChartBox: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  landingChartBoxSpacer: {
+    marginRight: 10,
+  },
+  landingChartBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 36,
+    marginBottom: 6,
+  },
+  landingChartBar: {
+    width: 6,
+    borderRadius: 3,
+    marginRight: 3,
+    opacity: 0.9,
+  },
+  landingChartLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.5)',
+    textAlign: 'center',
+  },
+  landingOtherRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  landingOtherLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.55)',
+  },
+  landingOtherAmount: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  landingCommandBar: {
+    marginTop: 'auto',
   },
   bottomFog: {
     position: 'absolute',
