@@ -1,0 +1,41 @@
+{
+  "data": {
+    "id": "evt-txn-created",
+    "type": "transaction.created",
+    "attributes": {
+      "occurredAt": "2024-01-03T00:00:00.000Z"
+    },
+    "relationships": {
+      "transaction": {
+        "data": {
+          "type": "transaction",
+          "id": "txn-1"
+        }
+      },
+      "authorization": {
+        "data": {
+          "type": "authorization",
+          "id": "auth-1"
+        }
+      },
+      "account": {
+        "data": {
+          "type": "account",
+          "id": "account-1"
+        }
+      }
+    }
+  },
+  "included": [
+    {
+      "type": "transaction",
+      "id": "txn-1",
+      "attributes": {
+        "amount": 1200,
+        "currency": "USD",
+        "direction": "debit",
+        "createdAt": "2024-01-03T00:00:00.000Z"
+      }
+    }
+  ]
+}

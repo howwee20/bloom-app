@@ -1,0 +1,38 @@
+{
+  "data": {
+    "id": "evt-auth-created",
+    "type": "authorization.created",
+    "attributes": {
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    "relationships": {
+      "authorization": {
+        "data": {
+          "type": "authorization",
+          "id": "auth-1"
+        }
+      },
+      "account": {
+        "data": {
+          "type": "account",
+          "id": "account-1"
+        }
+      }
+    }
+  },
+  "included": [
+    {
+      "type": "authorization",
+      "id": "auth-1",
+      "attributes": {
+        "amount": 1200,
+        "currency": "USD",
+        "merchant": {
+          "name": "Test Merchant",
+          "mcc": "5814"
+        },
+        "createdAt": "2024-01-01T00:00:00.000Z"
+      }
+    }
+  ]
+}

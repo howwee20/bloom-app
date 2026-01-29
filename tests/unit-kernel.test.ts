@@ -1,13 +1,21 @@
 import 'dotenv/config';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'crypto';
+import { createHmac, randomUUID } from 'crypto';
+import { readFileSync } from 'fs';
+import path from 'path';
+import type { Server } from 'http';
 import { after, before, beforeEach, test } from 'node:test';
 import { supabaseAdmin } from '../lib/server/supabaseAdmin';
 import { SpendPowerKernel } from '../lib/engine/spendPowerKernel';
 import { SpendPowerEngine } from '../lib/engine/spendPower';
 import { normalizeUnitEvent } from '../providers/unit';
+import { createApiServer } from '../dev/api-only';
 
 const TEST_PASSWORD = 'testpass123';
+const UNIT_SECRET = 'unit-test-secret';
+const ORIGINAL_UNIT_SECRET = process.env.UNIT_WEBHOOK_SECRET;
+let apiServer: Server | null = null;
+let apiBaseUrl = '';
 
 async function ensureTestUser(): Promise<string> {
   const email = `unit-test-${randomUUID()}@bloom.local`;
@@ -45,8 +53,15 @@ async function clearUserData(userId: string) {
 
 let userId = '';
 const accountId = `unit-account-${randomUUID()}`;
+const fixturesDir = path.join(process.cwd(), 'fixtures', 'unit');
 
 before(async () => {
+  process.env.UNIT_WEBHOOK_SECRET = UNIT_SECRET;
+  const app = createApiServer();
+  apiServer = app.listen(0);
+  const address = apiServer.address();
+  const port = typeof address === 'object' && address ? address.port : 3000;
+  apiBaseUrl = `http://127.0.0.1:${port}`;
   userId = await ensureTestUser();
 });
 
@@ -54,6 +69,16 @@ after(async () => {
   if (!userId) return;
   await clearUserData(userId);
   await supabaseAdmin.auth.admin.deleteUser(userId);
+  if (apiServer) {
+    await new Promise<void>((resolve, reject) => {
+      apiServer?.close((err) => (err ? reject(err) : resolve()));
+    });
+  }
+  if (ORIGINAL_UNIT_SECRET !== undefined) {
+    process.env.UNIT_WEBHOOK_SECRET = ORIGINAL_UNIT_SECRET;
+  } else if (process.env.UNIT_WEBHOOK_SECRET === UNIT_SECRET) {
+    delete process.env.UNIT_WEBHOOK_SECRET;
+  }
 });
 
 beforeEach(async () => {
@@ -126,6 +151,65 @@ function buildTransactionEnvelope(eventId: string, txnId: string, authId: string
       },
     ],
   };
+}
+
+function loadFixture(name: string): any {
+  const raw = readFileSync(path.join(fixturesDir, name), 'utf8');
+  return JSON.parse(raw);
+}
+
+function applyAuthorizationFixture(
+  envelope: any,
+  options: { eventId: string; authId: string; occurredAt: string; amountCents: number; type: string; reason?: string }
+) {
+  envelope.data.id = options.eventId;
+  envelope.data.type = options.type;
+  envelope.data.attributes = envelope.data.attributes || {};
+  envelope.data.attributes.occurredAt = options.occurredAt;
+  if (options.reason) {
+    envelope.data.attributes.reason = options.reason;
+  }
+  envelope.data.relationships.authorization.data.id = options.authId;
+  envelope.data.relationships.account.data.id = accountId;
+  envelope.included[0].id = options.authId;
+  envelope.included[0].attributes.amount = options.amountCents;
+  envelope.included[0].attributes.createdAt = options.occurredAt;
+  return envelope;
+}
+
+function applyTransactionFixture(
+  envelope: any,
+  options: { eventId: string; txnId: string; authId: string; occurredAt: string; amountCents: number }
+) {
+  envelope.data.id = options.eventId;
+  envelope.data.attributes = envelope.data.attributes || {};
+  envelope.data.attributes.occurredAt = options.occurredAt;
+  envelope.data.relationships.transaction.data.id = options.txnId;
+  envelope.data.relationships.authorization.data.id = options.authId;
+  envelope.data.relationships.account.data.id = accountId;
+  envelope.included[0].id = options.txnId;
+  envelope.included[0].attributes.amount = options.amountCents;
+  envelope.included[0].attributes.createdAt = options.occurredAt;
+  return envelope;
+}
+
+function signBody(body: string, secret: string) {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signature = createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
+  return `t=${timestamp},v1=${signature}`;
+}
+
+async function postUnitWebhook(payload: unknown) {
+  const body = JSON.stringify(payload);
+  const signature = signBody(body, UNIT_SECRET);
+  return fetch(`${apiBaseUrl}/api/unit/webhook`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'unit-signature': signature,
+    },
+    body,
+  });
 }
 
 async function insertRawEvent(event: { data: { id: string; type: string } }) {
@@ -232,6 +316,119 @@ test('partial capture leaves remaining hold active', async () => {
 
   assert.equal(hold.status, 'active');
   assert.equal(Number(hold.amount_cents), 400);
+});
+
+test('webhook fixtures are idempotent', async () => {
+  const authId = `auth-${randomUUID()}`;
+  const eventId = `evt-${randomUUID()}`;
+  const now = new Date().toISOString();
+  const envelope = applyAuthorizationFixture(loadFixture('authorization.created.json'), {
+    eventId,
+    authId,
+    occurredAt: now,
+    amountCents: 1500,
+    type: 'authorization.created',
+  });
+
+  const first = await postUnitWebhook(envelope);
+  assert.equal(first.status, 200);
+  const second = await postUnitWebhook(envelope);
+  assert.equal(second.status, 200);
+
+  const { data: rawEvents, error: rawEventsError } = await supabaseAdmin
+    .from('raw_events')
+    .select('id')
+    .eq('provider', 'unit')
+    .eq('provider_event_id', eventId);
+  if (rawEventsError) throw rawEventsError;
+  assert.equal(rawEvents?.length, 1);
+
+  const { data: receipts, error: receiptsError } = await supabaseAdmin
+    .from('receipts')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('source', 'unit_event')
+    .eq('provider_event_id', eventId);
+  if (receiptsError) throw receiptsError;
+  assert.equal(receipts?.length, 1);
+});
+
+test('webhook tolerates out-of-order cancel', async () => {
+  const authId = `auth-${randomUUID()}`;
+  const createdAt = new Date().toISOString();
+  const canceledAt = new Date(Date.now() + 60_000).toISOString();
+
+  const cancelEnvelope = applyAuthorizationFixture(loadFixture('authorization.canceled.json'), {
+    eventId: `evt-${randomUUID()}`,
+    authId,
+    occurredAt: canceledAt,
+    amountCents: 2000,
+    type: 'authorization.canceled',
+    reason: 'merchant_canceled',
+  });
+  const createEnvelope = applyAuthorizationFixture(loadFixture('authorization.created.json'), {
+    eventId: `evt-${randomUUID()}`,
+    authId,
+    occurredAt: createdAt,
+    amountCents: 2000,
+    type: 'authorization.created',
+  });
+
+  const cancelRes = await postUnitWebhook(cancelEnvelope);
+  assert.equal(cancelRes.status, 200);
+  const createRes = await postUnitWebhook(createEnvelope);
+  assert.equal(createRes.status, 200);
+
+  const { data: hold, error: holdError } = await supabaseAdmin
+    .from('auth_holds')
+    .select('status')
+    .eq('hold_id', authId)
+    .single();
+  if (holdError) throw holdError;
+  assert.equal(hold.status, 'canceled');
+});
+
+test('webhook transaction releases hold', async () => {
+  const authId = `auth-${randomUUID()}`;
+  const txnId = `txn-${randomUUID()}`;
+  const createdAt = new Date().toISOString();
+  const txnAt = new Date(Date.now() + 30_000).toISOString();
+
+  const authEnvelope = applyAuthorizationFixture(loadFixture('authorization.created.json'), {
+    eventId: `evt-${randomUUID()}`,
+    authId,
+    occurredAt: createdAt,
+    amountCents: 1200,
+    type: 'authorization.created',
+  });
+  const txnEnvelope = applyTransactionFixture(loadFixture('transaction.created.json'), {
+    eventId: `evt-${randomUUID()}`,
+    txnId,
+    authId,
+    occurredAt: txnAt,
+    amountCents: 1200,
+  });
+
+  const authRes = await postUnitWebhook(authEnvelope);
+  assert.equal(authRes.status, 200);
+  const txnRes = await postUnitWebhook(txnEnvelope);
+  assert.equal(txnRes.status, 200);
+
+  const { data: hold, error: holdError } = await supabaseAdmin
+    .from('auth_holds')
+    .select('status')
+    .eq('hold_id', authId)
+    .single();
+  if (holdError) throw holdError;
+  assert.equal(hold.status, 'released');
+
+  const { data: txn, error: txnError } = await supabaseAdmin
+    .from('transactions')
+    .select('transaction_id')
+    .eq('transaction_id', txnId)
+    .maybeSingle();
+  if (txnError) throw txnError;
+  assert.ok(txn?.transaction_id);
 });
 
 test('stale feed adds degradation buffer', async () => {
