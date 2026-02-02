@@ -1469,6 +1469,11 @@ export default function HomeScreen() {
         />
       )}
       {!isLandingWeb && <View style={styles.backdropGlow} pointerEvents="none" />}
+      {isLandingWeb && (
+        <View style={styles.landingLogo} pointerEvents="none">
+          <Text style={styles.landingLogoText}>bloom</Text>
+        </View>
+      )}
       <ScrollView
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
@@ -2072,6 +2077,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#FFFFFF',
     letterSpacing: 0.6,
+  },
+  landingLogo: {
+    position: 'absolute',
+    top: 24,
+    left: 24,
+    zIndex: 10,
+  },
+  landingLogoText: {
+    fontFamily: fonts.heading,
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.85)',
+    letterSpacing: 0.4,
+    textTransform: 'lowercase',
   },
   scrollContent: {
     paddingBottom: 24,
