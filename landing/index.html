@@ -74,10 +74,26 @@
     }
 
     .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .logo img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      object-fit: cover;
+    }
+
+    .logo span {
       font-family: 'Zen Dots', cursive;
       font-size: 18px;
-      color: #ffffff;
       letter-spacing: 0.02em;
+      text-transform: lowercase;
     }
 
     .pill {
@@ -1845,7 +1861,10 @@
   <canvas id="bg-particles"></canvas>
 
   <header>
-    <span class="logo">bloom</span>
+    <a class="logo" href="https://paywithbloom.com" aria-label="Bloom">
+      <img src="assets/bloom-logo.png" alt="Bloom logo">
+      <span>bloom</span>
+    </a>
   </header>
 
   <main>
