@@ -16,6 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -74,25 +75,11 @@
     }
 
     .logo {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      color: #ffffff;
-      text-decoration: none;
-    }
-
-    .logo img {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-      object-fit: cover;
-    }
-
-    .logo span {
       font-family: 'Zen Dots', cursive;
       font-size: 18px;
+      color: #ffffff;
       letter-spacing: 0.02em;
+      text-decoration: none;
       text-transform: lowercase;
     }
 
@@ -559,7 +546,7 @@
     }
 
     .copy {
-      display: flex;
+      display: none;
       flex-direction: column;
       align-items: center;
       gap: var(--space-24);
@@ -1752,6 +1739,340 @@
       }
     }
 
+    .architecture {
+      --arch-ink: #f8fafc;
+      --arch-muted: rgba(226, 232, 240, 0.72);
+      --arch-muted-soft: rgba(226, 232, 240, 0.5);
+      --arch-accent: #e8a87c;
+      --arch-accent-strong: #f5c9a8;
+      position: relative;
+      z-index: 2;
+      padding: 96px 0 120px;
+      font-family: "Space Grotesk", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    }
+
+    .arch-shell {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    .arch-label {
+      margin: 0 0 10px;
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(148, 163, 184, 0.8);
+    }
+
+    .arch-title {
+      margin: 0 0 12px;
+      font-size: 34px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--arch-ink);
+    }
+
+    .arch-description {
+      margin: 0 0 28px;
+      max-width: 680px;
+      color: var(--arch-muted);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .architecture .diagram {
+      position: relative;
+      min-height: 700px;
+      padding: 48px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      box-shadow: 0 30px 80px rgba(15, 23, 42, 0.45);
+      overflow: hidden;
+    }
+
+    .architecture .diagram::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(500px 320px at 50% 40%, rgba(232, 168, 124, 0.1), transparent 70%),
+        radial-gradient(600px 400px at 30% 80%, rgba(94, 234, 212, 0.08), transparent 70%);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    .architecture .diagram-inner {
+      position: relative;
+      height: 100%;
+      z-index: 1;
+    }
+
+    .architecture .diagram-lines {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .architecture .diagram-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    .architecture .layer {
+      position: absolute;
+      left: 50%;
+      transform: translate(-50%, -10px);
+      opacity: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      transition: opacity 0.6s ease, transform 0.6s ease;
+      pointer-events: none;
+    }
+
+    .architecture .layer[data-visible="true"] {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+
+    .architecture .layer-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .architecture .layer-label {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .architecture .pill {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .architecture .spend-badge {
+      background: linear-gradient(135deg, #f5c9a8 0%, #e8a87c 100%);
+      border: none;
+      border-radius: 20px;
+      padding: 10px 24px;
+      color: #1a1a1a;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+    }
+
+    .architecture .kernel-box {
+      background: linear-gradient(135deg, #e8a87c 0%, #d4956a 100%);
+      border: 2px solid #f5c9a8;
+      border-radius: 16px;
+      padding: 32px 48px;
+      color: #1a1a1a;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(232, 168, 124, 0.3);
+      animation: kernelGlow 3s ease-in-out infinite;
+    }
+
+    .architecture .kernel-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+    }
+
+    .architecture .kernel-sub {
+      margin-top: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+
+    .architecture .foundation {
+      position: absolute;
+      right: 0;
+      transform: translate(24px, -50%);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 22px 24px;
+      color: rgba(255, 255, 255, 0.8);
+      text-align: left;
+      width: 180px;
+      opacity: 0;
+      transition: opacity 0.6s ease, transform 0.6s ease;
+      pointer-events: none;
+    }
+
+    .architecture .foundation[data-visible="true"] {
+      opacity: 1;
+      transform: translate(0, -50%);
+      pointer-events: auto;
+    }
+
+    .architecture .foundation-label {
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .architecture .foundation-body {
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .architecture .flow-down {
+      animation: flowDown 2s linear infinite;
+    }
+
+    .architecture .flow-up {
+      animation: flowUp 2s linear infinite;
+    }
+
+    .architecture .stepper {
+      margin-top: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+    }
+
+    .architecture .stepper-btn {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(15, 23, 42, 0.8);
+      color: #ffffff;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .architecture .stepper-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(232, 168, 124, 0.6);
+    }
+
+    .architecture .stepper-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .architecture .stepper-label {
+      font-size: 13px;
+      color: rgba(226, 232, 240, 0.7);
+    }
+
+    @keyframes kernelGlow {
+      0%,
+      100% {
+        box-shadow: 0 0 60px rgba(232, 168, 124, 0.3);
+      }
+      50% {
+        box-shadow: 0 0 80px rgba(232, 168, 124, 0.5);
+      }
+    }
+
+    @keyframes flowDown {
+      from {
+        stroke-dashoffset: 0;
+      }
+      to {
+        stroke-dashoffset: -24;
+      }
+    }
+
+    @keyframes flowUp {
+      from {
+        stroke-dashoffset: 0;
+      }
+      to {
+        stroke-dashoffset: 24;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .arch-shell {
+        padding: 0 24px;
+      }
+
+      .architecture .diagram {
+        padding: 32px;
+        min-height: 640px;
+      }
+
+      .architecture .kernel-box {
+        padding: 26px 34px;
+      }
+
+      .architecture .foundation {
+        width: 160px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .architecture {
+        padding: 72px 0 96px;
+      }
+
+      .arch-title {
+        font-size: 28px;
+      }
+
+      .architecture .diagram {
+        padding: 24px;
+        min-height: 600px;
+      }
+
+      .architecture .layer-row {
+        gap: 10px;
+      }
+
+      .architecture .kernel-box {
+        padding: 22px 28px;
+      }
+
+      .architecture .foundation {
+        position: static;
+        transform: none;
+        width: auto;
+        margin-top: 24px;
+      }
+
+      .architecture .foundation[data-visible="true"] {
+        transform: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .architecture .kernel-box,
+      .architecture .flow-down,
+      .architecture .flow-up {
+        animation: none;
+      }
+    }
+
     @media (max-width: 768px) {
       header {
         top: 16px;
@@ -1861,10 +2182,7 @@
   <canvas id="bg-particles"></canvas>
 
   <header>
-    <a class="logo" href="https://paywithbloom.com" aria-label="Bloom">
-      <img src="assets/bloom-logo.png" alt="Bloom logo">
-      <span>bloom</span>
-    </a>
+    <a class="logo" href="https://paywithbloom.com" aria-label="Bloom">bloom</a>
   </header>
 
   <main>
@@ -1982,109 +2300,77 @@
     <section class="scroll-section" aria-hidden="true"></section>
   </main>
 
-  <section class="content-section execute-section" aria-labelledby="execute-title">
-    <div class="section-inner">
-      <div class="copy section-copy">
-        <div class="headline" id="execute-title">Type it. Done.</div>
-      </div>
-      <div class="screen-mockups">
-        <div class="screen-card screen-card--confirm">
-          <div class="screen-header">Spend power: <strong>$47,291</strong></div>
-          <div class="screen-confirm-box">
-            <div class="screen-ticker">AAPL</div>
-            <div class="screen-amount">$500</div>
-            <div class="screen-shares">~2.19 shares</div>
-            <div class="screen-graph" aria-hidden="true">
-              <svg viewBox="0 0 120 48" preserveAspectRatio="none">
-                <path d="M0,36 L12,30 L24,32 L36,22 L48,24 L60,16 L72,20 L84,14 L96,18 L108,10 L120,12" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
-                <path d="M0,36 L12,30 L24,32 L36,22 L48,24 L60,16 L72,20 L84,14 L96,18 L108,10 L120,12 L120,48 L0,48 Z" fill="rgba(22,163,74,0.12)"/>
-              </svg>
-            </div>
-            <div class="screen-detail-row"><span>Price</span><span>$228.31</span></div>
-            <div class="screen-detail-row"><span>Fee</span><span>$0.00</span></div>
-          </div>
-          <div class="screen-after">After: Spend power $46,791</div>
-          <div class="screen-confirm-btn">Confirm with Face ID</div>
-          <div class="screen-cancel">Cancel</div>
-        </div>
-      </div>
-    </div>
-  </section>
+  <section class="architecture" id="architecture">
+    <div class="arch-shell">
+      <p class="arch-label">ARCHITECTURE</p>
+      <h2 class="arch-title">Bloom Architecture</h2>
+      <p class="arch-description" id="archDescription"></p>
 
-  <section class="content-section defense-section" aria-labelledby="defense-title">
-    <div class="section-inner">
-      <div class="copy section-copy">
-        <div class="headline" id="defense-title">We handle the problems.</div>
-        <div class="subhead">Fraud, errors, disputes — fixed automatically.</div>
-      </div>
-      <div class="mini-card-container">
-        <div class="card-glow" aria-hidden="true"></div>
-        <div class="defense-field" aria-hidden="true">
-          <div class="defense-impact impact-1"></div>
-          <div class="defense-impact impact-2"></div>
-          <div class="defense-impact impact-3"></div>
-        </div>
-        <div class="mini-card">
-          <div class="mini-card-face mini-card-front">
-            <div class="mini-card-content">
-              <div class="mini-card-label">Bloom</div>
-              <div class="mini-card-number">$8,412</div>
-              <div class="mini-card-delta">+$34 today</div>
+      <div class="diagram" id="diagram">
+        <div class="diagram-inner" id="diagramInner">
+          <svg class="diagram-lines" id="diagramLines" aria-hidden="true"></svg>
+
+          <div class="diagram-stage" id="diagramStage">
+            <div class="layer interfaces" data-layer="interfaces">
+              <div class="layer-label">INTERFACES</div>
+              <div class="layer-row">
+                <div class="pill" data-node="interface">Claude</div>
+                <div class="pill" data-node="interface">Apps</div>
+                <div class="pill" data-node="interface">Cards</div>
+                <div class="pill" data-node="interface">Agents</div>
+              </div>
             </div>
-          </div>
-          <div class="mini-card-face mini-card-back">
-            <div class="mini-back-content">
-              <div class="mini-section">
-                <div class="mini-section-label">Payments</div>
-                <div class="mini-payment-row"><span>Spotify <span class="mini-time">9:24a</span></span><span>-$12</span></div>
-                <div class="mini-payment-row"><span>Apple <span class="mini-time">8:11a</span></span><span>-$3</span></div>
+
+            <div class="layer actions" data-layer="actions">
+              <div class="layer-label">ACTIONS</div>
+              <div class="layer-row">
+                <div class="pill" data-node="action">Transfers</div>
+                <div class="pill" data-node="action">Polymarket</div>
               </div>
-              <div class="mini-section">
-                <div class="mini-section-label">Investments</div>
-                <div class="mini-inv-row"><span>Cash</span><div class="mini-bar"><div class="mini-bar-fill" style="width:35%"></div></div><span>$2,180</span></div>
-                <div class="mini-inv-row"><span>Stocks</span><div class="mini-bar"><div class="mini-bar-fill" style="width:55%"></div></div><span>$4,892</span></div>
+            </div>
+
+            <div class="layer spend" data-layer="spend">
+              <div class="spend-badge">SPEND POWER</div>
+            </div>
+
+            <div class="layer kernel" data-layer="kernel">
+              <div class="kernel-box">
+                <div class="kernel-title">BLOOM KERNEL</div>
+                <div class="kernel-sub">Policy · Ledger · Receipts</div>
               </div>
-              <div class="mini-charts">
-                <div class="mini-chart"><svg viewBox="0 0 40 20"><path d="M0,16 L8,14 L16,10 L24,12 L32,6 L40,4" fill="none" stroke="#16a34a" stroke-width="1.5"/></svg></div>
-                <div class="mini-chart"><svg viewBox="0 0 40 20"><path d="M0,10 L8,14 L16,8 L24,16 L32,10 L40,6" fill="none" stroke="#f59e0b" stroke-width="1.5"/></svg></div>
-                <div class="mini-chart"><svg viewBox="0 0 40 20"><path d="M0,14 L8,12 L16,10 L24,11 L32,8 L40,6" fill="none" stroke="#6366f1" stroke-width="1.5"/></svg></div>
+            </div>
+
+            <div class="layer adapters" data-layer="adapters">
+              <div class="layer-label">ASSET ADAPTERS</div>
+              <div class="layer-row">
+                <div class="pill" data-node="adapter">USDC World</div>
+                <div class="pill" data-node="adapter">BTC World</div>
               </div>
+            </div>
+
+            <div class="layer blockchains" data-layer="blockchains">
+              <div class="layer-label">BLOCKCHAINS</div>
+              <div class="layer-row">
+                <div class="pill" data-node="blockchain">Base USDC</div>
+                <div class="pill" data-node="blockchain">Bitcoin</div>
+              </div>
+            </div>
+
+            <div class="foundation" data-layer="foundation">
+              <div class="foundation-label">FOUNDATION</div>
+              <div class="foundation-body">Stewards protocol</div>
             </div>
           </div>
         </div>
-        <div class="defense-attackers" aria-hidden="true">
-          <div class="defense-hit hit-1"></div>
-          <div class="defense-hit hit-2"></div>
-          <div class="defense-hit hit-3"></div>
-        </div>
-        <div class="defense-labels" aria-hidden="true">
-          <span class="defense-label">fraud</span>
-          <span class="defense-label">disputes</span>
-          <span class="defense-label">errors</span>
-        </div>
+      </div>
+
+      <div class="stepper">
+        <button class="stepper-btn" id="prevStep" type="button" aria-label="Previous step">&larr;</button>
+        <span class="stepper-label" id="stepLabel"></span>
+        <button class="stepper-btn" id="nextStep" type="button" aria-label="Next step">&rarr;</button>
       </div>
     </div>
   </section>
-
-  <section class="content-section cta-section" aria-labelledby="cta-title">
-    <div class="section-inner">
-      <div class="copy section-copy" id="cta-copy">
-        <div class="headline" id="cta-title">Get early access</div>
-        <div class="subhead">We'll reach out when it's your turn.</div>
-        <form class="waitlist" id="waitlist-form-bottom">
-          <input type="email" name="email" placeholder="Email" required autocomplete="email" autocapitalize="off">
-          <input type="tel" name="phone" placeholder="Phone (optional)" autocomplete="tel">
-          <button type="submit">Get early access</button>
-        </form>
-        <div class="waitlist-success">You&apos;re in.</div>
-      </div>
-    </div>
-  </section>
-
-  <footer>
-    <span>Bloom</span>
-    <a href="mailto:hello@paywithbloom.com">Contact</a>
-  </footer>
 
   <script>
     const card = document.getElementById('bloom-card');
@@ -2118,7 +2404,7 @@
       // Back: phone screen shape (narrower ratio to read full height)
       const isCompact = window.innerWidth < 600 || window.innerHeight < 720;
       const phoneAspect = window.innerWidth < 700 ? 0.46 : 0.58;
-      const maxPhoneHeight = Math.min(window.innerHeight * (isCompact ? 0.8 : 0.94), isCompact ? 720 : 820);
+      const maxPhoneHeight = Math.min(window.innerHeight * (isCompact ? 0.78 : 0.88), isCompact ? 680 : 760);
       const maxPhoneWidth = window.innerWidth * (isCompact ? 0.92 : 0.96);
       const phoneHeight = Math.min(maxPhoneHeight, maxPhoneWidth / phoneAspect);
       const phoneWidth = phoneHeight * phoneAspect;
@@ -2164,12 +2450,13 @@
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const scrollRange = window.innerHeight || 1;
       const rawProgress = clamp(scrollTop / scrollRange, 0, 1);
-      const snapThreshold = 0.08;
+      const snapThreshold = 0.12;
       targetProgress = rawProgress < snapThreshold ? 0 : rawProgress > 1 - snapThreshold ? 1 : rawProgress;
       currentProgress = lerp(currentProgress, targetProgress, 0.14);
 
-      const tiltStrength = lerp(5, 2, currentProgress);
-      const tiltX = 2 + pointerY * -tiltStrength;
+      const tiltStrength = lerp(6, 0, currentProgress);
+      const baseTilt = lerp(4, 0, currentProgress);
+      const tiltX = baseTilt + pointerY * -tiltStrength;
       const tiltY = pointerX * tiltStrength;
 
       if (cardMetrics) {
@@ -2573,6 +2860,364 @@
     }
 
     requestAnimationFrame(animate);
+  </script>
+  <script>
+    (() => {
+      const STEP_COUNT = 7;
+
+      const descriptions = [
+        "",
+        "The kernel is a dumb lock. It enforces constraints, tracks state, and proves everything.",
+        "The kernel computes one thing: Spend Power. What you can actually spend right now.",
+        "Worlds translate blockchain state into something the kernel can read.",
+        "Drivers let the kernel act on reality. Transfers, trades, subscriptions.",
+        "Any AI can connect. Claude, ChatGPT, apps, agents - one kernel.",
+        "The Bloom Foundation stewards the protocol. Open forever.",
+        "One kernel. Every client. Banking you can talk to."
+      ];
+
+      const layerSteps = {
+        interfaces: 5,
+        actions: 4,
+        spend: 2,
+        kernel: 1,
+        adapters: 3,
+        blockchains: 3,
+        foundation: 6
+      };
+
+      const state = { step: 1 };
+
+      const elements = {
+        description: document.getElementById("archDescription"),
+        stepLabel: document.getElementById("stepLabel"),
+        prevButton: document.getElementById("prevStep"),
+        nextButton: document.getElementById("nextStep"),
+        stage: document.getElementById("diagramStage"),
+        inner: document.getElementById("diagramInner"),
+        svg: document.getElementById("diagramLines"),
+        layers: {
+          interfaces: document.querySelector('[data-layer="interfaces"]'),
+          actions: document.querySelector('[data-layer="actions"]'),
+          spend: document.querySelector('[data-layer="spend"]'),
+          kernel: document.querySelector('[data-layer="kernel"]'),
+          adapters: document.querySelector('[data-layer="adapters"]'),
+          blockchains: document.querySelector('[data-layer="blockchains"]'),
+          foundation: document.querySelector('[data-layer="foundation"]')
+        }
+      };
+
+      if (!elements.inner || !elements.svg) return;
+
+      const nodes = {
+        interfaces: Array.from(document.querySelectorAll('[data-node="interface"]')),
+        actions: Array.from(document.querySelectorAll('[data-node="action"]')),
+        adapters: Array.from(document.querySelectorAll('[data-node="adapter"]')),
+        blockchains: Array.from(document.querySelectorAll('[data-node="blockchain"]'))
+      };
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+      const setLayerVisibility = () => {
+        Object.entries(layerSteps).forEach(([key, minStep]) => {
+          const el = elements.layers[key];
+          if (!el) return;
+          el.setAttribute("data-visible", state.step >= minStep ? "true" : "false");
+        });
+      };
+
+      const updateCopy = () => {
+        if (elements.description) {
+          elements.description.textContent = descriptions[state.step] || "";
+        }
+        if (elements.stepLabel) {
+          elements.stepLabel.textContent = `Step ${state.step} of ${STEP_COUNT}`;
+        }
+        if (elements.prevButton) {
+          elements.prevButton.disabled = state.step === 1;
+        }
+        if (elements.nextButton) {
+          elements.nextButton.disabled = state.step === STEP_COUNT;
+        }
+      };
+
+      const setStep = (nextStep) => {
+        state.step = clamp(nextStep, 1, STEP_COUNT);
+        setLayerVisibility();
+        updateCopy();
+        layoutLayers();
+        renderLines();
+      };
+
+      const setTop = (el, value) => {
+        if (!el) return;
+        el.style.top = `${value}px`;
+      };
+
+      const layoutLayers = () => {
+        if (!elements.inner) return;
+        const height = elements.inner.clientHeight;
+
+        const gaps = {
+          interfaces: 60,
+          actions: 40,
+          spend: 24,
+          kernel: 24,
+          adapters: 40
+        };
+
+        const hInterfaces = elements.layers.interfaces?.offsetHeight ?? 0;
+        const hActions = elements.layers.actions?.offsetHeight ?? 0;
+        const hSpend = elements.layers.spend?.offsetHeight ?? 0;
+        const hKernel = elements.layers.kernel?.offsetHeight ?? 0;
+        const hAdapters = elements.layers.adapters?.offsetHeight ?? 0;
+        const hBlockchains = elements.layers.blockchains?.offsetHeight ?? 0;
+
+        const total =
+          hInterfaces +
+          gaps.interfaces +
+          hActions +
+          gaps.actions +
+          hSpend +
+          gaps.spend +
+          hKernel +
+          gaps.kernel +
+          hAdapters +
+          gaps.adapters +
+          hBlockchains;
+
+        const extra = Math.max(0, height - total);
+        const gapAboveKernel = gaps.spend + extra / 2;
+        const gapBelowKernel = gaps.kernel + extra / 2;
+
+        let current = 0;
+        setTop(elements.layers.interfaces, current);
+        current += hInterfaces + gaps.interfaces;
+        setTop(elements.layers.actions, current);
+        current += hActions + gaps.actions;
+        setTop(elements.layers.spend, current);
+        current += hSpend + gapAboveKernel;
+        setTop(elements.layers.kernel, current);
+        current += hKernel + gapBelowKernel;
+        setTop(elements.layers.adapters, current);
+        current += hAdapters + gaps.adapters;
+        setTop(elements.layers.blockchains, current);
+
+        const kernelTop = Number.parseFloat(elements.layers.kernel?.style.top ?? "0");
+        const kernelCenter = kernelTop + hKernel / 2;
+        if (elements.layers.foundation) {
+          const foundationHeight = elements.layers.foundation.offsetHeight;
+          elements.layers.foundation.style.top = `${kernelCenter - foundationHeight / 2}px`;
+        }
+      };
+
+      const getPoint = (el, position) => {
+        if (!el || !elements.inner) return { x: 0, y: 0 };
+        const rect = el.getBoundingClientRect();
+        const container = elements.inner.getBoundingClientRect();
+        let x = rect.left - container.left + rect.width / 2;
+        let y = rect.top - container.top + rect.height / 2;
+        if (position === "top") y = rect.top - container.top;
+        if (position === "bottom") y = rect.bottom - container.top;
+        if (position === "left") x = rect.left - container.left;
+        if (position === "right") x = rect.right - container.left;
+        return { x, y };
+      };
+
+      const curvedPath = (start, end) => {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const offset = dx * 0.3;
+        const c1 = {
+          x: start.x + offset,
+          y: start.y + dy * 0.4
+        };
+        const c2 = {
+          x: end.x - offset,
+          y: start.y + dy * 0.6
+        };
+        return `M ${start.x} ${start.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${end.x} ${end.y}`;
+      };
+
+      const addLine = (fragment, config) => {
+        if (!elements.svg) return;
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", curvedPath(config.start, config.end));
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", config.stroke);
+        path.setAttribute("stroke-width", config.width ?? 2);
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("stroke-dasharray", config.dash ?? "8 4");
+        if (config.opacity) {
+          path.setAttribute("stroke-opacity", String(config.opacity));
+        }
+        if (config.animated) {
+          path.classList.add(config.direction === "up" ? "flow-up" : "flow-down");
+        }
+        fragment.appendChild(path);
+      };
+
+      const renderLines = () => {
+        if (!elements.svg || !elements.inner) return;
+        const rect = elements.inner.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+
+        elements.svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        elements.svg.setAttribute("width", `${width}`);
+        elements.svg.setAttribute("height", `${height}`);
+
+        elements.svg.innerHTML = `
+          <defs>
+            <linearGradient id="lineGradientDown" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#E8A87C" stop-opacity="0.85" />
+              <stop offset="100%" stop-color="#E8A87C" stop-opacity="0.25" />
+            </linearGradient>
+            <linearGradient id="lineGradientUp" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#E8A87C" stop-opacity="0.25" />
+              <stop offset="100%" stop-color="#E8A87C" stop-opacity="0.85" />
+            </linearGradient>
+            <linearGradient id="lineGradientSoft" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#F5C9A8" stop-opacity="0.15" />
+              <stop offset="100%" stop-color="#F5C9A8" stop-opacity="0.4" />
+            </linearGradient>
+          </defs>
+        `;
+
+        const fragment = document.createDocumentFragment();
+
+        if (state.step >= 5 && nodes.interfaces.length) {
+          const actionsRow = elements.layers.actions?.querySelector(".layer-row");
+          const actionsTop = getPoint(actionsRow, "top");
+          const interfacesBottom = nodes.interfaces.map((node) => getPoint(node, "bottom"));
+          const maxInterfaceBottom = Math.max(...interfacesBottom.map((pt) => pt.y));
+          const junction = {
+            x: actionsTop.x,
+            y: maxInterfaceBottom + (actionsTop.y - maxInterfaceBottom) * 0.5
+          };
+
+          interfacesBottom.forEach((point) => {
+            addLine(fragment, {
+              start: point,
+              end: junction,
+              direction: "down",
+              animated: true,
+              stroke: "url(#lineGradientDown)"
+            });
+          });
+
+          addLine(fragment, {
+            start: junction,
+            end: actionsTop,
+            direction: "down",
+            animated: true,
+            stroke: "url(#lineGradientDown)"
+          });
+        }
+
+        if (state.step >= 4 && nodes.actions.length) {
+          const spendTop = getPoint(elements.layers.spend, "top");
+          const actionsBottom = nodes.actions.map((node) => getPoint(node, "bottom"));
+          const minSpendTop = spendTop.y;
+          const maxActionBottom = Math.max(...actionsBottom.map((pt) => pt.y));
+          const junction = {
+            x: spendTop.x,
+            y: maxActionBottom + (minSpendTop - maxActionBottom) * 0.5
+          };
+
+          actionsBottom.forEach((point) => {
+            addLine(fragment, {
+              start: point,
+              end: junction,
+              direction: "down",
+              animated: true,
+              stroke: "url(#lineGradientDown)"
+            });
+          });
+
+          addLine(fragment, {
+            start: junction,
+            end: spendTop,
+            direction: "down",
+            animated: true,
+            stroke: "url(#lineGradientDown)"
+          });
+        }
+
+        if (state.step >= 2) {
+          addLine(fragment, {
+            start: getPoint(elements.layers.spend, "bottom"),
+            end: getPoint(elements.layers.kernel, "top"),
+            direction: "down",
+            animated: true,
+            stroke: "url(#lineGradientDown)"
+          });
+        }
+
+        if (state.step >= 3) {
+          const kernelBottom = getPoint(elements.layers.kernel, "bottom");
+          nodes.adapters.forEach((node) => {
+            addLine(fragment, {
+              start: getPoint(node, "top"),
+              end: kernelBottom,
+              direction: "up",
+              animated: true,
+              stroke: "url(#lineGradientUp)"
+            });
+          });
+
+          nodes.blockchains.forEach((node, index) => {
+            const adapter = nodes.adapters[index];
+            if (!adapter) return;
+            addLine(fragment, {
+              start: getPoint(node, "top"),
+              end: getPoint(adapter, "bottom"),
+              direction: "up",
+              animated: true,
+              stroke: "url(#lineGradientUp)"
+            });
+          });
+        }
+
+        if (state.step >= 6 && window.innerWidth >= 640) {
+          const kernelRight = getPoint(elements.layers.kernel, "right");
+          const foundationLeft = getPoint(elements.layers.foundation, "left");
+          addLine(fragment, {
+            start: { x: kernelRight.x + 12, y: kernelRight.y },
+            end: { x: foundationLeft.x - 12, y: foundationLeft.y },
+            direction: "down",
+            animated: false,
+            stroke: "url(#lineGradientSoft)",
+            dash: "6 6",
+            opacity: 0.6
+          });
+        }
+
+        elements.svg.appendChild(fragment);
+      };
+
+      const handleResize = () => {
+        layoutLayers();
+        renderLines();
+      };
+
+      if (elements.prevButton) {
+        elements.prevButton.addEventListener("click", () => setStep(state.step - 1));
+      }
+
+      if (elements.nextButton) {
+        elements.nextButton.addEventListener("click", () => setStep(state.step + 1));
+      }
+
+      window.addEventListener("resize", handleResize);
+
+      if (window.ResizeObserver && elements.inner) {
+        const observer = new ResizeObserver(handleResize);
+        observer.observe(elements.inner);
+      }
+
+      setStep(state.step);
+    })();
   </script>
 </body>
 </html>
