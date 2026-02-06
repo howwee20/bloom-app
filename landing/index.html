@@ -4,19 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bloom</title>
-  <meta name="description" content="What you can spend, right now.">
+  <meta name="description" content="One account. Everywhere. Banking you can talk to.">
   <meta property="og:title" content="Bloom">
-  <meta property="og:description" content="What you can spend, right now.">
+  <meta property="og:description" content="One account. Everywhere. Banking you can talk to.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://paywithbloom.com">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Bloom">
-  <meta name="twitter:description" content="What you can spend, right now.">
+  <meta name="twitter:description" content="One account. Everywhere. Banking you can talk to.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23000' width='100' height='100' rx='16'/><text x='50' y='65' font-size='44' text-anchor='middle' fill='%23fff' font-weight='500' font-family='-apple-system,system-ui'>b</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -25,1729 +24,375 @@
     }
 
     :root {
-      --black: #000000;
+      --peach: #FFD7B5;
+      --peach-light: #FFF0E3;
+      --peach-bg: #FFF5EB;
+      --orange: #E86B20;
+      --orange-hover: #D45E18;
+      --black: #1a1a1a;
       --white: #ffffff;
-      --secondary: #888888;
-      --card: #141414;
-      --card-border: #333333;
-      --aura: rgba(78, 92, 255, 0.28);
-      --aura-soft: rgba(120, 86, 255, 0.2);
-      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-      --space-8: 8px;
-      --space-16: 16px;
-      --space-24: 24px;
-      --space-32: 32px;
-      --space-40: 40px;
-      --space-48: 48px;
-      --space-64: 64px;
-      --space-80: 80px;
-      --space-120: 120px;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --green: #16a34a;
     }
 
-    html,
-    body {
-      height: 100%;
-      overscroll-behavior: none;
+    html {
+      scroll-behavior: smooth;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
-      background: var(--black);
-      color: var(--white);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+      background: var(--white);
+      color: var(--black);
       overflow-x: hidden;
-      touch-action: pan-y;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
-    #space-bg {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      pointer-events: none;
-    }
-
+    /* ── Header / Nav ── */
     header {
       position: fixed;
-      top: 24px;
-      left: 24px;
-      z-index: 5;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .logo {
-      font-family: 'Zen Dots', cursive;
-      font-size: 18px;
-      color: #ffffff;
-      letter-spacing: 0.02em;
+      font-family: 'Inter', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--black);
       text-decoration: none;
-      text-transform: lowercase;
+      letter-spacing: -0.01em;
     }
 
-    .pill {
-      padding: 10px 20px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      background: rgba(255, 255, 255, 0.1);
-      color: #ffffff;
-      font-size: 12px;
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 36px;
+    }
+
+    .nav-links a {
+      font-size: 15px;
       font-weight: 500;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      backdrop-filter: blur(16px);
+      color: var(--gray-600);
+      text-decoration: none;
+      transition: color 0.2s ease;
     }
 
-    main {
-      position: relative;
-      z-index: 1;
-      min-height: 200vh;
+    .nav-links a:hover {
+      color: var(--black);
     }
 
-    .sticky-layer {
-      position: sticky;
-      top: 0;
-      min-height: 100vh;
-      display: flex;
+    .nav-cta {
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      padding: var(--space-80) var(--space-24);
-      text-align: center;
-    }
-
-    .scroll-cue {
-      position: absolute;
-      bottom: 28px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 26px;
-      height: 26px;
+      padding: 10px 22px;
+      background: var(--orange);
+      color: var(--white) !important;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(255, 255, 255, 0.08);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: rgba(255, 255, 255, 0.75);
-      font-size: 12px;
-      pointer-events: none;
-      z-index: 4;
-      opacity: 0.8;
-      transition: opacity 0.4s var(--ease-out);
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: background 0.2s ease, transform 0.2s ease;
     }
 
-    .scroll-cue-icon {
-      display: block;
-      animation: cueBounce 1.8s ease-in-out infinite;
+    .nav-cta:hover {
+      background: var(--orange-hover);
+      color: var(--white) !important;
+      transform: translateY(-1px);
     }
 
-    .scroll-section {
-      height: 100vh;
+    /* ── Hero ── */
+    .hero {
+      padding: 140px 40px 80px;
+      text-align: center;
+      background: var(--white);
     }
 
-    .stage {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-32);
-      max-width: 720px;
-      width: 100%;
+    .hero-inner {
+      max-width: 1100px;
+      margin: 0 auto;
     }
 
-    .card-stage {
-      position: relative;
-      perspective: 1200px;
+    .hero-card {
+      background: var(--peach-bg);
+      border-radius: 32px;
+      padding: 80px 40px 60px;
     }
 
-    .card-stage::after {
-      content: "";
-      position: absolute;
-      inset: -80px;
-      background:
-        radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.2), transparent 50%),
-        radial-gradient(ellipse at 50% 100%, rgba(200, 200, 210, 0.15), transparent 40%);
-      opacity: 1;
-      filter: blur(40px);
-      z-index: -1;
-    }
-
-    .card-3d {
-      position: relative;
-      width: 450px;
-      height: 284px;
-      transform-style: preserve-3d;
-      -webkit-transform-style: preserve-3d;
-      border-radius: 18px;
-      transition: transform 0.6s var(--ease-out), width 0.5s var(--ease-out), height 0.5s var(--ease-out), border-radius 0.5s var(--ease-out);
-      will-change: transform, width, height;
-    }
-
-    .card-face {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border-radius: inherit;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      box-shadow:
-        0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
-        0 -1px 0 0 rgba(0, 0, 0, 0.05) inset,
-        0 30px 60px rgba(0, 0, 0, 0.3),
-        0 10px 20px rgba(0, 0, 0, 0.2),
-        0 0 0 1px rgba(0, 0, 0, 0.05);
-      overflow: hidden;
-    }
-
-    .card-face::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(135deg,
-          rgba(255, 255, 255, 0.5) 0%,
-          rgba(255, 255, 255, 0.1) 25%,
-          transparent 50%,
-          rgba(0, 0, 0, 0.02) 75%,
-          rgba(0, 0, 0, 0.05) 100%
-        );
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    .card-face::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 60%;
-      height: 100%;
-      background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0.4) 50%,
-        transparent 100%
-      );
-      transform: skewX(-20deg);
-      z-index: 2;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-
-    .card-3d:hover .card-face::after {
-      opacity: 1;
-      animation: shimmer 1.5s ease-in-out;
-    }
-
-    @keyframes shimmer {
-      0% { left: -100%; }
-      100% { left: 150%; }
-    }
-
-    @keyframes cueBounce {
-      0%, 100% { transform: translateY(2px); }
-      50% { transform: translateY(-6px); }
-    }
-
-    .card-front {
-      position: relative;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background:
-        linear-gradient(165deg,
-          #e8e8ed 0%,
-          #d4d4d8 15%,
-          #f0f0f2 30%,
-          #c8c8cc 50%,
-          #e0e0e4 70%,
-          #d0d0d4 85%,
-          #e8e8ec 100%
-        );
-    }
-
-    .paper-texture {
-      position: absolute;
-      inset: 0;
-      background-image:
-        radial-gradient(rgba(0, 0, 0, 0.05) 0.6px, transparent 0.8px),
-        radial-gradient(rgba(0, 0, 0, 0.04) 0.7px, transparent 0.9px),
-        repeating-linear-gradient(
-          0deg,
-          rgba(0, 0, 0, 0.03) 0,
-          rgba(0, 0, 0, 0.03) 1px,
-          transparent 1px,
-          transparent 3px
-        );
-      background-size: 8px 8px, 12px 12px, 100% 100%;
-      mix-blend-mode: multiply;
-      opacity: 0.14;
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .card-back {
-      padding: 0;
-      display: flex;
-      align-items: stretch;
-      justify-content: stretch;
-      opacity: 0;
-      background:
-        linear-gradient(165deg,
-          #f4f4f6 0%,
-          #e4e4e8 35%,
-          #f8f8fa 70%,
-          #ededf0 100%
-        );
-      border: 1px solid rgba(0, 0, 0, 0.06);
-      box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.8) inset,
-        0 -1px 0 rgba(0, 0, 0, 0.08) inset,
-        0 40px 70px rgba(0, 0, 0, 0.25),
-        0 12px 24px rgba(0, 0, 0, 0.2);
-    }
-
-    /* Front card - centered number */
-    .front-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      position: relative;
-      z-index: 3;
-    }
-
-    .spend-label {
-      font-family: 'Zen Dots', cursive;
-      font-size: 12px;
+    .hero-headline {
+      font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+      font-size: clamp(52px, 8vw, 96px);
       font-weight: 400;
-      letter-spacing: 0.02em;
-      text-transform: lowercase;
-      color: rgba(26, 26, 26, 0.7);
-    }
-
-    .spend-number {
-      font-size: clamp(42px, 10vw, 56px);
-      font-weight: 600;
+      line-height: 1.0;
       letter-spacing: -0.02em;
-      font-variant-numeric: tabular-nums;
-      color: #1a1a1a;
-      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-      position: relative;
-      z-index: 3;
+      color: var(--black);
+      margin-bottom: 28px;
     }
 
-    .spend-delta {
-      font-size: 14px;
-      color: #16a34a;
-      font-weight: 600;
-      position: relative;
-      z-index: 3;
-    }
-
-    .detail-hint {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: lowercase;
-      color: rgba(26, 26, 26, 0.7);
-      opacity: 0.2;
-      pointer-events: none;
-      z-index: 3;
-    }
-
-    .detail-hint-icon {
-      font-size: 12px;
-      line-height: 1;
-    }
-
-    .spend-bridge {
-      position: absolute;
-      top: 0;
-      left: 0;
-      font-size: clamp(42px, 10vw, 56px);
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      font-variant-numeric: tabular-nums;
-      color: #1a1a1a;
-      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-      transform-origin: top left;
-      pointer-events: none;
-      z-index: 4;
-      opacity: 0;
-      will-change: transform, opacity;
-    }
-
-    /* Back card - Bloom app layout */
-    .back-content {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      width: 100%;
-      padding: 24px 24px;
-      gap: 20px;
-      color: #1a1a1a;
-      position: relative;
-      z-index: 2;
-    }
-
-    .section-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: rgba(0, 0, 0, 0.45);
-      margin-bottom: 10px;
-    }
-
-    .payments-list,
-    .investments-list,
-    .other-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .payment-row,
-    .other-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-size: 13px;
-    }
-
-    .payment-name {
-      font-weight: 600;
-      color: #1a1a1a;
-    }
-
-    .payment-time {
-      font-size: 10px;
-      color: rgba(0, 0, 0, 0.4);
-      margin-left: 8px;
-      font-weight: 500;
-    }
-
-    .payment-amount {
-      color: rgba(0, 0, 0, 0.6);
-      font-size: 12px;
-    }
-
-    .investment-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 12px;
-    }
-
-    .inv-label {
-      width: 50px;
-      color: rgba(0, 0, 0, 0.55);
-      font-weight: 600;
-    }
-
-    .charts-section {
-      display: flex;
-      gap: 10px;
-      flex: 1;
-      align-items: center;
-    }
-
-    .chart-box {
-      flex: 1;
-      background: rgba(0, 0, 0, 0.03);
-      border-radius: 8px;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .chart-box svg {
-      width: 100%;
-      height: 40px;
-    }
-
-    .chart-label {
-      font-size: 10px;
-      font-weight: 600;
-      color: rgba(0, 0, 0, 0.5);
-      text-align: center;
-    }
-
-    .other-section {
-      margin-top: auto;
-    }
-
-    .inv-bar-track {
-      flex: 1;
-      height: 5px;
-      background: rgba(0, 0, 0, 0.1);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-
-    .inv-bar-fill {
-      height: 100%;
-      background: rgba(0, 0, 0, 0.35);
-      border-radius: 999px;
-    }
-
-    .inv-amount {
-      min-width: 54px;
-      text-align: right;
-      color: #1a1a1a;
-      font-weight: 600;
-    }
-
-    .other-row {
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    .other-label {
-      color: rgba(0, 0, 0, 0.55);
-    }
-
-    .other-amount {
-      color: #1a1a1a;
-    }
-
-    .command-bar {
-      margin-top: auto;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      background: rgba(0, 0, 0, 0.05);
-      border-radius: 10px;
-      border: 1px solid rgba(0, 0, 0, 0.1);
-      color: rgba(0, 0, 0, 0.55);
-      font-size: 10px;
-    }
-
-    #bg-particles {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    .copy {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-24);
-      text-align: center;
-    }
-
-    .copy-states {
-      position: relative;
-      min-height: 120px;
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .copy-block {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-8);
-      transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out);
-      text-align: center;
-      white-space: nowrap;
-    }
-
-    #copy-back {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-
-    .headline {
-      font-size: clamp(24px, 4vw, 36px);
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
-    }
-
-    .subhead {
-      font-size: clamp(14px, 2vw, 17px);
-      color: var(--secondary);
-      max-width: 420px;
+    .hero-sub {
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--gray-600);
+      max-width: 560px;
+      margin: 0 auto 56px;
       line-height: 1.5;
     }
 
-    .subhead-lines {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .subhead-line {
-      display: block;
-    }
-
-    .subhead-line-secondary {
-      font-size: 0.92em;
-      color: #777777;
-    }
-
-    .waitlist {
-      display: flex;
-      gap: var(--space-16);
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .waitlist input {
-      width: min(280px, 100%);
-      padding: 14px 18px;
-      font-size: 15px;
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      color: var(--white);
-      outline: none;
-      transition: border-color 0.6s var(--ease-out);
-    }
-
-    .waitlist input::placeholder {
-      color: #555555;
-    }
-
-    .waitlist input:focus {
-      border-color: rgba(120, 130, 255, 0.6);
-    }
-
-    .waitlist button {
-      padding: 14px 24px;
-      font-size: 15px;
-      font-weight: 500;
-      border: none;
-      border-radius: 10px;
-      background: var(--white);
-      color: var(--black);
-      cursor: pointer;
-      transition: transform 0.6s var(--ease-out), opacity 0.6s var(--ease-out);
-    }
-
-    .waitlist button:hover {
-      transform: translateY(-1px);
-      opacity: 0.92;
-    }
-
-    .waitlist-note,
-    .waitlist-success {
-      font-size: 13px;
-      color: var(--secondary);
-    }
-
-    .waitlist-success {
-      display: none;
-    }
-
-    .copy.success .waitlist {
-      display: none;
-    }
-
-    .copy.success .waitlist-note {
-      display: none;
-    }
-
-    .copy.success .waitlist-success {
-      display: block;
-    }
-
-    .content-section {
-      position: relative;
-      z-index: 1;
-      min-height: 100vh;
-      padding: var(--space-120) var(--space-24);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-    }
-
-    .section-inner {
-      width: min(960px, 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-40);
-    }
-
-    .section-copy {
-      max-width: 520px;
-    }
-
-    .screen-mockups {
-      display: flex;
-      gap: clamp(24px, 5vw, 56px);
-      justify-content: center;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .screen-card {
-      width: clamp(300px, 34vw, 380px);
-      background:
-        linear-gradient(165deg,
-          #f4f4f6 0%,
-          #e4e4e8 35%,
-          #f8f8fa 70%,
-          #ededf0 100%
-        );
-      border-radius: 30px;
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.8) inset,
-        0 -1px 0 rgba(0, 0, 0, 0.06) inset,
-        0 35px 60px rgba(0, 0, 0, 0.3),
-        0 12px 22px rgba(0, 0, 0, 0.2);
-      padding: 34px 30px;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .screen-card::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(135deg,
-          rgba(255, 255, 255, 0.5) 0%,
-          rgba(255, 255, 255, 0.12) 25%,
-          transparent 50%
-        );
-      pointer-events: none;
-    }
-
-    .screen-card--app {
-      width: clamp(340px, 38vw, 460px);
-      min-height: clamp(520px, 70vw, 680px);
-      padding: 0;
-    }
-
-    .screen-card--confirm {
-      width: clamp(360px, 38vw, 480px);
-      min-height: clamp(640px, 78vh, 680px);
-    }
-
-    .execute-section .screen-card--app {
-      width: clamp(300px, 30vw, 360px);
-      border-radius: 34px;
-    }
-
-    .screen-header {
-      text-align: center;
-      color: #1a1a1a;
-      font-size: 11px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      position: relative;
-      z-index: 1;
-    }
-
-    .screen-header strong {
-      font-weight: 600;
-    }
-
-    .screen-command-input {
-      width: 100%;
-      background: rgba(0, 0, 0, 0.05);
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: 16px;
-      padding: 14px 18px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: #1a1a1a;
-      font-size: 14px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .screen-command-dot {
-      width: 2px;
-      height: 16px;
-      background: rgba(0, 0, 0, 0.35);
-      border-radius: 2px;
-      animation: caretBlink 1.2s ease-in-out infinite;
-    }
-
-    .screen-keyboard {
-      width: 100%;
-      background: #e5e5ea;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: 18px;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      position: relative;
-      z-index: 1;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.75),
-        0 6px 14px rgba(0, 0, 0, 0.12);
-    }
-
-    .screen-key-row {
-      display: flex;
-      gap: 6px;
-      justify-content: center;
-    }
-
-    .screen-key-row .key {
-      flex: 1;
-      height: 24px;
-      min-width: 20px;
-      background: #ffffff;
-      border-radius: 6px;
-      box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.95) inset,
-        0 1px 2px rgba(0, 0, 0, 0.14);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 9px;
-      font-weight: 600;
-      color: #3a3a3c;
-      text-transform: lowercase;
-    }
-
-    .screen-key-row .key-special {
-      background: #d1d1d6;
-      color: #2c2c2e;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .screen-key-row .key-shift,
-    .screen-key-row .key-backspace {
-      flex: 1.45;
-      font-size: 8px;
-    }
-
-    .screen-key-row .key-123,
-    .screen-key-row .key-globe {
-      flex: 1.1;
-    }
-
-    .screen-key-row .key-space {
-      flex: 3.2;
-      text-transform: lowercase;
-    }
-
-    .screen-key-row .key-return {
-      flex: 1.35;
-      background: #c7c7cc;
-      color: #1f2937;
-    }
-
-    .screen-back {
-      padding: 26px 26px 22px;
-      gap: 16px;
-      height: auto;
-    }
-
-    .screen-back .section-label {
-      font-size: 10px;
-      letter-spacing: 0.2em;
-    }
-
-    .screen-back .payment-row,
-    .screen-back .other-row {
-      font-size: 12px;
-    }
-
-    .screen-back .payment-time {
-      font-size: 10px;
-    }
-
-    .screen-back .investment-row {
-      font-size: 11px;
-      gap: 8px;
-    }
-
-    .screen-back .inv-label {
-      width: 44px;
-      font-weight: 600;
-    }
-
-    .screen-back .inv-bar-track {
-      height: 4px;
-    }
-
-    .screen-back .charts-section {
-      flex: 0;
-      gap: 12px;
-    }
-
-    .screen-back .chart-box {
-      border-radius: 10px;
-      padding: 10px;
-    }
-
-    .screen-back .other-section {
-      margin-top: 6px;
-    }
-
-    .screen-back .command-bar {
-      margin-top: 6px;
-      padding: 10px 14px;
-      border-radius: 14px;
-      font-size: 11px;
-      color: rgba(0, 0, 0, 0.55);
-    }
-
-    .screen-back .screen-keyboard {
-      margin-top: 10px;
-    }
-
-    .execute-section .screen-back {
-      padding: 20px 20px 18px;
-      gap: 12px;
-      height: auto;
-    }
-
-    .execute-section .screen-back .section-label {
-      text-align: center;
-      font-size: 10px;
-      letter-spacing: 0.26em;
-      margin-bottom: 6px;
-    }
-
-    .execute-section .payments-section,
-    .execute-section .investments-section,
-    .execute-section .other-section {
-      width: 100%;
-    }
-
-    .execute-section .payments-list,
-    .execute-section .investments-list,
-    .execute-section .other-list {
-      gap: 8px;
-    }
-
-    .execute-section .payment-row {
-      font-size: 12px;
-    }
-
-    .execute-section .payment-amount {
-      font-size: 11px;
-    }
-
-    .execute-section .investment-row {
-      font-size: 11px;
-      gap: 8px;
-    }
-
-    .execute-section .inv-label {
-      width: 46px;
-    }
-
-    .execute-section .inv-bar-track {
-      height: 4px;
-    }
-
-    .execute-section .charts-section {
-      flex: 0;
-      gap: 10px;
-    }
-
-    .execute-section .chart-box {
-      border-radius: 10px;
-      padding: 10px;
-    }
-
-    .execute-section .other-section {
-      margin-top: 0;
-    }
-
-    .execute-section .command-stack {
-      margin-top: auto;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .execute-section .screen-back .command-bar {
-      margin-top: 0;
-      padding: 12px 16px;
-      border-radius: 16px;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      background: #f2f2f7;
-      font-size: 12px;
-      color: rgba(0, 0, 0, 0.55);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-    }
-
-    .execute-section .screen-back .command-text {
-      color: rgba(0, 0, 0, 0.55);
-      font-weight: 500;
-    }
-
-    .execute-section .screen-back .command-caret {
-      width: 2px;
-      height: 16px;
-      background: rgba(0, 0, 0, 0.35);
-      border-radius: 2px;
-      animation: caretBlink 1.2s ease-in-out infinite;
-    }
-
-    .execute-section .screen-keyboard {
-      width: calc(100% + 8px);
-      margin: 0 -4px;
-      padding: 14px 12px 16px;
-      border-radius: 20px;
-      gap: 8px;
-    }
-
-    .execute-section .screen-key-row {
-      gap: 7px;
-    }
-
-    .execute-section .screen-key-row .key {
-      height: 28px;
-      font-size: 10px;
-      border-radius: 7px;
-    }
-
-    .execute-section .screen-key-row .key-shift,
-    .execute-section .screen-key-row .key-backspace {
-      flex: 1.6;
-      font-size: 8px;
-    }
-
-    .execute-section .screen-key-row .key-123,
-    .execute-section .screen-key-row .key-globe {
-      flex: 1.15;
-    }
-
-    .execute-section .screen-key-row .key-space {
-      flex: 3.6;
-      height: 30px;
-    }
-
-    .execute-section .screen-key-row .key-return {
-      flex: 1.45;
-    }
-
-    .screen-confirm-box {
-      background: rgba(255, 255, 255, 0.7);
-      border: 1px solid rgba(0, 0, 0, 0.06);
-      border-radius: 22px;
-      padding: 20px 20px 18px;
-      text-align: center;
-      color: #1a1a1a;
-      position: relative;
-      z-index: 1;
-    }
-
-    .screen-ticker {
-      font-size: 13px;
-      color: rgba(0, 0, 0, 0.45);
-      margin-bottom: 6px;
-    }
-
-    .screen-amount {
-      font-size: 40px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-
-    .screen-shares {
-      font-size: 13px;
-      color: rgba(0, 0, 0, 0.45);
-      margin-bottom: 20px;
-    }
-
-    .screen-detail-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      color: rgba(0, 0, 0, 0.6);
-      margin-bottom: 8px;
-    }
-
-    .screen-graph {
-      width: 100%;
-      height: 64px;
-      margin: 8px 0 14px;
-      background: rgba(0, 0, 0, 0.03);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .screen-graph svg {
-      width: 100%;
-      height: 100%;
-    }
-
-    .screen-after {
-      font-size: 12px;
-      color: rgba(0, 0, 0, 0.45);
-      margin-top: 20px;
-    }
-
-    .screen-confirm-btn {
-      background: #1a1a1a;
-      color: #fff;
-      border-radius: 14px;
-      padding: 14px 18px;
-      font-size: 14px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .screen-cancel {
-      color: rgba(0, 0, 0, 0.4);
-      font-size: 14px;
-      text-align: center;
-    }
-
-    @keyframes caretBlink {
-      0%, 100% { opacity: 0.2; }
-      50% { opacity: 1; }
-    }
-
-    @media (max-width: 768px) {
-      .screen-mockups {
-        flex-direction: column;
-        align-items: center;
-        gap: 24px;
-      }
-      .screen-card {
-        width: min(320px, 90vw);
-      }
-    }
-
-    .mini-card-container {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    /* ── Two-column cards ── */
+    .cards-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 24px;
-      isolation: isolate;
+      max-width: 900px;
+      margin: 0 auto;
     }
 
-    .card-glow {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -60%);
-      width: 200px;
-      height: 140px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 255, 255, 0.25), transparent 65%);
-      filter: blur(20px);
-      opacity: 0.6;
-      animation: cardPulse 4s var(--ease-out) infinite;
-      z-index: 1;
-    }
-
-    .defense-field {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .defense-field::before {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 320px;
-      height: 210px;
-      transform: translate(-50%, -60%);
-      border-radius: 28px;
-      border: 1px solid rgba(255, 120, 150, 0.25);
-      box-shadow:
-        0 0 18px rgba(255, 90, 130, 0.3),
-        inset 0 0 12px rgba(255, 120, 160, 0.2);
-      background: radial-gradient(circle at 50% 50%, rgba(255, 130, 160, 0.14), transparent 65%);
-      opacity: 0.75;
-      animation: fieldPulse 5s ease-in-out infinite;
-    }
-
-    .defense-field::after {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 340px;
-      height: 230px;
-      transform: translate(-50%, -60%) rotate(0deg);
-      border-radius: 32px;
-      background: conic-gradient(
-        from 120deg,
-        transparent 0deg,
-        rgba(255, 90, 130, 0.35) 70deg,
-        transparent 140deg
-      );
-      mix-blend-mode: screen;
-      opacity: 0.6;
-      animation: fieldSweep 6s linear infinite;
-    }
-
-    .defense-attackers {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 4;
-    }
-
-    .defense-shield {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 140px;
-      height: 170px;
-      transform: translate(-50%, -60%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .feature-card {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 40px 32px 36px;
       text-align: center;
-      background: linear-gradient(165deg, #f8f8fb 0%, #e2e2e8 45%, #f0f0f4 100%);
-      clip-path: polygon(50% 0%, 92% 12%, 88% 70%, 50% 100%, 12% 70%, 8% 12%);
-      box-shadow:
-        inset 0 0 18px rgba(255, 255, 255, 0.7),
-        inset 0 -12px 18px rgba(0, 0, 0, 0.08),
-        0 20px 40px rgba(0, 0, 0, 0.32),
-        0 0 22px rgba(255, 120, 140, 0.35);
-      z-index: 4;
-      animation: shieldFloat 5s ease-in-out infinite, shieldPulse 3.6s ease-in-out infinite;
-    }
-
-    .defense-shield::after {
-      content: "";
-      position: absolute;
-      inset: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      clip-path: polygon(50% 0%, 92% 12%, 88% 70%, 50% 100%, 12% 70%, 8% 12%);
-      opacity: 0.65;
-    }
-
-    .shield-content {
-      position: relative;
-      z-index: 2;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
     }
 
-    .shield-label {
-      font-size: 9px;
+    .feature-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--orange);
+      margin-bottom: 14px;
+    }
+
+    .feature-title {
+      font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+      font-size: clamp(26px, 3.5vw, 36px);
+      font-weight: 400;
+      line-height: 1.15;
+      color: var(--black);
+      margin-bottom: 10px;
+    }
+
+    .feature-sub {
+      font-size: 14px;
+      color: var(--gray-500);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .feature-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--orange);
+      text-decoration: none;
+      margin-bottom: 28px;
+      transition: gap 0.2s ease;
+    }
+
+    .feature-link:hover {
+      gap: 10px;
+    }
+
+    .feature-link .arrow {
+      font-size: 18px;
+      transition: transform 0.2s ease;
+    }
+
+    .feature-link:hover .arrow {
+      transform: translateX(2px);
+    }
+
+    /* ── Demo Card (USE BLOOM) ── */
+    .demo-card {
+      width: 100%;
+      max-width: 320px;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: left;
+    }
+
+    .demo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .demo-available {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .demo-status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--green);
+    }
+
+    .demo-status-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--green);
+      border-radius: 50%;
+    }
+
+    .demo-balance {
+      font-family: 'Inter', sans-serif;
+      font-size: 42px;
+      font-weight: 700;
+      color: var(--black);
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+
+    .demo-prompt {
+      display: inline-block;
+      padding: 8px 16px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gray-700);
+      margin-bottom: 12px;
+    }
+
+    .demo-response {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--gray-700);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .demo-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .demo-chip {
+      padding: 8px 14px;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--gray-700);
+      white-space: nowrap;
+    }
+
+    /* ── Code Card (BUILD WITH BLOOM) ── */
+    .code-card {
+      width: 100%;
+      max-width: 340px;
+      background: var(--gray-800);
+      border-radius: 14px;
+      overflow: hidden;
+      text-align: left;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 18px 10px;
+    }
+
+    .code-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .code-dot--red { background: #ff5f57; }
+    .code-dot--yellow { background: #febc2e; }
+    .code-dot--green { background: #28c840; }
+
+    .code-filename {
+      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      color: var(--gray-400);
+      margin-left: 8px;
+    }
+
+    .code-body {
+      padding: 4px 20px 24px;
+      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      color: #e2e8f0;
+    }
+
+    .code-keyword { color: #c084fc; }
+    .code-brace { color: #94a3b8; }
+    .code-string { color: #86efac; }
+    .code-comment { color: #64748b; font-style: italic; }
+    .code-method { color: #93c5fd; }
+    .code-prop { color: #fbbf24; }
+    .code-number { color: #f472b6; }
+
+    /* ── Tagline ── */
+    .tagline {
+      text-align: center;
+      padding: 64px 40px;
+      font-size: 16px;
+      font-weight: 500;
       letter-spacing: 0.28em;
       text-transform: uppercase;
-      color: rgba(26, 26, 26, 0.55);
+      color: var(--gray-400);
     }
 
-    .shield-number {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: 0.18em;
-      color: #1a1a1a;
-      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
-    }
-
-    .defense-impact {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 190px;
-      height: 190px;
-      border-radius: 999px;
-      border: 1.5px solid rgba(255, 80, 120, 0.75);
-      background: radial-gradient(circle, rgba(255, 80, 120, 0.35), transparent 60%);
-      box-shadow:
-        0 0 28px rgba(255, 90, 120, 0.9),
-        inset 0 0 22px rgba(255, 120, 150, 0.55);
-      opacity: 0;
-      pointer-events: none;
-      z-index: 5;
-      transform: translate(-50%, -60%) scale(0.7);
-      animation: defenseImpact 3.6s ease-out infinite;
-      mix-blend-mode: screen;
-    }
-
-    .defense-impact.impact-1 {
-      animation-delay: 0s;
-    }
-
-    .defense-impact.impact-2 {
-      animation-delay: 1.2s;
-    }
-
-    .defense-impact.impact-3 {
-      animation-delay: 2.4s;
-    }
-
-    .defense-hit {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 12px;
-      height: 12px;
-      border-radius: 6px;
-      background: radial-gradient(circle, rgba(255, 240, 245, 0.98) 0%, rgba(255, 110, 150, 0.9) 55%, rgba(255, 60, 100, 0.7) 100%);
-      box-shadow:
-        0 0 14px rgba(255, 90, 130, 0.95),
-        0 0 28px rgba(255, 60, 100, 0.55);
-      opacity: 0;
-      z-index: 6;
-      transform-origin: center;
-      animation: defenseHit 4.4s cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
-      mix-blend-mode: screen;
-      filter: drop-shadow(0 0 12px rgba(255, 80, 120, 0.7));
-    }
-
-    .defense-hit::before {
-      content: "";
-      position: absolute;
-      right: 100%;
-      top: 50%;
-      width: 52px;
-      height: 2px;
-      border-radius: 999px;
-      background: linear-gradient(90deg, rgba(255, 80, 120, 0), rgba(255, 120, 160, 0.65), rgba(255, 220, 235, 0.75));
-      transform: translateY(-50%);
-      opacity: 0.8;
-    }
-
-    .defense-hit::after {
-      content: "";
-      position: absolute;
-      inset: -6px;
-      border-radius: 10px;
-      border: 1px solid rgba(255, 140, 170, 0.35);
-      opacity: 0.35;
-    }
-
-    .defense-hit.hit-1 {
-      --start-x: -220px;
-      --start-y: -120px;
-      --end-x: -90px;
-      --end-y: -40px;
-      --deflect-x: -32px;
-      --deflect-y: -24px;
-      --hit-rotate: 18deg;
-      animation-delay: 0s;
-    }
-
-    .defense-hit.hit-2 {
-      --start-x: 240px;
-      --start-y: 80px;
-      --end-x: 95px;
-      --end-y: 24px;
-      --deflect-x: 36px;
-      --deflect-y: 22px;
-      --hit-rotate: 200deg;
-      animation-delay: 1.4s;
-    }
-
-    .defense-hit.hit-3 {
-      --start-x: -210px;
-      --start-y: 150px;
-      --end-x: -85px;
-      --end-y: 70px;
-      --deflect-x: -26px;
-      --deflect-y: 36px;
-      --hit-rotate: 320deg;
-      animation-delay: 2.8s;
-    }
-
-    @keyframes cardPulse {
-      0%, 100% { opacity: 0.5; transform: translate(-50%, -60%) scale(0.95); }
-      50% { opacity: 0.8; transform: translate(-50%, -60%) scale(1.05); }
-    }
-
-    @keyframes defenseImpact {
-      0% {
-        opacity: 0;
-        transform: translate(-50%, -60%) scale(0.5);
-      }
-      20% {
-        opacity: 0;
-      }
-      32% {
-        opacity: 1;
-        transform: translate(-50%, -60%) scale(0.8);
-      }
-      48% {
-        opacity: 0;
-        transform: translate(-50%, -60%) scale(1.35);
-      }
-      100% {
-        opacity: 0;
-      }
-    }
-
-    @keyframes defenseHit {
-      0% {
-        opacity: 0;
-        transform: translate(-50%, -60%) translate(var(--start-x), var(--start-y)) rotate(var(--hit-rotate)) scale(0.6);
-      }
-      18% {
-        opacity: 1;
-      }
-      52% {
-        opacity: 1;
-        transform: translate(-50%, -60%) translate(var(--end-x), var(--end-y)) rotate(var(--hit-rotate)) scale(1);
-      }
-      64% {
-        opacity: 0.65;
-        transform: translate(-50%, -60%) translate(calc(var(--end-x) + var(--deflect-x)), calc(var(--end-y) + var(--deflect-y))) rotate(var(--hit-rotate)) scale(0.25);
-      }
-      100% {
-        opacity: 0;
-        transform: translate(-50%, -60%) translate(calc(var(--end-x) + var(--deflect-x)), calc(var(--end-y) + var(--deflect-y))) rotate(var(--hit-rotate)) scale(0.2);
-      }
-    }
-
-    @keyframes fieldPulse {
-      0%, 100% {
-        opacity: 0.55;
-        transform: translate(-50%, -60%) scale(0.96);
-      }
-      50% {
-        opacity: 0.95;
-        transform: translate(-50%, -60%) scale(1.02);
-      }
-    }
-
-    @keyframes fieldSweep {
-      0% {
-        opacity: 0.25;
-        transform: translate(-50%, -60%) rotate(0deg);
-      }
-      55% {
-        opacity: 0.65;
-      }
-      100% {
-        opacity: 0.2;
-        transform: translate(-50%, -60%) rotate(360deg);
-      }
-    }
-
-    .mini-card {
-      width: 280px;
-      height: 176px;
-      position: relative;
-      transform-style: preserve-3d;
-      animation: cardSpin 8s ease-in-out infinite;
-      z-index: 3;
-    }
-
-    .mini-card-face {
-      position: absolute;
-      inset: 0;
-      border-radius: 14px;
-      backface-visibility: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      box-shadow:
-        0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
-        0 -1px 0 0 rgba(0, 0, 0, 0.05) inset,
-        0 20px 40px rgba(0, 0, 0, 0.3),
-        0 8px 16px rgba(0, 0, 0, 0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .mini-card-front {
-      background:
-        linear-gradient(165deg,
-          #e8e8ed 0%,
-          #d4d4d8 15%,
-          #f0f0f2 30%,
-          #c8c8cc 50%,
-          #e0e0e4 70%,
-          #d0d0d4 85%,
-          #e8e8ec 100%
-        );
-    }
-
-    .mini-card-back {
-      background:
-        linear-gradient(165deg,
-          #f4f4f6 0%,
-          #e4e4e8 35%,
-          #f8f8fa 70%,
-          #ededf0 100%
-        );
-      transform: rotateY(180deg);
-      padding: 12px 14px;
-    }
-
-    .mini-back-content {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .mini-section {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .mini-section-label {
-      font-size: 7px;
-      font-weight: 600;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: rgba(0, 0, 0, 0.4);
-      margin-bottom: 2px;
-    }
-
-    .mini-payment-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 9px;
-      color: #1a1a1a;
-    }
-
-    .mini-time {
-      font-size: 7px;
-      color: rgba(0, 0, 0, 0.4);
-      margin-left: 4px;
-    }
-
-    .mini-inv-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 8px;
-      color: rgba(0, 0, 0, 0.6);
-    }
-
-    .mini-inv-row > span:first-child {
-      width: 36px;
-      font-weight: 500;
-    }
-
-    .mini-inv-row > span:last-child {
-      width: 36px;
-      text-align: right;
-      color: #1a1a1a;
-    }
-
-    .mini-bar {
-      flex: 1;
-      height: 3px;
-      background: rgba(0, 0, 0, 0.1);
-      border-radius: 2px;
-    }
-
-    .mini-bar-fill {
-      height: 100%;
-      background: rgba(0, 0, 0, 0.35);
-      border-radius: 2px;
-    }
-
-    .mini-charts {
-      display: flex;
-      gap: 6px;
-      margin-top: auto;
-    }
-
-    .mini-chart {
-      flex: 1;
-      background: rgba(0, 0, 0, 0.03);
-      border-radius: 4px;
-      padding: 6px;
-    }
-
-    .mini-chart svg {
-      width: 100%;
-      height: 20px;
-    }
-
-    @keyframes cardSpin {
-      0%, 85% { transform: rotateY(0deg); }
-      92.5% { transform: rotateY(180deg); }
-      100% { transform: rotateY(360deg); }
-    }
-
-    .mini-card-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-    }
-
-    .mini-card-label {
-      font-size: 9px;
-      font-weight: 600;
-      letter-spacing: 0.24em;
-      text-transform: uppercase;
-      color: rgba(26, 26, 26, 0.55);
-    }
-
-    .mini-card-number {
-      font-size: 32px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      color: #1a1a1a;
-    }
-
-    .mini-card-delta {
-      font-size: 11px;
-      color: #16a34a;
-      font-weight: 600;
-    }
-
-    .defense-labels {
-      display: flex;
-      gap: 18px;
-      font-size: 11px;
-      letter-spacing: 0.16em;
-      color: var(--secondary);
-      position: relative;
-      z-index: 5;
-    }
-
-    .defense-label {
-      opacity: 0;
-      animation: defenseLabel 6s ease-in-out infinite;
-    }
-
-    .defense-label:nth-child(1) {
-      animation-delay: 0s;
-    }
-
-    .defense-label:nth-child(2) {
-      animation-delay: 2s;
-    }
-
-    .defense-label:nth-child(3) {
-      animation-delay: 4s;
-      color: rgba(10, 12, 24, 0.82);
-      z-index: 4;
-      pointer-events: none;
-      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35);
-    }
-
-    .cta-section {
-      padding-bottom: calc(var(--space-120) + 40px);
-    }
-
-    footer {
-      position: fixed;
-      bottom: 24px;
-      left: 24px;
-      right: 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: var(--secondary);
-      font-size: 13px;
-      letter-spacing: 0.02em;
-      z-index: 4;
-    }
-
-    footer a {
-      color: var(--secondary);
-      text-decoration: none;
-      transition: color 0.6s var(--ease-out);
-    }
-
-    footer a:hover {
-      color: var(--white);
-    }
-
-    @keyframes dustFloat {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(120px); }
-    }
-
-    @keyframes shieldPulse {
-      0% { opacity: 0.65; }
-      50% { opacity: 1; }
-      100% { opacity: 0.65; }
-    }
-
-    @keyframes defenseLabel {
-      0% { opacity: 0; transform: translateY(4px); }
-      20% { opacity: 0.75; transform: translateY(0); }
-      50% { opacity: 0.2; transform: translateY(0); }
-      100% { opacity: 0; transform: translateY(-4px); }
-    }
-
-    @keyframes shieldFloat {
-      0% { transform: translate(-50%, -60%) scale(1); }
-      50% { transform: translate(-50%, -64%) scale(1.01); }
-      100% { transform: translate(-50%, -60%) scale(1); }
-    }
-
-    @keyframes shieldImpact {
-      0% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.65);
-      }
-      26% {
-        opacity: 0;
-      }
-      34% {
-        opacity: 0.9;
-        transform: translate(-50%, -50%) scale(0.9);
-      }
-      46% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(1.15);
-      }
-      100% {
-        opacity: 0;
-      }
-    }
-
+    /* ── Architecture Section ── */
     .architecture {
       --arch-ink: #f8fafc;
       --arch-muted: rgba(226, 232, 240, 0.72);
-      --arch-muted-soft: rgba(226, 232, 240, 0.5);
       --arch-accent: #e8a87c;
       --arch-accent-strong: #f5c9a8;
       position: relative;
       z-index: 2;
       padding: 96px 0 120px;
+      background: #0f172a;
       font-family: "Space Grotesk", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
     }
 
@@ -1965,7 +610,7 @@
       border-radius: 10px;
       font-size: 16px;
       cursor: pointer;
-      transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+      transition: transform 0.2s ease, border-color 0.2s ease;
     }
 
     .architecture .stepper-btn:hover {
@@ -1985,321 +630,173 @@
     }
 
     @keyframes kernelGlow {
-      0%,
-      100% {
-        box-shadow: 0 0 60px rgba(232, 168, 124, 0.3);
-      }
-      50% {
-        box-shadow: 0 0 80px rgba(232, 168, 124, 0.5);
-      }
+      0%, 100% { box-shadow: 0 0 60px rgba(232, 168, 124, 0.3); }
+      50% { box-shadow: 0 0 80px rgba(232, 168, 124, 0.5); }
     }
 
     @keyframes flowDown {
-      from {
-        stroke-dashoffset: 0;
-      }
-      to {
-        stroke-dashoffset: -24;
-      }
+      from { stroke-dashoffset: 0; }
+      to { stroke-dashoffset: -24; }
     }
 
     @keyframes flowUp {
-      from {
-        stroke-dashoffset: 0;
-      }
-      to {
-        stroke-dashoffset: 24;
-      }
+      from { stroke-dashoffset: 0; }
+      to { stroke-dashoffset: 24; }
     }
 
+    /* ── Footer ── */
+    footer {
+      padding: 40px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--gray-400);
+      background: var(--white);
+    }
+
+    footer a {
+      color: var(--gray-500);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    footer a:hover {
+      color: var(--black);
+    }
+
+    /* ── Responsive ── */
     @media (max-width: 900px) {
-      .arch-shell {
-        padding: 0 24px;
+      .arch-shell { padding: 0 24px; }
+      .architecture .diagram { padding: 32px; min-height: 640px; }
+      .architecture .kernel-box { padding: 26px 34px; }
+      .architecture .foundation { width: 160px; }
+    }
+
+    @media (max-width: 768px) {
+      .nav-inner { padding: 14px 24px; }
+      .nav-links { gap: 20px; }
+      .nav-links a:not(.nav-cta) { display: none; }
+
+      .hero { padding: 110px 20px 60px; }
+      .hero-card { padding: 56px 24px 40px; border-radius: 24px; }
+      .hero-headline { font-size: clamp(40px, 10vw, 64px); }
+
+      .cards-row {
+        grid-template-columns: 1fr;
+        max-width: 440px;
       }
 
-      .architecture .diagram {
-        padding: 32px;
-        min-height: 640px;
-      }
+      .feature-card { padding: 32px 24px 28px; }
 
-      .architecture .kernel-box {
-        padding: 26px 34px;
-      }
-
-      .architecture .foundation {
-        width: 160px;
-      }
+      .tagline { padding: 48px 24px; font-size: 14px; letter-spacing: 0.2em; }
     }
 
     @media (max-width: 640px) {
-      .architecture {
-        padding: 72px 0 96px;
-      }
-
-      .arch-title {
-        font-size: 28px;
-      }
-
-      .architecture .diagram {
-        padding: 24px;
-        min-height: 600px;
-      }
-
-      .architecture .layer-row {
-        gap: 10px;
-      }
-
-      .architecture .kernel-box {
-        padding: 22px 28px;
-      }
-
+      .architecture { padding: 72px 0 96px; }
+      .arch-title { font-size: 28px; }
+      .architecture .diagram { padding: 24px; min-height: 600px; }
+      .architecture .layer-row { gap: 10px; }
+      .architecture .kernel-box { padding: 22px 28px; }
       .architecture .foundation {
         position: static;
         transform: none;
         width: auto;
         margin-top: 24px;
       }
-
-      .architecture .foundation[data-visible="true"] {
-        transform: none;
-      }
+      .architecture .foundation[data-visible="true"] { transform: none; }
     }
 
     @media (prefers-reduced-motion: reduce) {
       .architecture .kernel-box,
       .architecture .flow-down,
-      .architecture .flow-up {
-        animation: none;
-      }
-    }
-
-    @media (max-width: 768px) {
-      header {
-        top: 16px;
-      }
-
-      footer {
-        bottom: 16px;
-        left: 16px;
-        right: 16px;
-      }
-
-      .card-3d {
-        width: min(360px, 82vw);
-      }
-
-      .copy-states {
-        min-height: 120px;
-      }
-
-      .headline {
-        font-size: clamp(32px, 10vw, 48px);
-      }
-
-      .waitlist {
-        flex-direction: column;
-      }
-
-      .waitlist input,
-      .waitlist button {
-        width: min(320px, 100%);
-      }
-
-      .content-section {
-        padding: var(--space-80) var(--space-24);
-      }
-
-      .video-frame {
-        border-radius: 22px;
-      }
-    }
-
-    @media (max-width: 600px) {
-      .sticky-layer {
-        padding: var(--space-48) var(--space-16);
-      }
-
-      .stage {
-        gap: var(--space-16);
-      }
-
-      .copy-states {
-        min-height: 0;
-        height: auto;
-      }
-
-      .copy-block {
-        position: relative;
-        inset: auto;
-        white-space: normal;
-      }
-
-      #copy-back {
-        position: absolute;
-        inset: 0;
-      }
-
-      .headline {
-        font-size: clamp(26px, 8vw, 34px);
-      }
-
-      .subhead {
-        font-size: 14px;
-        max-width: min(320px, 92vw);
-      }
-
-      .back-content {
-        padding: 20px;
-        gap: 16px;
-      }
-
-      .section-label {
-        margin-bottom: 8px;
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .card-3d,
-      .copy-state {
-        transition: none;
-      }
-
-      .mini-card,
-      .card-glow,
-      .defense-label,
-      .defense-impact,
-      .defense-hit,
-      .defense-field::before,
-      .defense-field::after,
-      .scroll-cue-icon {
-        animation: none;
-      }
+      .architecture .flow-up { animation: none; }
     }
   </style>
 </head>
 <body>
-  <canvas id="space-bg"></canvas>
-  <canvas id="bg-particles"></canvas>
 
+  <!-- ── Header ── -->
   <header>
-    <a class="logo" href="https://paywithbloom.com" aria-label="Bloom">bloom</a>
+    <nav class="nav-inner">
+      <a class="logo" href="https://paywithbloom.com">Bloom</a>
+      <div class="nav-links">
+        <a href="#architecture">Docs</a>
+        <a href="#foundation">Foundation</a>
+        <a href="#developers">Developers</a>
+        <a href="#contact">Contact</a>
+        <a class="nav-cta" href="#waitlist">Join the List</a>
+      </div>
+    </nav>
   </header>
 
-  <main>
-    <div class="sticky-layer">
-      <div class="stage">
-        <div class="card-stage">
-          <div class="card-3d" id="bloom-card" aria-hidden="true">
-          <div class="card-face card-front" id="card-front">
-            <div class="paper-texture" aria-hidden="true"></div>
-            <div class="front-content">
-              <div class="spend-label">bloom</div>
-              <div class="spend-number" id="spend-front">$47,291</div>
-              <div class="spend-delta">+$127 today</div>
-            </div>
-          </div>
-          <div class="card-face card-back" id="card-back">
-            <div class="back-content">
-              <div class="payments-section">
-                <div class="section-label">Payments</div>
-                <div class="payments-list">
-                  <div class="payment-row">
-                    <span><span class="payment-name">Spotify</span><span class="payment-time">9:24a</span></span>
-                    <span class="payment-amount">-$12</span>
-                  </div>
-                  <div class="payment-row">
-                    <span><span class="payment-name">Blue Bottle</span><span class="payment-time">8:11a</span></span>
-                    <span class="payment-amount">-$7</span>
-                  </div>
-                  <div class="payment-row">
-                    <span><span class="payment-name">Apple</span><span class="payment-time">Yesterday</span></span>
-                    <span class="payment-amount">-$3</span>
-                  </div>
-                </div>
-              </div>
-              <div class="investments-section">
-                <div class="section-label">Investments</div>
-                <div class="investments-list">
-                  <div class="investment-row">
-                    <span class="inv-label">Cash</span>
-                    <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 35%"></div></div>
-                    <span class="inv-amount">$12,480</span>
-                  </div>
-                  <div class="investment-row">
-                    <span class="inv-label">Stocks</span>
-                    <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 55%"></div></div>
-                    <span class="inv-amount">$21,940</span>
-                  </div>
-                  <div class="investment-row">
-                    <span class="inv-label">BTC</span>
-                    <div class="inv-bar-track"><div class="inv-bar-fill" style="width: 22%"></div></div>
-                    <span class="inv-amount">$7,820</span>
-                  </div>
-                </div>
-              </div>
-              <div class="charts-section">
-                <div class="chart-box">
-                  <svg viewBox="0 0 60 40" preserveAspectRatio="none">
-                    <path d="M0,35 L8,32 L16,28 L24,30 L32,22 L40,18 L48,20 L60,12" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M0,35 L8,32 L16,28 L24,30 L32,22 L40,18 L48,20 L60,12 L60,40 L0,40 Z" fill="rgba(22,163,74,0.15)"/>
-                  </svg>
-                  <span class="chart-label">Stocks</span>
-                </div>
-                <div class="chart-box">
-                  <svg viewBox="0 0 60 40" preserveAspectRatio="none">
-                    <path d="M0,25 L8,28 L16,20 L24,32 L32,26 L40,30 L48,22 L60,18" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M0,25 L8,28 L16,20 L24,32 L32,26 L40,30 L48,22 L60,18 L60,40 L0,40 Z" fill="rgba(245,158,11,0.15)"/>
-                  </svg>
-                  <span class="chart-label">BTC</span>
-                </div>
-                <div class="chart-box">
-                  <svg viewBox="0 0 60 40" preserveAspectRatio="none">
-                    <path d="M0,30 L8,28 L16,26 L24,27 L32,24 L40,22 L48,20 L60,16" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M0,30 L8,28 L16,26 L24,27 L32,24 L40,22 L48,20 L60,16 L60,40 L0,40 Z" fill="rgba(99,102,241,0.15)"/>
-                  </svg>
-                  <span class="chart-label">ETH</span>
-                </div>
-              </div>
-              <div class="other-section">
-                <div class="section-label">Other</div>
-                <div class="other-list">
-                  <div class="other-row">
-                    <span class="other-label">Spend power</span>
-                    <span class="other-amount" id="spend-back">$47,291</span>
-                  </div>
-                  <div class="other-row">
-                    <span class="other-label">Total value</span>
-                    <span class="other-amount">$68,102</span>
-                  </div>
-                </div>
-              </div>
-              <div class="command-bar">
-                <span>⌘</span>
-                <span>Balance, transfer, buy, sell...</span>
-              </div>
-            </div>
-          </div>
-          <div class="spend-bridge" id="spend-bridge" aria-hidden="true">$47,291</div>
-          </div>
-        </div>
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-card">
+        <h1 class="hero-headline">One account.<br>Everywhere.</h1>
+        <p class="hero-sub">Banking you can talk to&mdash;across apps, assistants, and the world.</p>
 
-        <div class="copy" id="copy">
-        <div class="copy-states">
-          <div class="copy-block" id="copy-front">
+        <div class="cards-row">
+          <!-- USE BLOOM -->
+          <div class="feature-card">
+            <div class="feature-label">Use Bloom</div>
+            <h2 class="feature-title">Banking you can talk to.</h2>
+            <p class="feature-sub">One number. Always accurate. Ask any AI.</p>
+            <a href="#waitlist" class="feature-link">Get started <span class="arrow">&rarr;</span></a>
+
+            <div class="demo-card">
+              <div class="demo-header">
+                <span class="demo-available">Available</span>
+                <span class="demo-status"><span class="demo-status-dot"></span> Connected</span>
+              </div>
+              <div class="demo-balance">$847</div>
+              <div class="demo-prompt">How much do I have?</div>
+              <div class="demo-response">$847 available. $200 is set aside for rent on Thursday.</div>
+              <div class="demo-actions">
+                <span class="demo-chip">Send $50 to Mom</span>
+                <span class="demo-chip">Approve rent</span>
+                <span class="demo-chip">Subscriptions &middot; $29</span>
+              </div>
+            </div>
           </div>
-          <div class="copy-block" id="copy-back">
+
+          <!-- BUILD WITH BLOOM -->
+          <div class="feature-card">
+            <div class="feature-label">Build with Bloom</div>
+            <h2 class="feature-title">Add money to any app or agent.</h2>
+            <p class="feature-sub">Open protocol. Run the kernel anywhere.</p>
+            <a href="#architecture" class="feature-link">Read docs <span class="arrow">&rarr;</span></a>
+
+            <div class="code-card">
+              <div class="code-header">
+                <span class="code-dot code-dot--red"></span>
+                <span class="code-dot code-dot--yellow"></span>
+                <span class="code-dot code-dot--green"></span>
+                <span class="code-filename">agent.ts</span>
+              </div>
+              <div class="code-body">
+                <div><span class="code-keyword">import</span> <span class="code-brace">{</span> Bloom <span class="code-brace">}</span> <span class="code-keyword">from</span> <span class="code-string">"@bloom/sdk"</span></div>
+                <div>&nbsp;</div>
+                <div><span class="code-keyword">const</span> kernel = <span class="code-keyword">new</span> <span class="code-method">Bloom</span>(<span class="code-string">"sk_live_..."</span>)</div>
+                <div>&nbsp;</div>
+                <div><span class="code-comment">// What can this agent spend?</span></div>
+                <div><span class="code-keyword">const</span> power = <span class="code-keyword">await</span> kernel.<span class="code-method">spendPower</span>()</div>
+                <div>&nbsp;</div>
+                <div><span class="code-comment">// Hold &rarr; Execute &rarr; Receipt</span></div>
+                <div><span class="code-keyword">const</span> receipt = <span class="code-keyword">await</span> kernel.<span class="code-method">execute</span>(<span class="code-brace">{</span></div>
+                <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-prop">to</span>: <span class="code-string">"0x..."</span>, <span class="code-prop">amount</span>: <span class="code-number">50</span></div>
+                <div><span class="code-brace">}</span>)</div>
+              </div>
+            </div>
           </div>
         </div>
-        </div>
-      </div>
-      <div class="scroll-cue" aria-hidden="true">
-        <span class="scroll-cue-icon">⌃</span>
       </div>
     </div>
-    <section class="scroll-section" aria-hidden="true"></section>
-    <section class="scroll-section" aria-hidden="true"></section>
-  </main>
+  </section>
 
+  <!-- ── Tagline ── -->
+  <div class="tagline">ASK, APPROVE, DONE.</div>
+
+  <!-- ── Architecture ── -->
   <section class="architecture" id="architecture">
     <div class="arch-shell">
       <p class="arch-label">ARCHITECTURE</p>
@@ -2336,7 +833,7 @@
             <div class="layer kernel" data-layer="kernel">
               <div class="kernel-box">
                 <div class="kernel-title">BLOOM KERNEL</div>
-                <div class="kernel-sub">Policy · Ledger · Receipts</div>
+                <div class="kernel-sub">Policy &middot; Ledger &middot; Receipts</div>
               </div>
             </div>
 
@@ -2356,7 +853,7 @@
               </div>
             </div>
 
-            <div class="foundation" data-layer="foundation">
+            <div class="foundation" data-layer="foundation" id="foundation">
               <div class="foundation-label">FOUNDATION</div>
               <div class="foundation-body">Stewards protocol</div>
             </div>
@@ -2372,495 +869,11 @@
     </div>
   </section>
 
-  <script>
-    const card = document.getElementById('bloom-card');
-    const cardFront = document.getElementById('card-front');
-    const cardBack = document.getElementById('card-back');
-    const copyFront = document.getElementById('copy-front');
-    const copyBack = document.getElementById('copy-back');
-    const copy = document.getElementById('copy');
-    const spendFront = document.getElementById('spend-front');
-    const spendBack = document.getElementById('spend-back');
-    const spendBridge = document.getElementById('spend-bridge');
-    const scrollCue = document.querySelector('.scroll-cue');
-
-    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-    const lerp = (start, end, t) => start + (end - start) * t;
-
-    let targetProgress = 0;
-    let currentProgress = 0;
-    let pointerX = 0;
-    let pointerY = 0;
-    let cardMetrics = null;
-
-    if (spendBridge && spendFront) {
-      spendBridge.textContent = spendFront.textContent || '';
-    }
-
-    const updateMetrics = () => {
-      // Front: credit card shape (1.586 ratio, wider than tall)
-      const cardWidth = Math.min(450, window.innerWidth * 0.85);
-      const cardHeight = cardWidth / 1.586;
-      // Back: phone screen shape (narrower ratio to read full height)
-      const isCompact = window.innerWidth < 600 || window.innerHeight < 720;
-      const phoneAspect = window.innerWidth < 700 ? 0.46 : 0.58;
-      const maxPhoneHeight = Math.min(window.innerHeight * (isCompact ? 0.78 : 0.88), isCompact ? 680 : 760);
-      const maxPhoneWidth = window.innerWidth * (isCompact ? 0.92 : 0.96);
-      const phoneHeight = Math.min(maxPhoneHeight, maxPhoneWidth / phoneAspect);
-      const phoneWidth = phoneHeight * phoneAspect;
-      cardMetrics = {
-        cardWidth,
-        cardHeight,
-        phoneWidth,
-        phoneHeight,
-        cardRadius: 18,
-        phoneRadius: 32
-      };
-    };
-
-    updateMetrics();
-    const handlePointerMove = (event) => {
-      const x = event.clientX / window.innerWidth;
-      const y = event.clientY / window.innerHeight;
-      pointerX = (x - 0.5) * 2;
-      pointerY = (y - 0.5) * 2;
-    };
-
-    const updateSpendBridge = (progress) => {
-      if (!spendBridge || !spendFront || !spendBack || !card) return;
-      const cardRect = card.getBoundingClientRect();
-      const frontRect = spendFront.getBoundingClientRect();
-      const backRect = spendBack.getBoundingClientRect();
-      if (!frontRect.width || !backRect.width) return;
-
-      const t = clamp((progress - 0.05) / 0.9, 0, 1);
-      const fromX = frontRect.left - cardRect.left;
-      const fromY = frontRect.top - cardRect.top;
-      const toX = backRect.left - cardRect.left;
-      const toY = backRect.top - cardRect.top;
-      const scale = lerp(1, backRect.width / frontRect.width, t);
-
-      spendBridge.style.transform = `translate3d(${fromX + (toX - fromX) * t}px, ${fromY + (toY - fromY) * t}px, 0) scale(${scale.toFixed(3)})`;
-      spendBridge.style.opacity = '1';
-      spendFront.style.opacity = '0';
-      spendBack.style.opacity = '0';
-    };
-
-    const animate = () => {
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const scrollRange = window.innerHeight || 1;
-      const rawProgress = clamp(scrollTop / scrollRange, 0, 1);
-      const snapThreshold = 0.12;
-      targetProgress = rawProgress < snapThreshold ? 0 : rawProgress > 1 - snapThreshold ? 1 : rawProgress;
-      currentProgress = lerp(currentProgress, targetProgress, 0.14);
-
-      const tiltStrength = lerp(6, 0, currentProgress);
-      const baseTilt = lerp(4, 0, currentProgress);
-      const tiltX = baseTilt + pointerY * -tiltStrength;
-      const tiltY = pointerX * tiltStrength;
-
-      if (cardMetrics) {
-        const width = lerp(cardMetrics.cardWidth, cardMetrics.phoneWidth, currentProgress);
-        const height = lerp(cardMetrics.cardHeight, cardMetrics.phoneHeight, currentProgress);
-        const radius = lerp(cardMetrics.cardRadius, cardMetrics.phoneRadius, currentProgress);
-        card.style.width = `${width.toFixed(2)}px`;
-        card.style.height = `${height.toFixed(2)}px`;
-        card.style.borderRadius = `${radius.toFixed(2)}px`;
-      }
-
-      card.style.transform = `rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg)`;
-
-      const backOpacity = clamp((currentProgress - 0.82) / 0.12, 0, 1);
-      const frontOpacity = 1 - backOpacity;
-      if (cardFront) {
-        cardFront.style.opacity = frontOpacity.toFixed(2);
-      }
-      if (cardBack) {
-        cardBack.style.opacity = backOpacity.toFixed(2);
-      }
-
-      const copyProgress = clamp((currentProgress - 0.55) / 0.3, 0, 1);
-      const copyFrontOpacity = 1 - copyProgress;
-      copyFront.style.opacity = copyFrontOpacity.toFixed(2);
-      copyFront.style.transform = `translateY(${(1 - copyFrontOpacity) * 8}px)`;
-      copyBack.style.opacity = copyProgress.toFixed(2);
-      copyBack.style.transform = `translateY(${(1 - copyProgress) * -8}px)`;
-
-      if (scrollCue) {
-        const cueOpacity = clamp((0.4 - currentProgress) / 0.4, 0, 1);
-        scrollCue.style.opacity = cueOpacity.toFixed(2);
-      }
-
-      updateSpendBridge(currentProgress);
-
-      requestAnimationFrame(animate);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('resize', updateMetrics);
-
-    // Animated space background with nebulae and auroras
-    const createSpaceBackground = (canvas) => {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      let time = 0;
-      const nebulae = [];
-      const nebulaCount = 5;
-
-      const resize = () => {
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = window.innerWidth * dpr;
-        canvas.height = window.innerHeight * dpr;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      };
-
-      // Cosmic palette with richer aurora tones
-      const colors = [
-        { r: 24, g: 74, b: 150 },   // cobalt
-        { r: 110, g: 52, b: 170 },  // violet
-        { r: 30, g: 126, b: 150 },  // teal
-        { r: 140, g: 54, b: 120 },  // magenta
-        { r: 44, g: 90, b: 140 },   // indigo
-      ];
-
-      const seedNebulae = () => {
-        nebulae.length = 0;
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-
-        for (let i = 0; i < nebulaCount; i++) {
-          nebulae.push({
-            x: Math.random() * w,
-            y: Math.random() * h * 0.7,
-            baseX: Math.random() * w,
-            baseY: Math.random() * h * 0.7,
-            radius: 200 + Math.random() * 300,
-            color: colors[i % colors.length],
-            speed: 0.0003 + Math.random() * 0.0004,
-            phase: Math.random() * Math.PI * 2,
-            driftX: 0.0001 + Math.random() * 0.0002,
-            driftY: 0.00005 + Math.random() * 0.0001,
-          });
-        }
-      };
-
-      const draw = () => {
-        time += 1;
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-
-        // Base space gradient
-        const baseGradient = ctx.createLinearGradient(0, 0, 0, h);
-        baseGradient.addColorStop(0, '#05060f');
-        baseGradient.addColorStop(0.45, '#070b18');
-        baseGradient.addColorStop(1, '#030307');
-        ctx.fillStyle = baseGradient;
-        ctx.fillRect(0, 0, w, h);
-
-        const coreGlow = ctx.createRadialGradient(
-          w * 0.52, h * 0.18, 0,
-          w * 0.52, h * 0.18, h * 0.9
-        );
-        coreGlow.addColorStop(0, 'rgba(46, 68, 150, 0.35)');
-        coreGlow.addColorStop(0.4, 'rgba(22, 30, 70, 0.12)');
-        coreGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = coreGlow;
-        ctx.fillRect(0, 0, w, h);
-
-        // Draw each nebula
-        nebulae.forEach((neb, i) => {
-          // Slow organic movement
-          neb.x = neb.baseX + Math.sin(time * neb.speed + neb.phase) * 80;
-          neb.y = neb.baseY + Math.cos(time * neb.speed * 0.7 + neb.phase) * 50;
-
-          // Slowly drift the base position
-          neb.baseX += Math.sin(time * neb.driftX) * 0.3;
-          neb.baseY += Math.cos(time * neb.driftY) * 0.2;
-
-          // Wrap around
-          if (neb.baseX < -neb.radius) neb.baseX = w + neb.radius;
-          if (neb.baseX > w + neb.radius) neb.baseX = -neb.radius;
-          if (neb.baseY < -neb.radius) neb.baseY = h * 0.5;
-          if (neb.baseY > h) neb.baseY = 0;
-
-          // Pulsing radius
-          const pulseRadius = neb.radius + Math.sin(time * 0.001 + i) * 30;
-
-          // Create radial gradient
-          const gradient = ctx.createRadialGradient(
-            neb.x, neb.y, 0,
-            neb.x, neb.y, pulseRadius
-          );
-
-          // Color intensity pulses
-          const intensity = 0.28 + Math.sin(time * 0.0008 + neb.phase) * 0.12;
-
-          gradient.addColorStop(0, `rgba(${neb.color.r}, ${neb.color.g}, ${neb.color.b}, ${intensity})`);
-          gradient.addColorStop(0.4, `rgba(${neb.color.r}, ${neb.color.g}, ${neb.color.b}, ${intensity * 0.5})`);
-          gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, w, h);
-        });
-
-        // Add subtle aurora waves at the top
-        const auroraGradient = ctx.createLinearGradient(0, 0, 0, h * 0.65);
-        const auroraIntensity = 0.18 + Math.sin(time * 0.0004) * 0.06;
-        const hueShift = Math.sin(time * 0.0002) * 25;
-
-        auroraGradient.addColorStop(0, `hsla(${205 + hueShift}, 70%, 38%, ${auroraIntensity})`);
-        auroraGradient.addColorStop(0.2, `hsla(${235 + hueShift}, 65%, 32%, ${auroraIntensity * 0.75})`);
-        auroraGradient.addColorStop(0.45, `hsla(${265 + hueShift}, 60%, 28%, ${auroraIntensity * 0.55})`);
-        auroraGradient.addColorStop(0.7, `hsla(${290 + hueShift}, 55%, 26%, ${auroraIntensity * 0.35})`);
-        auroraGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-        ctx.fillStyle = auroraGradient;
-        ctx.fillRect(0, 0, w, h * 0.6);
-
-        requestAnimationFrame(draw);
-      };
-
-      resize();
-      seedNebulae();
-      requestAnimationFrame(draw);
-
-      window.addEventListener('resize', () => {
-        resize();
-        seedNebulae();
-      });
-    };
-
-    createSpaceBackground(document.getElementById('space-bg'));
-
-    const createParticles = (canvas) => {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const dustCount = 60;
-      const starCount = 4;
-      const particles = [];
-      const stars = [];
-      let lastTime = performance.now();
-
-      const resize = () => {
-        const rect = canvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      };
-
-      const spawnStar = (width, height, initialDelay = false) => {
-        const fromTop = Math.random() > 0.3;
-        const direction = Math.random() > 0.5 ? 1 : -1;
-        const angle = (Math.PI / 12) + Math.random() * (Math.PI / 4);
-
-        // Random: sometimes fast short, sometimes slow long traversal
-        const isLongTraversal = Math.random() > 0.7;
-        const speed = isLongTraversal ? 280 + Math.random() * 180 : 140 + Math.random() * 160;
-        const length = isLongTraversal ? 100 + Math.random() * 150 : 40 + Math.random() * 60;
-
-        let x, y;
-        if (fromTop) {
-          x = Math.random() * width;
-          y = -length;
-        } else {
-          x = direction > 0 ? -length : width + length;
-          y = Math.random() * height * 0.6;
-        }
-
-        // Much more random delays - sometimes long pauses
-        const baseDelay = initialDelay ? Math.random() * 6000 : Math.random() * 8000;
-        const extraPause = Math.random() > 0.6 ? Math.random() * 5000 : 0;
-
-        return {
-          x,
-          y,
-          vx: Math.cos(angle) * speed * (fromTop ? direction : 1),
-          vy: Math.sin(angle) * speed,
-          angle: fromTop ? (direction > 0 ? angle : Math.PI - angle) : (direction > 0 ? angle : Math.PI - angle),
-          length,
-          thickness: 1.5 + Math.random() * 2,
-          opacity: 0,
-          opacityBase: 0.5 + Math.random() * 0.4,
-          life: 0,
-          duration: isLongTraversal ? 2000 + Math.random() * 1500 : 800 + Math.random() * 600,
-          delay: baseDelay + extraPause
-        };
-      };
-
-      const seedParticles = () => {
-        particles.length = 0;
-        stars.length = 0;
-        const width = canvas.getBoundingClientRect().width;
-        const height = canvas.getBoundingClientRect().height;
-
-        for (let i = 0; i < dustCount; i += 1) {
-          particles.push({
-            x: Math.random() * width,
-            y: Math.random() * height,
-            baseX: Math.random() * width,
-            baseY: Math.random() * height,
-            radius: Math.random() * 1.5 + 0.5,
-            alpha: Math.random() * 0.5 + 0.2,
-            angle: Math.random() * Math.PI * 2,
-            speed: Math.random() * 0.008 + 0.003,
-            range: Math.random() * 25 + 15
-          });
-        }
-
-        for (let i = 0; i < starCount; i += 1) {
-          stars.push(spawnStar(width, height, true));
-        }
-      };
-
-      const draw = (currentTime) => {
-        const dt = Math.min(currentTime - lastTime, 50);
-        lastTime = currentTime;
-
-        const width = canvas.getBoundingClientRect().width;
-        const height = canvas.getBoundingClientRect().height;
-        ctx.clearRect(0, 0, width, height);
-
-        // Draw dust particles
-        particles.forEach((particle) => {
-          particle.angle += particle.speed;
-          particle.x = particle.baseX + Math.sin(particle.angle) * particle.range;
-          particle.y = particle.baseY + Math.cos(particle.angle * 0.7) * particle.range;
-
-          if (particle.x < -10) particle.x += width + 20;
-          if (particle.x > width + 10) particle.x -= width + 20;
-          if (particle.y < -10) particle.y += height + 20;
-          if (particle.y > height + 10) particle.y -= height + 20;
-
-          ctx.fillStyle = `rgba(255, 255, 255, ${particle.alpha})`;
-          ctx.beginPath();
-          ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        // Draw shooting stars
-        for (let i = 0; i < stars.length; i++) {
-          const star = stars[i];
-
-          if (star.delay > 0) {
-            star.delay -= dt;
-            continue;
-          }
-
-          star.life += dt / star.duration;
-          star.x += star.vx * (dt / 1000);
-          star.y += star.vy * (dt / 1000);
-
-          const lifeFade = Math.sin(Math.PI * Math.min(Math.max(star.life, 0), 1));
-          star.opacity = star.opacityBase * lifeFade;
-
-          if (star.opacity > 0.01) {
-            ctx.save();
-            ctx.translate(star.x, star.y);
-            ctx.rotate(star.angle);
-
-            // Create gradient for the tail
-            const gradient = ctx.createLinearGradient(0, 0, star.length, 0);
-            gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
-            gradient.addColorStop(0.3, `rgba(255, 210, 245, ${star.opacity * 0.3})`);
-            gradient.addColorStop(0.6, `rgba(255, 230, 250, ${star.opacity * 0.6})`);
-            gradient.addColorStop(0.85, `rgba(255, 255, 255, ${star.opacity * 0.9})`);
-            gradient.addColorStop(1, `rgba(255, 255, 255, ${star.opacity})`);
-
-            // Draw tail
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.ellipse(star.length / 2, 0, star.length / 2, star.thickness / 2, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Draw bright core/head
-            ctx.shadowColor = 'rgba(255, 230, 250, 0.8)';
-            ctx.shadowBlur = 8;
-            ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
-            ctx.beginPath();
-            ctx.arc(star.length, 0, star.thickness, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.restore();
-          }
-
-          const offscreen = star.x > width + star.length || star.y > height + star.length || star.life >= 1;
-          if (offscreen) {
-            stars[i] = spawnStar(width, height, false);
-          }
-        }
-
-        requestAnimationFrame(draw);
-      };
-
-      resize();
-      seedParticles();
-      requestAnimationFrame(draw);
-      window.addEventListener('resize', () => {
-        resize();
-        seedParticles();
-      });
-    };
-
-    createParticles(document.getElementById('bg-particles'));
-
-    const handleWaitlistSubmit = async (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const email = form.email.value.trim();
-      const phone = form.phone.value.trim();
-      if (!email) return;
-
-      try {
-        const response = await fetch('/api/waitlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, phone })
-        });
-
-        if (!response.ok) {
-          throw new Error('Waitlist endpoint unavailable');
-        }
-      } catch (error) {
-        const stored = JSON.parse(localStorage.getItem('bloom_waitlist') || '[]');
-        stored.push({ email, phone, timestamp: new Date().toISOString() });
-        localStorage.setItem('bloom_waitlist', JSON.stringify(stored));
-      }
-
-      const container = form.closest('.copy') || copy;
-      if (container) {
-        container.classList.add('success');
-      }
-    };
-
-    document.querySelectorAll('.waitlist').forEach((form) => {
-      form.addEventListener('submit', handleWaitlistSubmit);
-    });
-
-    const commandVideo = document.getElementById('command-video');
-    if (commandVideo && 'IntersectionObserver' in window) {
-      commandVideo.muted = true;
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) {
-            commandVideo.pause();
-            return;
-          }
-
-          const playPromise = commandVideo.play();
-          if (playPromise && typeof playPromise.catch === 'function') {
-            playPromise.catch(() => {});
-          }
-        });
-      }, { threshold: 0.4 });
-
-      observer.observe(commandVideo);
-    }
-
-    requestAnimationFrame(animate);
-  </script>
+  <footer>
+    <span>&copy; 2025 Bloom</span>
+  </footer>
+
+  <!-- ── Architecture stepper JS ── -->
   <script>
     (() => {
       const STEP_COUNT = 7;
@@ -2974,16 +987,11 @@
         const hBlockchains = elements.layers.blockchains?.offsetHeight ?? 0;
 
         const total =
-          hInterfaces +
-          gaps.interfaces +
-          hActions +
-          gaps.actions +
-          hSpend +
-          gaps.spend +
-          hKernel +
-          gaps.kernel +
-          hAdapters +
-          gaps.adapters +
+          hInterfaces + gaps.interfaces +
+          hActions + gaps.actions +
+          hSpend + gaps.spend +
+          hKernel + gaps.kernel +
+          hAdapters + gaps.adapters +
           hBlockchains;
 
         const extra = Math.max(0, height - total);
@@ -3028,14 +1036,8 @@
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const offset = dx * 0.3;
-        const c1 = {
-          x: start.x + offset,
-          y: start.y + dy * 0.4
-        };
-        const c2 = {
-          x: end.x - offset,
-          y: start.y + dy * 0.6
-        };
+        const c1 = { x: start.x + offset, y: start.y + dy * 0.4 };
+        const c2 = { x: end.x - offset, y: start.y + dy * 0.6 };
         return `M ${start.x} ${start.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${end.x} ${end.y}`;
       };
 
@@ -3048,12 +1050,8 @@
         path.setAttribute("stroke-width", config.width ?? 2);
         path.setAttribute("stroke-linecap", "round");
         path.setAttribute("stroke-dasharray", config.dash ?? "8 4");
-        if (config.opacity) {
-          path.setAttribute("stroke-opacity", String(config.opacity));
-        }
-        if (config.animated) {
-          path.classList.add(config.direction === "up" ? "flow-up" : "flow-down");
-        }
+        if (config.opacity) path.setAttribute("stroke-opacity", String(config.opacity));
+        if (config.animated) path.classList.add(config.direction === "up" ? "flow-up" : "flow-down");
         fragment.appendChild(path);
       };
 
@@ -3091,91 +1089,39 @@
           const actionsTop = getPoint(actionsRow, "top");
           const interfacesBottom = nodes.interfaces.map((node) => getPoint(node, "bottom"));
           const maxInterfaceBottom = Math.max(...interfacesBottom.map((pt) => pt.y));
-          const junction = {
-            x: actionsTop.x,
-            y: maxInterfaceBottom + (actionsTop.y - maxInterfaceBottom) * 0.5
-          };
+          const junction = { x: actionsTop.x, y: maxInterfaceBottom + (actionsTop.y - maxInterfaceBottom) * 0.5 };
 
           interfacesBottom.forEach((point) => {
-            addLine(fragment, {
-              start: point,
-              end: junction,
-              direction: "down",
-              animated: true,
-              stroke: "url(#lineGradientDown)"
-            });
+            addLine(fragment, { start: point, end: junction, direction: "down", animated: true, stroke: "url(#lineGradientDown)" });
           });
-
-          addLine(fragment, {
-            start: junction,
-            end: actionsTop,
-            direction: "down",
-            animated: true,
-            stroke: "url(#lineGradientDown)"
-          });
+          addLine(fragment, { start: junction, end: actionsTop, direction: "down", animated: true, stroke: "url(#lineGradientDown)" });
         }
 
         if (state.step >= 4 && nodes.actions.length) {
           const spendTop = getPoint(elements.layers.spend, "top");
           const actionsBottom = nodes.actions.map((node) => getPoint(node, "bottom"));
-          const minSpendTop = spendTop.y;
           const maxActionBottom = Math.max(...actionsBottom.map((pt) => pt.y));
-          const junction = {
-            x: spendTop.x,
-            y: maxActionBottom + (minSpendTop - maxActionBottom) * 0.5
-          };
+          const junction = { x: spendTop.x, y: maxActionBottom + (spendTop.y - maxActionBottom) * 0.5 };
 
           actionsBottom.forEach((point) => {
-            addLine(fragment, {
-              start: point,
-              end: junction,
-              direction: "down",
-              animated: true,
-              stroke: "url(#lineGradientDown)"
-            });
+            addLine(fragment, { start: point, end: junction, direction: "down", animated: true, stroke: "url(#lineGradientDown)" });
           });
-
-          addLine(fragment, {
-            start: junction,
-            end: spendTop,
-            direction: "down",
-            animated: true,
-            stroke: "url(#lineGradientDown)"
-          });
+          addLine(fragment, { start: junction, end: spendTop, direction: "down", animated: true, stroke: "url(#lineGradientDown)" });
         }
 
         if (state.step >= 2) {
-          addLine(fragment, {
-            start: getPoint(elements.layers.spend, "bottom"),
-            end: getPoint(elements.layers.kernel, "top"),
-            direction: "down",
-            animated: true,
-            stroke: "url(#lineGradientDown)"
-          });
+          addLine(fragment, { start: getPoint(elements.layers.spend, "bottom"), end: getPoint(elements.layers.kernel, "top"), direction: "down", animated: true, stroke: "url(#lineGradientDown)" });
         }
 
         if (state.step >= 3) {
           const kernelBottom = getPoint(elements.layers.kernel, "bottom");
           nodes.adapters.forEach((node) => {
-            addLine(fragment, {
-              start: getPoint(node, "top"),
-              end: kernelBottom,
-              direction: "up",
-              animated: true,
-              stroke: "url(#lineGradientUp)"
-            });
+            addLine(fragment, { start: getPoint(node, "top"), end: kernelBottom, direction: "up", animated: true, stroke: "url(#lineGradientUp)" });
           });
-
           nodes.blockchains.forEach((node, index) => {
             const adapter = nodes.adapters[index];
             if (!adapter) return;
-            addLine(fragment, {
-              start: getPoint(node, "top"),
-              end: getPoint(adapter, "bottom"),
-              direction: "up",
-              animated: true,
-              stroke: "url(#lineGradientUp)"
-            });
+            addLine(fragment, { start: getPoint(node, "top"), end: getPoint(adapter, "bottom"), direction: "up", animated: true, stroke: "url(#lineGradientUp)" });
           });
         }
 
@@ -3185,29 +1131,18 @@
           addLine(fragment, {
             start: { x: kernelRight.x + 12, y: kernelRight.y },
             end: { x: foundationLeft.x - 12, y: foundationLeft.y },
-            direction: "down",
-            animated: false,
-            stroke: "url(#lineGradientSoft)",
-            dash: "6 6",
-            opacity: 0.6
+            direction: "down", animated: false,
+            stroke: "url(#lineGradientSoft)", dash: "6 6", opacity: 0.6
           });
         }
 
         elements.svg.appendChild(fragment);
       };
 
-      const handleResize = () => {
-        layoutLayers();
-        renderLines();
-      };
+      const handleResize = () => { layoutLayers(); renderLines(); };
 
-      if (elements.prevButton) {
-        elements.prevButton.addEventListener("click", () => setStep(state.step - 1));
-      }
-
-      if (elements.nextButton) {
-        elements.nextButton.addEventListener("click", () => setStep(state.step + 1));
-      }
+      if (elements.prevButton) elements.prevButton.addEventListener("click", () => setStep(state.step - 1));
+      if (elements.nextButton) elements.nextButton.addEventListener("click", () => setStep(state.step + 1));
 
       window.addEventListener("resize", handleResize);
 
